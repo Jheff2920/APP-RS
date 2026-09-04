@@ -1,0 +1,21 @@
+services:
+  flutter:
+    build: .
+    volumes:
+      - .:/app
+      - flutter-pub-cache:/root/.pub-cache
+      - flutter-sdk-cache:/sdks/flutter/.pub-cache
+      # Misma firma debug entre builds (evita INSTALL_FAILED_UPDATE_INCOMPATIBLE)
+      - android-debug-keystore:/root/.android
+    environment:
+      - ANDROID_HOME=/opt/android-sdk-linux
+      - GRADLE_USER_HOME=/root/.gradle
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    stdin_open: true
+    tty: true
+
+volumes:
+  flutter-pub-cache:
+  flutter-sdk-cache:
+  android-debug-keystore:
