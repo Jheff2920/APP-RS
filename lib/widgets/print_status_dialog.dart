@@ -154,7 +154,8 @@ Future<T> runWithPrintStatusDialog<T>({
       phase.value = p;
     });
     phase.value = PrintPhase.done;
-    await Future<void>.delayed(const Duration(milliseconds: 450));
+    // Confirmación visual breve; el transporte ya terminó y no requiere 450 ms.
+    await Future<void>.delayed(const Duration(milliseconds: 150));
     return result;
   } finally {
     if (nav.mounted && nav.canPop()) {

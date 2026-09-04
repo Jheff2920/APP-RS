@@ -2,12 +2,13 @@ import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 
 import '../models/paper_width.dart';
 import '../models/saved_printer.dart';
+import 'escpos_capability_profile.dart';
 import 'escpos_feed.dart';
 
 class EscPosTestPage {
   /// Genera bytes ESC/POS de una pagina de prueba con regla de calibracion.
   static Future<List<int>> build(SavedPrinter printer) async {
-    final profile = await CapabilityProfile.load();
+    final profile = await EscPosCapabilityProfile.load;
     final paperSize =
         printer.paper == PaperWidth.mm58 ? PaperSize.mm58 : PaperSize.mm80;
     final generator = Generator(paperSize, profile);
@@ -86,7 +87,8 @@ class EscPosTestPage {
     leftLine('Texto en negrita.', styles: const PosStyles(bold: true));
     leftLine('Si la regla se corta, sube margenes.');
     leftLine('Borde blanco L/R ~5mm en 58mm es fisico.');
-    leftLine('Inf=${margins.bottomMm.toStringAsFixed(0)}mm = avance para cortar.');
+    leftLine(
+        'Inf=${margins.bottomMm.toStringAsFixed(0)}mm = avance para cortar.');
 
     // Margen inferior + corte opcional (RawBT: feed luego cutPaper).
     bytes += EscPosFeed.finishJob(

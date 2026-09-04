@@ -4,12 +4,15 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.example.hello_world_app.printservice.PrintTiming
 import io.flutter.FlutterInjector
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -28,17 +31,49 @@ object PrintEngineBridge {
 
     private val main = Handler(Looper.getMainLooper())
     private val lock = Any()
+    private val warmupExecutor = Executors.newSingleThreadExecutor()
+    private val warmupScheduled = AtomicBoolean(false)
+
+    fun prewarm(context: Context) {
+        if (engine != null && dartReady) return
+        if (!warmupScheduled.compareAndSet(false, true)) return
+        warmupExecutor.execute {
+            val startedAt = PrintTiming.now()
+            try {
+                val coldStart = ensureEngine(context.applicationContext)
+                PrintTiming.phase(
+                    "prewarm",
+                    "engine_prewarm",
+                    startedAt,
+                    mapOf("cold" to coldStart),
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Engine prewarm failed", e)
+            } finally {
+                warmupScheduled.set(false)
+            }
+        }
+    }
 
     fun rasterize(
         context: Context,
         filePath: String,
         printerId: String,
-    ): String {
-        ensureEngine(context.applicationContext)
+        jobId: String,
+    ): ByteArray {
+        val engineStartedAt = PrintTiming.now()
+        val coldStart = ensureEngine(context.applicationContext)
+        PrintTiming.phase(
+            jobId,
+            "engine_ready",
+            engineStartedAt,
+            mapOf("cold" to coldStart),
+        )
 
         val latch = CountDownLatch(1)
-        val resultPath = AtomicReference<String?>(null)
+        val resultBytes = AtomicReference<ByteArray?>(null)
         val error = AtomicReference<String?>(null)
+        val rasterStartedAt = PrintTiming.now()
 
         main.post {
             try {
@@ -53,10 +88,11 @@ object PrintEngineBridge {
                         mapOf(
                             "filePath" to filePath,
                             "printerId" to printerId,
+                            "jobId" to jobId,
                         ),
                         object : MethodChannel.Result {
                             override fun success(result: Any?) {
-                                resultPath.set(result as? String)
+                                resultBytes.set(result as? ByteArray)
                                 latch.countDown()
                             }
 
@@ -81,15 +117,16 @@ object PrintEngineBridge {
         if (!latch.await(120, TimeUnit.SECONDS)) {
             throw IllegalStateException("Tiempo agotado preparando el ticket")
         }
+        PrintTiming.phase(jobId, "raster_channel", rasterStartedAt)
         error.get()?.let { throw IllegalStateException(it) }
-        return resultPath.get()
-            ?: throw IllegalStateException("Sin archivo ESC/POS")
+        return resultBytes.get()
+            ?: throw IllegalStateException("Sin bytes ESC/POS")
     }
 
-    private fun ensureEngine(appContext: Context) {
-        if (engine != null && dartReady) return
+    private fun ensureEngine(appContext: Context): Boolean {
+        if (engine != null && dartReady) return false
         synchronized(lock) {
-            if (engine != null && dartReady) return
+            if (engine != null && dartReady) return false
 
             val readyLatch = CountDownLatch(1)
             val initError = AtomicReference<String?>(null)
@@ -144,6 +181,7 @@ object PrintEngineBridge {
             // Tras engineReady, el handler nativo solo escuchaba eso.
             // Reemplazar no hace falta: rasterize usa invokeMethod, no el handler.
             // Pero hay que poner el handler Dart en system_print_main para rasterize.
+            return true
         }
     }
 }

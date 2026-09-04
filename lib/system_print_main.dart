@@ -4,17 +4,17 @@ import 'dart:ui' show DartPluginRegistrant;
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:path_provider/path_provider.dart';
 
 import 'models/saved_printer.dart';
 import 'services/escpos_pdf_print.dart';
 import 'services/print_service.dart';
+import 'services/print_timing.dart';
 import 'services/printer_permissions.dart';
 import 'services/printer_store.dart';
 import 'services/transports/printer_transport.dart';
 import 'widgets/print_status_dialog.dart';
 
-/// Entrypoint headless: PrintService rasteriza PDF → archivo `.bin` ESC/POS.
+/// Entrypoint headless: PrintService rasteriza PDF → bytes ESC/POS.
 @pragma('vm:entry-point')
 void systemPrintMain() {
   DartPluginRegistrant.ensureInitialized();
@@ -30,14 +30,17 @@ void systemPrintMain() {
     final args = Map<String, dynamic>.from(call.arguments as Map? ?? {});
     final filePath = args['filePath'] as String? ?? '';
     final printerId = args['printerId'] as String? ?? '';
+    final jobId = args['jobId'] as String? ?? '';
     if (filePath.isEmpty) {
       throw PlatformException(code: 'bad_args', message: 'filePath vacio');
     }
 
+    final prefsWatch = Stopwatch()..start();
     final printer = PrinterStore.findByIdOrDefault(
       await store.loadAll(),
       printerId,
     );
+    prefsWatch.stop();
     if (printer == null) {
       throw PlatformException(
         code: 'no_printer',
@@ -45,17 +48,31 @@ void systemPrintMain() {
       );
     }
 
-    final lower = filePath.toLowerCase();
-    final bytes = lower.endsWith('.pdf')
-        ? await EscPosPdfPrint.build(printer, filePath: filePath)
-        : await EscPosPdfPrint.buildImageFile(printer, filePath: filePath);
-
-    final dir = await getTemporaryDirectory();
-    final out = File(
-      '${dir.path}/escpos_${DateTime.now().millisecondsSinceEpoch}.bin',
+    final timing = PrintTiming.forPrinter(
+      jobId: jobId.isEmpty ? null : jobId,
+      source: 'system-headless',
+      printer: printer,
     );
-    await out.writeAsBytes(bytes, flush: true);
-    return out.path;
+    timing.duration('load_preferences', prefsWatch.elapsed);
+    try {
+      final lower = filePath.toLowerCase();
+      final bytes = lower.endsWith('.pdf')
+          ? await EscPosPdfPrint.build(
+              printer,
+              filePath: filePath,
+              timing: timing,
+            )
+          : await EscPosPdfPrint.buildImageFile(
+              printer,
+              filePath: filePath,
+              timing: timing,
+            );
+      timing.finish(ok: true, bytes: bytes.length);
+      return Uint8List.fromList(bytes);
+    } catch (_) {
+      timing.finish(ok: false);
+      rethrow;
+    }
   });
 
   unawaited(channel.invokeMethod<void>('engineReady'));
@@ -96,7 +113,8 @@ class SystemPrintUiHandler {
 
   Future<void> _drainPending() async {
     try {
-      final pending = await _channel.invokeMethod<Map>('takePendingSystemPrint');
+      final pending =
+          await _channel.invokeMethod<Map>('takePendingSystemPrint');
       if (pending == null) return;
       await _runSystemPrint(Map<String, dynamic>.from(pending));
     } catch (e) {
@@ -143,10 +161,7 @@ class SystemPrintUiHandler {
       if (!await src.exists()) {
         throw PrinterTransportException('No se encontro el PDF');
       }
-      final dir = await getTemporaryDirectory();
-      final filePath =
-          '${dir.path}/boleta_ui_${DateTime.now().millisecondsSinceEpoch}.pdf';
-      await src.copy(filePath);
+      final filePath = src.path;
 
       if (printer.type == PrinterLinkType.bluetooth) {
         final ok = await PrinterPermissions.ensureBluetooth();
@@ -172,6 +187,7 @@ class SystemPrintUiHandler {
             source: 'system',
             onPhase: setPhase,
             requestPermissions: false,
+            jobId: token.isEmpty ? null : token,
           ),
         );
       } else {
@@ -180,6 +196,7 @@ class SystemPrintUiHandler {
           filePath: filePath,
           source: 'system',
           requestPermissions: false,
+          jobId: token.isEmpty ? null : token,
         );
       }
 
@@ -189,6 +206,13 @@ class SystemPrintUiHandler {
     } catch (e) {
       await _notify(token: token, ok: false, message: '$e');
     } finally {
+      if (rawPath.isNotEmpty) {
+        try {
+          await File(rawPath).delete();
+        } catch (_) {
+          // El PrintService también intenta limpiar; borrar es idempotente.
+        }
+      }
       _busy = false;
     }
   }

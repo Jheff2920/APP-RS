@@ -15,7 +15,7 @@ object EscPosTransport {
     private const val TAG = "EscPosTransport"
     private val SPP: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
-    fun sendBluetooth(mac: String, data: ByteArray) {
+    fun sendBluetooth(mac: String, data: ByteArray, jobId: String) {
         val adapter = BluetoothAdapter.getDefaultAdapter()
             ?: throw IllegalStateException("Bluetooth no disponible")
         if (!adapter.isEnabled) {
@@ -34,28 +34,49 @@ object EscPosTransport {
                 m.invoke(device, 1) as BluetoothSocket
             }
             adapter.cancelDiscovery()
+            val connectStartedAt = PrintTiming.now()
             socket.connect()
+            PrintTiming.phase(jobId, "bluetooth_connect", connectStartedAt)
             val out = socket.outputStream
-            out.write(data)
+            val ranges = EscPosChunker.ranges(data)
+            val writeStartedAt = PrintTiming.now()
+            for (range in ranges) {
+                out.write(data, range.offset, range.length)
+            }
             out.flush()
             Thread.sleep(80)
+            PrintTiming.phase(
+                jobId,
+                "bluetooth_write",
+                writeStartedAt,
+                mapOf("bytes" to data.size, "chunks" to ranges.size),
+            )
         } finally {
             try {
                 socket?.close()
             } catch (_: Exception) {
             }
         }
-        Log.i(TAG, "Sent ${data.size} bytes (single write)")
+        Log.i(TAG, "Sent ${data.size} bytes")
     }
 
-    fun sendNetwork(host: String, port: Int, data: ByteArray) {
+    fun sendNetwork(host: String, port: Int, data: ByteArray, jobId: String) {
         Socket().use { socket ->
+            val connectStartedAt = PrintTiming.now()
             socket.connect(InetSocketAddress(host.trim(), port), 8_000)
+            PrintTiming.phase(jobId, "network_connect", connectStartedAt)
             socket.soTimeout = 30_000
             val out = socket.getOutputStream()
+            val writeStartedAt = PrintTiming.now()
             out.write(data)
             out.flush()
             Thread.sleep(50)
+            PrintTiming.phase(
+                jobId,
+                "network_write",
+                writeStartedAt,
+                mapOf("bytes" to data.size, "chunks" to 1),
+            )
         }
         Log.i(TAG, "Sent ${data.size} bytes TCP")
     }

@@ -8,6 +8,7 @@ import '../widgets/print_status_dialog.dart';
 import 'escpos_pdf_print.dart';
 import 'escpos_test_page.dart';
 import 'print_history_store.dart';
+import 'print_timing.dart';
 import 'printer_permissions.dart';
 import 'transports/printer_transport.dart';
 import 'transports/printer_transport_factory.dart';
@@ -17,6 +18,7 @@ class PrintService {
       : _history = history ?? PrintHistoryStore();
 
   final PrintHistoryStore _history;
+  Future<void> _historyWrites = Future<void>.value();
 
   PrintHistoryStore get history => _history;
 
@@ -29,7 +31,7 @@ class PrintService {
       title: 'Pagina de prueba',
       source: 'test',
       onPhase: onPhase,
-      buildBytes: () => EscPosTestPage.build(printer),
+      buildBytes: (_) => EscPosTestPage.build(printer),
     );
   }
 
@@ -40,6 +42,7 @@ class PrintService {
     void Function(PrintPhase phase)? onPhase,
     String source = 'share',
     bool requestPermissions = true,
+    String? jobId,
   }) async {
     final name = p.basename(filePath);
     final lower = filePath.toLowerCase();
@@ -48,14 +51,23 @@ class PrintService {
       printer: printer,
       title: name,
       source: source,
+      jobId: jobId,
       onPhase: onPhase,
       requestPermissions: requestPermissions,
-      buildBytes: () async {
+      buildBytes: (timing) async {
         if (lower.endsWith('.pdf')) {
-          return EscPosPdfPrint.build(printer, filePath: filePath);
+          return EscPosPdfPrint.build(
+            printer,
+            filePath: filePath,
+            timing: timing,
+          );
         }
         if (_isImage(lower)) {
-          return EscPosPdfPrint.buildImageFile(printer, filePath: filePath);
+          return EscPosPdfPrint.buildImageFile(
+            printer,
+            filePath: filePath,
+            timing: timing,
+          );
         }
         throw PrinterTransportException(
           'Formato no soportado aun. Usa PDF o imagen (PNG/JPG).',
@@ -68,7 +80,8 @@ class PrintService {
     required SavedPrinter printer,
     required String title,
     required String source,
-    required Future<List<int>> Function() buildBytes,
+    required Future<List<int>> Function(PrintTiming timing) buildBytes,
+    String? jobId,
     void Function(PrintPhase phase)? onPhase,
     bool requestPermissions = true,
   }) async {
@@ -78,67 +91,113 @@ class PrintService {
       await Future<void>.delayed(Duration.zero);
     }
 
-    if (requestPermissions && printer.type == PrinterLinkType.bluetooth) {
-      final ok = await PrinterPermissions.ensureBluetooth();
-      if (!ok) {
+    final timing = PrintTiming.forPrinter(
+      jobId: jobId,
+      source: source,
+      printer: printer,
+    );
+    final transport = PrinterTransportFactory.create(printer);
+    var succeeded = false;
+    int? byteCount;
+    try {
+      if (requestPermissions && printer.type == PrinterLinkType.bluetooth) {
+        final ok = await PrinterPermissions.ensureBluetooth();
+        if (!ok) {
+          throw PrinterTransportException(
+            'Faltan permisos de Bluetooth. Concedelos en Ajustes de la app.',
+          );
+        }
+      }
+
+      if (printer.address.trim().isEmpty) {
         throw PrinterTransportException(
-          'Faltan permisos de Bluetooth. Concedelos en Ajustes de la app.',
+          'La direccion de la impresora esta vacia.',
         );
       }
-    }
 
-    if (printer.address.trim().isEmpty) {
-      throw PrinterTransportException('La direccion de la impresora esta vacia.');
-    }
-
-    final transport = PrinterTransportFactory.create(printer);
-    try {
       phase(PrintPhase.preparing);
       await paint();
-      final bytes = await buildBytes().timeout(
-        const Duration(seconds: 90),
-        onTimeout: () => throw PrinterTransportException(
-          'Tiempo agotado preparando el ticket (PDF).',
+      final bytes = await timing.measure(
+        'prepare',
+        () => buildBytes(timing).timeout(
+          const Duration(seconds: 90),
+          onTimeout: () => throw PrinterTransportException(
+            'Tiempo agotado preparando el ticket (PDF).',
+          ),
         ),
       );
+      byteCount = bytes.length;
 
       phase(PrintPhase.connecting);
       await paint();
-      await transport.connect(printer).timeout(
-        const Duration(seconds: 45),
-        onTimeout: () => throw PrinterTransportException(
-          'No se pudo conectar con la impresora (tiempo agotado).',
-        ),
+      await timing.measure(
+        'connect',
+        () => transport.connect(printer).timeout(
+              const Duration(seconds: 45),
+              onTimeout: () => throw PrinterTransportException(
+                'No se pudo conectar con la impresora (tiempo agotado).',
+              ),
+            ),
       );
 
       phase(PrintPhase.sending);
       await paint();
-      await transport.writeBytes(bytes);
+      await timing.measure(
+        'write',
+        () => transport.writeBytes(bytes),
+        fields: {'bytes': bytes.length},
+      );
 
       phase(PrintPhase.printing);
       await paint();
-      await Future<void>.delayed(const Duration(milliseconds: 400));
-
-      await _history.add(
+      succeeded = true;
+      _recordHistory(
         title: title,
-        printerId: printer.id,
-        printerName: printer.name,
+        printer: printer,
         status: PrintJobStatus.success,
         source: source,
       );
     } catch (e) {
-      await _history.add(
+      timing.event('error', fields: {'error_type': e.runtimeType.toString()});
+      _recordHistory(
         title: title,
-        printerId: printer.id,
-        printerName: printer.name,
+        printer: printer,
         status: PrintJobStatus.failed,
         source: source,
         error: e.toString(),
       );
       rethrow;
     } finally {
-      await transport.disconnect();
+      try {
+        await timing.measure('disconnect', transport.disconnect);
+      } finally {
+        timing.finish(ok: succeeded, bytes: byteCount);
+      }
     }
+  }
+
+  void _recordHistory({
+    required String title,
+    required SavedPrinter printer,
+    required PrintJobStatus status,
+    required String source,
+    String? error,
+  }) {
+    // Serializar escrituras evita perder registros sin bloquear el cierre visual.
+    _historyWrites = _historyWrites.then((_) async {
+      try {
+        await _history.add(
+          title: title,
+          printerId: printer.id,
+          printerName: printer.name,
+          status: status,
+          source: source,
+          error: error,
+        );
+      } catch (_) {
+        // El historial no debe convertir una impresión enviada en un fallo.
+      }
+    });
   }
 
   static bool _isImage(String path) {
