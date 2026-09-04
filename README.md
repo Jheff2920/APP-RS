@@ -4,33 +4,36 @@ Controlador Android de impresoras térmicas ESC/POS (58 / 80 / 110 mm).
 **No diseña boletas** — el POS las genera (PDF/imagen); esta app las imprime.
 
 **Repo:** https://github.com/Jheff2920/APP-RS  
-**Versión:** 1.5.6+13 · Package ID: `com.example.hello_world_app`
+**Versión:** 1.5.6+13 · Package ID: `com.example.hello_world_app`  
+**Rama estable:** `main` · **Rama de pruebas:** `test/pruebas`
 
-> Memoria técnica para agentes: [CONTEXTO.md](CONTEXTO.md)
+> Memoria técnica: [CONTEXTO.md](CONTEXTO.md) · Rendimiento: [docs/PRINT_PERFORMANCE.md](docs/PRINT_PERFORMANCE.md)
+
+---
+
+## Dónde quedamos (2026-09-04)
+
+- Impresión PDF/prueba **estable** (márgenes de config, corte, PrintService + overlay).
+- Mejoras de rendimiento fusionadas a `main` (GS v0 más rápido, chunking BT, timing).
+- Repo limpio en GitHub (sin dumps de ejemplo ni secretos).
+
+**Mañana:** seguir en `test/pruebas` para experimentos; si algo sale bien → merge a `main`.
 
 ---
 
 ## Flujo de trabajo (no romper `main`)
 
-`main` es la base estable. Las pruebas y experimentos van en ramas:
-
 ```powershell
-# Partir siempre desde main actualizado
 git checkout main
 git pull
-
-# Rama de pruebas
-git checkout -b test/pruebas
-# ... cambios de prueba ...
+git checkout test/pruebas   # o: git checkout -b test/nueva-prueba
+# ... cambios ...
 git add -A
 git commit -m "Prueba: describe el cambio"
-git push -u origin test/pruebas
+git push -u origin HEAD
 ```
 
-Cuando algo salga bien: abre un Pull Request de `test/pruebas` → `main` en GitHub.  
-No hagas push directo a `main` salvo hotfixes claros.
-
-Rama lista para experimentar: **`test/pruebas`**.
+Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 ---
 
@@ -40,63 +43,58 @@ Rama lista para experimentar: **`test/pruebas`**.
 |-------|-----------|
 | Bluetooth Classic + WiFi TCP :9100 | v2: jobs HTTP/cola del POS |
 | Compartir PDF/imagen → imprimir | USB/OTG |
-| **PrintService** del sistema (diálogo Imprimir) | iOS |
-| Overlay flotante (imprime sin saltar a la app) | |
-| Tamaños de papel: 58 / 58 Max / 80 / **80 Max** / 110 | |
-| Historial, márgenes L/R/inferior, página de prueba | |
-| Márgenes de config aplican igual a PDF y a prueba | |
-| Corte automático ESC/POS | |
-| Alta de impresora sin duplicados (ID estable + dedupe MAC) | |
-| Repo limpio (sin dumps de ejemplo / secretos) | |
+| PrintService + overlay flotante | iOS |
+| Papel 58 / 58 Max / 80 / 80 Max / 110 | |
+| Márgenes L/R/inf + corte (config manda en PDF y prueba) | |
+| Dedupe impresoras (ID estable + MAC) | |
+| Pipeline más rápido + métricas `BoletaPrintTiming` | |
+| Tests GS v0 / EscPosChunker + benchmark local | |
+| Repo limpio en GitHub | |
 
 ---
 
 ## Qué hace
 
 1. Vincular impresoras BT (emparejadas en Android) o WiFi.
-2. Configurar **antes de guardar**: nombre, conexión, rollo 58/80, márgenes, corte, predeterminada.
-3. **Compartir** un PDF/imagen a Boleta Print → imprimir.
-4. Desde otra app: **Imprimir** → Boleta Print → recuadro flotante encima (no cambia de app).
-5. Raster térmico `GS v 0` (mismo pipeline en Compartir y sistema).
+2. Configurar antes de guardar: rollo, márgenes, corte, predeterminada.
+3. Compartir PDF/imagen → imprimir.
+4. Diálogo **Imprimir** del sistema → overlay sin saltar de app.
+5. Raster `GS v 0` (Compartir y PrintService).
 
 ---
 
-## Ajustes de la impresora (mandan en todo)
-
-Lo que guardas en **Editar impresora** se aplica a **PDF, imagen y página de prueba**:
+## Ajustes de la impresora
 
 | Ajuste | Efecto |
 |--------|--------|
 | Papel 58 / 80 mm | Ancho del raster (384 / 576 dots) |
-| Margen izquierdo / derecho | Blanco dentro del área imprimible (no se recorta) |
-| Margen inferior | Avance al terminar el ticket |
-| Corte | Tras el margen inferior, envía el comando de cuchilla |
+| Márgenes L/R | Blanco en el área imprimible |
+| Margen inferior | Avance al terminar |
+| Corte | Después del margen inferior |
 
-Flujo de cierre: **contenido → avance inferior (si > 0) → corte (si no es «Sin corte»)**.
-
-> Tras cambiar márgenes o corte, pulsa **Guardar**.
+**contenido → avance inferior → corte**. Guardar tras cambiar ajustes.
 
 ---
 
 ## Activar impresión del sistema
 
-1. Abre **Boleta Print** y vincula la impresora (elige 58 u 80 mm al guardar).
-2. Concede **Mostrar sobre otras apps** (necesario en Android 10+ para el recuadro).
-3. **Ajustes → Impresión** → activa **Boleta Print**.
-4. PDF → **Imprimir** → elige la impresora → opcional: **Rollo 80 mm Max** para vista previa a ancho completo.
+1. Vincular impresora en la app.
+2. Permiso **Mostrar sobre otras apps**.
+3. Ajustes → Impresión → activar **Boleta Print**.
+4. PDF → Imprimir → elegir impresora (opcional: Rollo 80 mm Max).
 
 ---
 
-## Cómo se imprime el PDF
+## Pipeline PDF (resumen)
 
-1. Render → bitmap (`pdfx`) al ancho útil (rollo − márgenes L/R)
-2. Recorte solo blanco superior/inferior
-3. Umbral B/N rápido
-4. Sheet a ancho de rollo con padding izquierdo
-5. `GS v 0` + margen inferior + corte
-6. Envío BT/TCP (bloque único si cabe; si no, chunks alineados)
+Render al ancho útil → umbral/empaquetado GS v0 → márgenes → feed + corte → envío BT/TCP (chunks seguros).
 
-Un PDF chico (~50 KB) puede tardar: lo lento es rasterizar, no el tamaño del archivo.
+Detalle y cómo medir tiempos: [docs/PRINT_PERFORMANCE.md](docs/PRINT_PERFORMANCE.md).
+
+```powershell
+adb logcat | Select-String BoletaPrintTiming
+C:\flutter\bin\cache\dart-sdk\bin\dart.exe run tool\benchmark_escpos.dart
+```
 
 ---
 
@@ -106,6 +104,7 @@ Un PDF chico (~50 KB) puede tardar: lo lento es rasterizar, no el tamaño del ar
 .\scripts\run-phone.ps1 -InstallOnly
 .\scripts\run-phone.ps1 -InstallOnly -Serial HA1KL54R
 .\scripts\run-phone.ps1
+.\scripts\export-apk.ps1 -Build
 ```
 
 | Equipo | Serial ADB | Notas |
@@ -113,21 +112,14 @@ Un PDF chico (~50 KB) puede tardar: lo lento es rasterizar, no el tamaño del ar
 | Xiaomi | `863d005830483132385114e3efc08c` | default del script |
 | Lenovo YT-X705F | `HA1KL54R` | Android 10 · overlay obligatorio |
 
-```powershell
-.\scripts\export-apk.ps1 -Build
-```
-
 > Debug local y Docker usan keystores distintos → no mezclar installs.
 
 ---
 
 ## Qué no va en el repo
 
-Ignorado a propósito (no subir):
-
-- `apk-ejemplo/`, `apk2-ejemplo/`, `inst-apk/` — dumps de referencia / APKs locales
-- `**/local.properties` — rutas del SDK en tu PC
-- `*.env`, `key.properties`, `*.jks` / keystores
+- `apk-ejemplo/`, `apk2-ejemplo/`, `inst-apk/`
+- `**/local.properties`, `*.env`, `key.properties`, `*.jks`
 - `build/`, `.dart_tool/`
 
 ---
@@ -135,28 +127,16 @@ Ignorado a propósito (no subir):
 ## Estructura relevante
 
 ```
-lib/
-  main.dart / app.dart
-  system_print_main.dart      # headless raster + fallback UI
-  screens/                    # lista, formulario, share, historial
-  services/
-    print_service.dart
-    escpos_pdf_print.dart / escpos_gs_v0.dart / escpos_feed.dart
-    printer_store.dart
-    transports/               # BT / WiFi TCP
-android/.../printservice/
-  BoletaPrintService.kt
-  BoletaPrinterDiscoverySession.kt
-  SystemPrintOverlay.kt / EscPosTransport.kt
-PrintEngineBridge.kt
+lib/services/     escpos_pdf_print, escpos_gs_v0, print_timing, transports/
+android/.../printservice/   BoletaPrintService, EscPosTransport, EscPosChunker
+docs/PRINT_PERFORMANCE.md
+tool/benchmark_escpos.dart
 ```
 
 ---
 
 ## Roadmap
 
-1. **v1.1–v1.5.6** — hecho (Compartir, PrintService, overlay, márgenes, repo limpio)
+1. **v1.5.6** — estable en `main` (impresión + rendimiento + repo limpio)
 2. **v2** — jobs del POS por red/cola
 3. USB/OTG, iOS
-
-Detalle operativo: [CONTEXTO.md](CONTEXTO.md).
