@@ -3,9 +3,34 @@
 Controlador Android de impresoras térmicas ESC/POS (58 / 80 / 110 mm).  
 **No diseña boletas** — el POS las genera (PDF/imagen); esta app las imprime.
 
+**Repo:** https://github.com/Jheff2920/APP-RS  
+**Versión:** 1.5.6+13 · Package ID: `com.example.hello_world_app`
+
 > Memoria técnica para agentes: [CONTEXTO.md](CONTEXTO.md)
 
-**Versión:** 1.5.6+13 · Package ID: `com.example.hello_world_app`
+---
+
+## Flujo de trabajo (no romper `main`)
+
+`main` es la base estable. Las pruebas y experimentos van en ramas:
+
+```powershell
+# Partir siempre desde main actualizado
+git checkout main
+git pull
+
+# Rama de pruebas
+git checkout -b test/pruebas
+# ... cambios de prueba ...
+git add -A
+git commit -m "Prueba: describe el cambio"
+git push -u origin test/pruebas
+```
+
+Cuando algo salga bien: abre un Pull Request de `test/pruebas` → `main` en GitHub.  
+No hagas push directo a `main` salvo hotfixes claros.
+
+Rama lista para experimentar: **`test/pruebas`**.
 
 ---
 
@@ -20,8 +45,9 @@ Controlador Android de impresoras térmicas ESC/POS (58 / 80 / 110 mm).
 | Tamaños de papel: 58 / 58 Max / 80 / **80 Max** / 110 | |
 | Historial, márgenes L/R/inferior, página de prueba | |
 | Márgenes de config aplican igual a PDF y a prueba | |
-| Corte automático ESC/POS (como RawBT) | |
+| Corte automático ESC/POS | |
 | Alta de impresora sin duplicados (ID estable + dedupe MAC) | |
+| Repo limpio (sin dumps de ejemplo / secretos) | |
 
 ---
 
@@ -48,7 +74,7 @@ Lo que guardas en **Editar impresora** se aplica a **PDF, imagen y página de pr
 
 Flujo de cierre: **contenido → avance inferior (si > 0) → corte (si no es «Sin corte»)**.
 
-> Tras cambiar márgenes o corte, pulsa **Guardar**. La impresión del sistema recarga siempre los valores desde disco (evita caché del engine headless).
+> Tras cambiar márgenes o corte, pulsa **Guardar**.
 
 ---
 
@@ -59,54 +85,50 @@ Flujo de cierre: **contenido → avance inferior (si > 0) → corte (si no es «
 3. **Ajustes → Impresión** → activa **Boleta Print**.
 4. PDF → **Imprimir** → elige la impresora → opcional: **Rollo 80 mm Max** para vista previa a ancho completo.
 
-Sin el paso 3 solo verás RawBT u otros servicios.
-
 ---
 
 ## Cómo se imprime el PDF
 
-1. Render → bitmap (`pdfx`) al **ancho útil** (rollo − márgenes L/R)
-2. Recorte solo blanco superior/inferior (laterales los define la config)
+1. Render → bitmap (`pdfx`) al ancho útil (rollo − márgenes L/R)
+2. Recorte solo blanco superior/inferior
 3. Umbral B/N rápido
-4. Colocar en sheet a ancho de rollo con padding izquierdo
-5. `GS v 0` (franjas) + margen inferior (franjas blancas) + corte
-6. Envío BT/TCP (bloque único si cabe; si no, chunks alineados a GS v 0)
+4. Sheet a ancho de rollo con padding izquierdo
+5. `GS v 0` + margen inferior + corte
+6. Envío BT/TCP (bloque único si cabe; si no, chunks alineados)
 
-**Por qué un PDF chico (~50 KB) tarda un poco:** el peso del archivo casi no importa; lo lento es rasterizar a bitmap y empaquetar `GS v 0`.
-
-**Vista previa del sistema:** si el PDF del POS es angosto (~58) y eliges rollo 80, puede verse con margen; la impresión real usa el ancho configurado. Usa **Rollo 80 mm Max** para mejorar la preview.
-
-Referencia de protocolo: `apk-ejemplo/` (RawBT) — no copiar código.
+Un PDF chico (~50 KB) puede tardar: lo lento es rasterizar, no el tamaño del archivo.
 
 ---
 
-## Desarrollo rápido (sin Docker)
+## Desarrollo rápido
 
 ```powershell
-# Instala en el dispositivo ADB conectado (o pasa -Serial)
 .\scripts\run-phone.ps1 -InstallOnly
 .\scripts\run-phone.ps1 -InstallOnly -Serial HA1KL54R
-
-# Hot reload
 .\scripts\run-phone.ps1
 ```
-
-Dispositivos de prueba usados:
 
 | Equipo | Serial ADB | Notas |
 |--------|------------|--------|
 | Xiaomi | `863d005830483132385114e3efc08c` | default del script |
 | Lenovo YT-X705F | `HA1KL54R` | Android 10 · overlay obligatorio |
 
----
-
-## Docker (APK portable)
-
 ```powershell
 .\scripts\export-apk.ps1 -Build
 ```
 
-> Debug local y Docker usan keystores distintos → no mezclar installs (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`).
+> Debug local y Docker usan keystores distintos → no mezclar installs.
+
+---
+
+## Qué no va en el repo
+
+Ignorado a propósito (no subir):
+
+- `apk-ejemplo/`, `apk2-ejemplo/`, `inst-apk/` — dumps de referencia / APKs locales
+- `**/local.properties` — rutas del SDK en tu PC
+- `*.env`, `key.properties`, `*.jks` / keystores
+- `build/`, `.dart_tool/`
 
 ---
 
@@ -120,21 +142,20 @@ lib/
   services/
     print_service.dart
     escpos_pdf_print.dart / escpos_gs_v0.dart / escpos_feed.dart
-    printer_store.dart        # prefs.reload + sync nativo + dedupe
-    transports/               # BT (plugin) / WiFi TCP
+    printer_store.dart
+    transports/               # BT / WiFi TCP
 android/.../printservice/
-  BoletaPrintService.kt       # cola → overlay → raster → BT/WiFi nativo
-  BoletaPrinterDiscoverySession.kt  # tamaños de papel del diálogo
-  PrintSettingsActivity.kt
+  BoletaPrintService.kt
+  BoletaPrinterDiscoverySession.kt
   SystemPrintOverlay.kt / EscPosTransport.kt
-PrintEngineBridge.kt          # FlutterEngine headless
+PrintEngineBridge.kt
 ```
 
 ---
 
 ## Roadmap
 
-1. **v1.1–v1.5** — hecho (Compartir, PrintService, overlay, Max paper, dedupe, márgenes PDF)
+1. **v1.1–v1.5.6** — hecho (Compartir, PrintService, overlay, márgenes, repo limpio)
 2. **v2** — jobs del POS por red/cola
 3. USB/OTG, iOS
 
