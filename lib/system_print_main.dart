@@ -31,6 +31,13 @@ void systemPrintMain() {
     final filePath = args['filePath'] as String? ?? '';
     final printerId = args['printerId'] as String? ?? '';
     final jobId = args['jobId'] as String? ?? '';
+    final systemMediaSizeId = args['mediaSizeId'] as String?;
+    final mediaWidthRaw = args['mediaWidthMils'];
+    final mediaWidthMils = mediaWidthRaw is int
+        ? mediaWidthRaw
+        : mediaWidthRaw is num
+            ? mediaWidthRaw.toInt()
+            : null;
     if (filePath.isEmpty) {
       throw PlatformException(code: 'bad_args', message: 'filePath vacio');
     }
@@ -61,11 +68,15 @@ void systemPrintMain() {
               printer,
               filePath: filePath,
               timing: timing,
+              systemMediaSizeId: systemMediaSizeId,
+              mediaWidthMils: mediaWidthMils,
             )
           : await EscPosPdfPrint.buildImageFile(
               printer,
               filePath: filePath,
               timing: timing,
+              systemMediaSizeId: systemMediaSizeId,
+              mediaWidthMils: mediaWidthMils,
             );
       timing.finish(ok: true, bytes: bytes.length);
       return Uint8List.fromList(bytes);

@@ -117,7 +117,7 @@ class PrintService {
 
       phase(PrintPhase.preparing);
       await paint();
-      final bytes = await timing.measure(
+      final bytesFuture = timing.measure(
         'prepare',
         () => buildBytes(timing).timeout(
           const Duration(seconds: 90),
@@ -126,11 +126,7 @@ class PrintService {
           ),
         ),
       );
-      byteCount = bytes.length;
-
-      phase(PrintPhase.connecting);
-      await paint();
-      await timing.measure(
+      final connectFuture = timing.measure(
         'connect',
         () => transport.connect(printer).timeout(
               const Duration(seconds: 45),
@@ -139,6 +135,11 @@ class PrintService {
               ),
             ),
       );
+      final bytes = await bytesFuture;
+      byteCount = bytes.length;
+      phase(PrintPhase.connecting);
+      await paint();
+      await connectFuture;
 
       phase(PrintPhase.sending);
       await paint();

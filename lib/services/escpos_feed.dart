@@ -6,12 +6,13 @@ import 'escpos_gs_v0.dart';
 /// Avance de papel y cierre de ticket (margen inferior + corte).
 class EscPosFeed {
   /// ~203 dpi → ~8 puntos por mm.
-  static const double dotsPerMm = 8;
+  static const double dotsPerMm203 = 8;
 
   /// Franjas blancas GS v 0 (avance fiable tras raster).
   static List<int> tearOff({
     required double mm,
     required int paperDotsWidth,
+    double dotsPerMm = dotsPerMm203,
   }) {
     if (mm <= 0) return const [];
 
@@ -19,7 +20,7 @@ class EscPosFeed {
     final width = paperDotsWidth - (paperDotsWidth % 8);
     if (width < 8) return const [];
 
-    var remaining = (mm * dotsPerMm).round().clamp(1, 800);
+    var remaining = (mm * dotsPerMm).round().clamp(1, 1200);
 
     while (remaining > 0) {
       final h = remaining > 96 ? 96 : remaining;
@@ -37,10 +38,17 @@ class EscPosFeed {
     required double bottomMm,
     required int paperDotsWidth,
     CutMode cut = CutMode.none,
+    double dotsPerMm = dotsPerMm203,
   }) {
     final out = <int>[];
     if (bottomMm > 0) {
-      out.addAll(tearOff(mm: bottomMm, paperDotsWidth: paperDotsWidth));
+      out.addAll(
+        tearOff(
+          mm: bottomMm,
+          paperDotsWidth: paperDotsWidth,
+          dotsPerMm: dotsPerMm,
+        ),
+      );
     }
     if (cut != CutMode.none) {
       out.addAll(cut.escPosBytes);

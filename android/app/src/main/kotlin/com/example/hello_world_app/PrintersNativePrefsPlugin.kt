@@ -40,7 +40,7 @@ class PrintersNativePrefsPlugin : FlutterPlugin, MethodChannel.MethodCallHandler
                 ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                     .edit()
                     .putString(KEY, json)
-                    .apply()
+                    .commit()
                 Log.i(TAG, "Synced printers json len=${json.length}")
                 result.success(null)
             }

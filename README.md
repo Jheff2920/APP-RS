@@ -1,23 +1,22 @@
 # Boleta Print
 
-Controlador Android de impresoras térmicas ESC/POS (58 / 80 / 110 mm).  
+Controlador Android de impresoras térmicas ESC/POS (58 y 80 mm).  
 **No diseña boletas** — el POS las genera (PDF/imagen); esta app las imprime.
 
 **Repo:** https://github.com/Jheff2920/APP-RS  
-**Versión:** 1.5.6+13 · Package ID: `com.example.hello_world_app`  
+**Versión:** 1.6.1+18 · Package ID: `com.example.hello_world_app`  
 **Rama estable:** `main` · **Rama de pruebas:** `test/pruebas`
 
 > Memoria técnica: [CONTEXTO.md](CONTEXTO.md) · Rendimiento: [docs/PRINT_PERFORMANCE.md](docs/PRINT_PERFORMANCE.md)
 
 ---
 
-## Dónde quedamos (2026-09-04)
+## Dónde quedamos (2026-09-07)
 
-- Impresión PDF/prueba **estable** (márgenes de config, corte, PrintService + overlay).
-- Mejoras de rendimiento fusionadas a `main` (GS v0 más rápido, chunking BT, timing).
-- Repo limpio en GitHub (sin dumps de ejemplo ni secretos).
-
-**Mañana:** seguir en `test/pruebas` para experimentos; si algo sale bien → merge a `main`.
+- Raster nativo (`NativePdfEscPos`) alineado a RawBT: recorte de tinta + umbral promedio.
+- Calidad verificada contra RawBT (mismo look a x1).
+- Ajustes: **DPI 203/300** y **nitidez x1/x2/x3** (x2/x3 tarda más y puede verse más nítido).
+- Chrome/Google: recorta el ticket y llena el rollo 58/80.
 
 ---
 
@@ -37,14 +36,14 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 ---
 
-## Estado actual (v1.5.6)
+## Estado actual (v1.6.1)
 
 | Hecho | Pendiente |
 |-------|-----------|
 | Bluetooth Classic + WiFi TCP :9100 | v2: jobs HTTP/cola del POS |
 | Compartir PDF/imagen → imprimir | USB/OTG |
 | PrintService + overlay flotante | iOS |
-| Papel 58 / 58 Max / 80 / 80 Max / 110 | |
+| Papel 58 / 80 mm + DPI 203/300 + nitidez x1/x2/x3 | |
 | Márgenes L/R/inf + corte (config manda en PDF y prueba) | |
 | Dedupe impresoras (ID estable + MAC) | |
 | Pipeline más rápido + métricas `BoletaPrintTiming` | |
@@ -56,7 +55,7 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 ## Qué hace
 
 1. Vincular impresoras BT (emparejadas en Android) o WiFi.
-2. Configurar antes de guardar: rollo, márgenes, corte, predeterminada.
+2. Configurar antes de guardar: rollo, DPI, nitidez, márgenes, corte, predeterminada.
 3. Compartir PDF/imagen → imprimir.
 4. Diálogo **Imprimir** del sistema → overlay sin saltar de app.
 5. Raster `GS v 0` (Compartir y PrintService).
@@ -67,7 +66,9 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 | Ajuste | Efecto |
 |--------|--------|
-| Papel 58 / 80 mm | Ancho del raster (384 / 576 dots) |
+| Papel 58 / 80 mm | Ancho del rollo |
+| DPI 203 / 300 | Puntos del cabezal (203: 384/576; 300: 576/832) |
+| Nitidez x1 / x2 / x3 | x1 rápido (RawBT); x2/x3 más nítido y más lento |
 | Márgenes L/R | Blanco en el área imprimible |
 | Margen inferior | Avance al terminar |
 | Corte | Después del margen inferior |
@@ -76,12 +77,22 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 ---
 
-## Activar impresión del sistema
+## Impresión desde Chrome / sistema
 
-1. Vincular impresora en la app.
-2. Permiso **Mostrar sobre otras apps**.
-3. Ajustes → Impresión → activar **Boleta Print**.
-4. PDF → Imprimir → elegir impresora (opcional: Rollo 80 mm Max).
+En **Imprimir** elige el ancho del papel. El PDF se imprime **tal cual** (sin estirar):
+
+| Tamaño | Ancho | Vista previa |
+|--------|--------|----------------|
+| Rollo 58 mm | 384 puntos | Página corta |
+| Rollo 58 mm Max | 384 puntos | Página larga (PDF completo) |
+| Rollo 58 mm Google | 384 puntos | Chrome: página extra ancha, ticket 58 mm |
+| Rollo 80 mm | 576 puntos | Página corta |
+| Rollo 80 mm Max | 576 puntos | Página larga (PDF completo) |
+| Rollo 80 mm Google | 576 puntos | Chrome: página extra ancha, ticket 80 mm |
+
+Desde **Google/Chrome** usa **Rollo 80 mm Google** (o 58). Chrome deja el ticket de LIMAFAC a ~58 mm y centrado. Esa medida **recorta el blanco y ajusta el ticket al rollo** (escala uniforme, el texto no se deforma).
+
+Usa **Max** si en Chrome no se ve toda la boleta y no quieres la medida Google. Max no cambia el ancho: solo alarga la preview.
 
 ---
 

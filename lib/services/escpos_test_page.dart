@@ -19,7 +19,7 @@ class EscPosTestPage {
     final rightPad = _charsForMm(printer.paper, margins.rightMm);
     final usable = (totalCols - leftPad - rightPad).clamp(8, totalCols);
     final safeLeft = leftPad.clamp(0, totalCols - usable);
-    final paperDots = printer.paper == PaperWidth.mm58 ? 384 : 576;
+    final paperDots = printer.dotsWidth;
 
     List<int> bytes = [];
     bytes += generator.reset();
@@ -95,6 +95,7 @@ class EscPosTestPage {
       bottomMm: margins.bottomMm,
       paperDotsWidth: paperDots,
       cut: printer.cut,
+      dotsPerMm: printer.dpi.dotsPerMm,
     );
     return bytes;
   }

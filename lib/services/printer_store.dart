@@ -160,8 +160,10 @@ class PrinterStore {
       out[i] = p.copyWith(
         id: prev.id,
         isDefault: prev.isDefault || p.isDefault,
-        // Preferir papel/márgenes del último guardado.
         paper: p.paper,
+        dpi: p.dpi,
+        rasterScale: p.rasterScale,
+        cut: p.cut,
         margins: p.margins,
         name: p.name.isNotEmpty ? p.name : prev.name,
       );

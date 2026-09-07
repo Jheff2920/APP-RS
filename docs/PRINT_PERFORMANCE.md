@@ -39,7 +39,8 @@ Referencia local del 2026-09-04 para 576 × 1800 px:
 - `engine_ready`: disponibilidad del engine headless; `cold=true` identifica
   el primer arranque.
 - `load_preferences`: lectura de impresora y márgenes.
-- `open_pdf`, `render_page`, `encode_page`: preparación raster.
+- `native_raster`: PrintService con PdfRenderer nativo (sin Flutter/pdfx).
+- `open_pdf`, `render_page`, `encode_page`: preparación raster Dart (Compartir / fallback).
 - `bluetooth_connect` / `network_connect`: apertura del transporte.
 - `bluetooth_write` / `network_write`: envío y protección previa al cierre.
 - `system_total` / `finish`: duración total conocida por la app.

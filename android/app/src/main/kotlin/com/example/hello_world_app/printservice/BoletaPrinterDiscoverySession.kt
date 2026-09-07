@@ -50,7 +50,7 @@ class BoletaPrinterDiscoverySession(
             val label = if (p.isDefault) "${p.name} (predeterminada)" else p.name
             val builder = PrinterInfo.Builder(id, label, status)
                 .setDescription(p.description)
-                .setCapabilities(capabilitiesFor(id, p.paper))
+                .setCapabilities(capabilitiesFor(id, p.paper, p.dpi))
             infos.add(builder.build())
         }
 
@@ -80,50 +80,66 @@ class BoletaPrinterDiscoverySession(
         }
     }
 
-    private fun capabilitiesFor(printerId: PrinterId, paper: String): PrinterCapabilitiesInfo {
-        // Anchos en mils (1/1000 pulgada). Altura "Max" larga → la vista previa
-        // escala el PDF al ancho completo (como apps tipo RawBT/Playdin).
+    private fun capabilitiesFor(
+        printerId: PrinterId,
+        paper: String,
+        dpi: Int,
+    ): PrinterCapabilitiesInfo {
+        // Ancho en mils. Normal ~220 mm; Max/Google ~810 mm para preview.
+        // Google: mismo ancho 58/80; la app recorta el ticket y lo ajusta
+        // al rollo (Chrome deja el contenido a ~58 mm centrado).
         val roll58 = PrintAttributes.MediaSize(
             "BOLETA_ROLL_58",
             "Rollo 58 mm",
-            2283,
-            12000,
+            WIDTH_58_MILS,
+            HEIGHT_NORMAL_MILS,
         )
         val roll58Max = PrintAttributes.MediaSize(
             "BOLETA_ROLL_58_MAX",
             "Rollo 58 mm Max",
-            2283,
-            32000,
+            WIDTH_58_MILS,
+            HEIGHT_MAX_MILS,
+        )
+        val roll58Google = PrintAttributes.MediaSize(
+            "BOLETA_ROLL_58_GOOGLE",
+            "Rollo 58 mm Google",
+            WIDTH_58_MILS,
+            HEIGHT_MAX_MILS,
         )
         val roll80 = PrintAttributes.MediaSize(
             "BOLETA_ROLL_80",
             "Rollo 80 mm",
-            3150,
-            12000,
+            WIDTH_80_MILS,
+            HEIGHT_NORMAL_MILS,
         )
         val roll80Max = PrintAttributes.MediaSize(
             "BOLETA_ROLL_80_MAX",
             "Rollo 80 mm Max",
-            3150,
-            32000,
+            WIDTH_80_MILS,
+            HEIGHT_MAX_MILS,
         )
-        val roll110 = PrintAttributes.MediaSize(
-            "BOLETA_ROLL_110",
-            "Rollo 110 mm",
-            4331,
-            16000,
+        val roll80Google = PrintAttributes.MediaSize(
+            "BOLETA_ROLL_80_GOOGLE",
+            "Rollo 80 mm Google",
+            WIDTH_80_MILS,
+            HEIGHT_MAX_MILS,
         )
 
         val prefer80 = paper == "mm80"
         val builder = PrinterCapabilitiesInfo.Builder(printerId)
-            .addMediaSize(roll58, !prefer80)
+            .addMediaSize(roll58, false)
             .addMediaSize(roll58Max, false)
+            .addMediaSize(roll58Google, !prefer80)
             .addMediaSize(roll80, false)
-            .addMediaSize(roll80Max, prefer80)
-            .addMediaSize(roll110, false)
+            .addMediaSize(roll80Max, false)
+            .addMediaSize(roll80Google, prefer80)
             .addResolution(
                 PrintAttributes.Resolution("203dpi", "203 dpi", 203, 203),
-                true,
+                dpi < 280,
+            )
+            .addResolution(
+                PrintAttributes.Resolution("300dpi", "300 dpi", 300, 300),
+                dpi >= 280,
             )
             .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
             .setColorModes(
@@ -135,12 +151,17 @@ class BoletaPrinterDiscoverySession(
 
     companion object {
         private const val TAG = "BoletaDiscovery"
+        private const val WIDTH_58_MILS = 2283
+        private const val WIDTH_80_MILS = 3150
+        private const val HEIGHT_NORMAL_MILS = 8661
+        private const val HEIGHT_MAX_MILS = 32000
 
         data class SavedPrinterRow(
             val id: String,
             val name: String,
             val address: String,
             val paper: String,
+            val dpi: Int,
             val isDefault: Boolean,
             val description: String,
         )
@@ -185,11 +206,12 @@ class BoletaPrinterDiscoverySession(
                 val address = o.optString("address", "")
                 val port = o.optInt("port", 9100)
                 val paper = o.optString("paper", "mm58")
+                val dpi = if (o.optString("dpi", "dpi203") == "dpi300") 300 else 203
                 val isDefault = o.optBoolean("isDefault", false)
                 val desc = if (type == "bluetooth") {
-                    "BT $address · $paper"
+                    "BT $address · $paper · ${dpi}dpi"
                 } else {
-                    "$address:$port · $paper"
+                    "$address:$port · $paper · ${dpi}dpi"
                 }
                 out.add(
                     SavedPrinterRow(
@@ -197,6 +219,7 @@ class BoletaPrinterDiscoverySession(
                         name = name,
                         address = address,
                         paper = paper,
+                        dpi = dpi,
                         isDefault = isDefault,
                         description = desc,
                     ),

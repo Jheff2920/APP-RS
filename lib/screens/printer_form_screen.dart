@@ -4,6 +4,8 @@ import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import '../models/cut_mode.dart';
 import '../models/paper_width.dart';
 import '../models/print_margins.dart';
+import '../models/printer_dpi.dart';
+import '../models/raster_scale.dart';
 import '../models/saved_printer.dart';
 import '../services/print_service.dart';
 import '../services/printer_permissions.dart';
@@ -40,8 +42,10 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
 
   late PrinterLinkType _type;
   late PaperWidth _paper;
+  late PrinterDpi _dpi;
   late PrintMargins _margins;
   late CutMode _cut;
+  late RasterScale _rasterScale;
   late bool _isDefault;
 
   List<BluetoothInfo> _paired = [];
@@ -62,8 +66,10 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
     _portCtrl = TextEditingController(text: '${e?.port ?? 9100}');
     _type = e?.type ?? PrinterLinkType.bluetooth;
     _paper = e?.paper ?? PaperWidth.mm58;
+    _dpi = e?.dpi ?? PrinterDpi.dpi203;
     _margins = e?.margins ?? const PrintMargins();
     _cut = e?.cut ?? CutMode.fullGsV0;
+    _rasterScale = e?.rasterScale ?? RasterScale.x1;
     _isDefault = e?.isDefault ?? false;
 
     if (_type == PrinterLinkType.bluetooth) {
@@ -129,10 +135,17 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
       address: _addressCtrl.text.trim(),
       port: port,
       paper: _paper,
+      dpi: _dpi,
       margins: _margins,
       cut: _cut,
+      rasterScale: _rasterScale,
       isDefault: _isDefault || _firstPrinter,
     );
+  }
+
+  Future<void> _persistSettings() async {
+    if (!_isEdit || !_formKey.currentState!.validate()) return;
+    await widget.store.upsert(_buildPrinter());
   }
 
   Future<void> _save({bool pop = true}) async {
@@ -351,13 +364,34 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              _paper == PaperWidth.mm80
-                  ? 'Rollo 80 mm seleccionado (576 puntos).'
-                  : 'Rollo 58 mm seleccionado (384 puntos).',
+              '${_paper.label} · ${_dpi.label} · ${_dpi.dotsFor(_paper)} puntos',
               style: theme.textTheme.labelLarge?.copyWith(
                 color: theme.colorScheme.primary,
               ),
             ),
+            const SizedBox(height: 20),
+            Text('DPI del cabezal', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              '203 es lo normal. 300 solo si la impresora es 300 dpi; '
+              'si el ticket sale partido, vuelve a 203.',
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            SegmentedButton<PrinterDpi>(
+              segments: [
+                for (final d in PrinterDpi.values)
+                  ButtonSegment(value: d, label: Text(d.label)),
+              ],
+              selected: {_dpi},
+              onSelectionChanged: (set) {
+                if (set.isEmpty) return;
+                setState(() => _dpi = set.first);
+                _persistSettings();
+              },
+            ),
+            const SizedBox(height: 6),
+            Text(_dpi.hint, style: theme.textTheme.labelMedium),
             const SizedBox(height: 20),
             MarginFields(
               value: _margins,
@@ -392,6 +426,30 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
               const SizedBox(height: 6),
               Text(_cut.hint, style: theme.textTheme.labelMedium),
             ],
+            const SizedBox(height: 20),
+            Text('Nitidez', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              'x2 y x3 dibujan el PDF mas grande y lo bajan al rollo '
+              '(no agrandan el ticket). Sirve para comparar si sale mas nítido; '
+              'tardan mas.',
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            SegmentedButton<RasterScale>(
+              segments: [
+                for (final s in RasterScale.values)
+                  ButtonSegment(value: s, label: Text(s.label)),
+              ],
+              selected: {_rasterScale},
+              onSelectionChanged: (set) {
+                if (set.isEmpty) return;
+                setState(() => _rasterScale = set.first);
+                _persistSettings();
+              },
+            ),
+            const SizedBox(height: 6),
+            Text(_rasterScale.hint, style: theme.textTheme.labelMedium),
             const SizedBox(height: 8),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,

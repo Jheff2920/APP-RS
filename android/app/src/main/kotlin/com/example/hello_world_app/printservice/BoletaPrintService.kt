@@ -24,9 +24,12 @@ import com.example.hello_world_app.PrintersNativePrefsPlugin
 import org.json.JSONArray
 import java.io.File
 import java.io.FileOutputStream
+import android.bluetooth.BluetoothSocket
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * PrintService: imprime sin traer Boleta Print al frente.
@@ -36,6 +39,7 @@ class BoletaPrintService : PrintService() {
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executor = Executors.newSingleThreadExecutor()
+    private val connectPool = Executors.newSingleThreadExecutor()
     private val pendingFallbacks = ConcurrentHashMap<String, PendingFallback>()
     private val printResultReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -67,6 +71,7 @@ class BoletaPrintService : PrintService() {
         } catch (_: Exception) {
         }
         executor.shutdownNow()
+        connectPool.shutdownNow()
         super.onDestroy()
     }
 
@@ -110,6 +115,8 @@ class BoletaPrintService : PrintService() {
         var jobId = "unknown"
         var pdfFile: File? = null
         var succeeded = false
+        val pendingSocket = AtomicReference<BluetoothSocket?>(null)
+        var connectFuture: Future<BluetoothSocket>? = null
         try {
             val identifiers = mainHandler.runSync {
                 Pair(job.info.printerId?.localId, job.info.id.toString())
@@ -127,7 +134,9 @@ class BoletaPrintService : PrintService() {
                 ?: throw IllegalStateException("Impresora no encontrada")
 
             mainHandler.post { overlay.show(row.name) }
-            mainHandler.post { overlay.setStatus("Preparando ticket...") }
+            val sharp = if (row.rasterScale <= 1) "x1" else "x${row.rasterScale}"
+            mainHandler.post { overlay.setStatus("Preparando $sharp · ${row.dpi} dpi...") }
+            Log.i(TAG, "raster scale=${row.rasterScale} dpi=${row.dpi} paper=${row.paper}")
 
             val copyStartedAt = PrintTiming.now()
             val copiedPdf = copyPdf(job)
@@ -138,11 +147,51 @@ class BoletaPrintService : PrintService() {
                 copyStartedAt,
                 mapOf("bytes" to copiedPdf.length()),
             )
-            val data = PrintEngineBridge.rasterize(
-                applicationContext,
-                copiedPdf.absolutePath,
-                printerLocalId,
+            val media = mainHandler.runSync { job.info.attributes?.mediaSize }
+            val mediaSizeId = media?.id
+            val mediaWidthMils = media?.widthMils
+            Log.i(TAG, "mediaSize id=$mediaSizeId widthMils=$mediaWidthMils")
+
+            connectFuture = if (row.type == "bluetooth") {
+                connectPool.submit<BluetoothSocket> {
+                    val started = PrintTiming.now()
+                    val socket = EscPosTransport.openBluetooth(row.address)
+                    pendingSocket.set(socket)
+                    PrintTiming.phase(jobId, "bluetooth_connect", started)
+                    socket
+                }
+            } else {
+                null
+            }
+
+            val rasterStartedAt = PrintTiming.now()
+            val data = try {
+                NativePdfEscPos.build(
+                    copiedPdf,
+                    mediaSizeId,
+                    mediaWidthMils,
+                    row.paper,
+                    row.bottomMm,
+                    row.cut,
+                    row.dpi,
+                    row.rasterScale,
+                )
+            } catch (nativeError: Exception) {
+                Log.w(TAG, "Native raster fallback to Flutter", nativeError)
+                PrintEngineBridge.rasterize(
+                    applicationContext,
+                    copiedPdf.absolutePath,
+                    printerLocalId,
+                    jobId,
+                    mediaSizeId,
+                    mediaWidthMils,
+                )
+            }
+            PrintTiming.phase(
                 jobId,
+                "native_raster",
+                rasterStartedAt,
+                mapOf("bytes" to data.size),
             )
             if (data.isEmpty()) {
                 throw IllegalStateException("Ticket vacio")
@@ -150,9 +199,17 @@ class BoletaPrintService : PrintService() {
 
             mainHandler.post { overlay.setStatus("Enviando a ${row.name}...") }
 
-            when (row.type) {
-                "bluetooth" -> EscPosTransport.sendBluetooth(row.address, data, jobId)
-                else -> EscPosTransport.sendNetwork(row.address, row.port, data, jobId)
+            if (connectFuture != null) {
+                val socket = try {
+                    connectFuture.get(45, TimeUnit.SECONDS)
+                } catch (e: Exception) {
+                    throw IllegalStateException(
+                        e.cause?.message ?: e.message ?: "No se pudo conectar",
+                    )
+                }
+                EscPosTransport.writeBluetooth(socket, data, jobId)
+            } else {
+                EscPosTransport.sendNetwork(row.address, row.port, data, jobId)
             }
 
             succeeded = true
@@ -163,6 +220,11 @@ class BoletaPrintService : PrintService() {
             }
             Log.i(TAG, "Inline print OK")
         } catch (e: Exception) {
+            connectFuture?.cancel(true)
+            try {
+                pendingSocket.getAndSet(null)?.close()
+            } catch (_: Exception) {
+            }
             Log.e(TAG, "Inline print failed", e)
             mainHandler.post {
                 overlay.setStatus(e.message ?: "Error", spinning = false)
@@ -316,18 +378,37 @@ class BoletaPrintService : PrintService() {
             PrintersNativePrefsPlugin.PREFS,
             MODE_PRIVATE,
         )
-        val raw = prefs.getString(PrintersNativePrefsPlugin.KEY, null) ?: return null
+        var raw = prefs.getString(PrintersNativePrefsPlugin.KEY, null)
+        if (raw.isNullOrBlank()) {
+            val flutter = applicationContext.getSharedPreferences(
+                "FlutterSharedPreferences",
+                MODE_PRIVATE,
+            )
+            raw = flutter.getString("flutter.saved_printers_v1", null)
+                ?: flutter.getString("saved_printers_v1", null)
+        }
+        if (raw.isNullOrBlank()) return null
         return try {
             val arr = JSONArray(raw)
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
                 if (o.optString("id") != id) continue
+                val margins = o.optJSONObject("margins")
                 return PrinterRow(
                     id = id,
                     name = o.optString("name", "Impresora"),
                     type = o.optString("type", "bluetooth"),
                     address = o.optString("address", ""),
                     port = o.optInt("port", 9100),
+                    paper = o.optString("paper", "mm58"),
+                    bottomMm = margins?.optDouble("bottomMm", 10.0) ?: 10.0,
+                    cut = o.optString("cut", "fullGsV0"),
+                    dpi = if (o.optString("dpi", "dpi203") == "dpi300") 300 else 203,
+                    rasterScale = when (o.optString("rasterScale", "x1")) {
+                        "x3" -> 3
+                        "x2" -> 2
+                        else -> 1
+                    },
                 )
             }
             null
@@ -367,6 +448,11 @@ class BoletaPrintService : PrintService() {
         val type: String,
         val address: String,
         val port: Int,
+        val paper: String,
+        val bottomMm: Double,
+        val cut: String,
+        val dpi: Int,
+        val rasterScale: Int,
     )
 
     private data class PendingFallback(

@@ -15,28 +15,29 @@ object EscPosTransport {
     private const val TAG = "EscPosTransport"
     private val SPP: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
-    fun sendBluetooth(mac: String, data: ByteArray, jobId: String) {
+    fun openBluetooth(mac: String): BluetoothSocket {
         val adapter = BluetoothAdapter.getDefaultAdapter()
             ?: throw IllegalStateException("Bluetooth no disponible")
         if (!adapter.isEnabled) {
             throw IllegalStateException("Bluetooth apagado")
         }
         val device = adapter.getRemoteDevice(mac.trim())
-        var socket: BluetoothSocket? = null
+        val socket = try {
+            device.createRfcommSocketToServiceRecord(SPP)
+        } catch (_: Exception) {
+            val m = device.javaClass.getMethod(
+                "createRfcommSocket",
+                Int::class.javaPrimitiveType,
+            )
+            m.invoke(device, 1) as BluetoothSocket
+        }
+        adapter.cancelDiscovery()
+        socket.connect()
+        return socket
+    }
+
+    fun writeBluetooth(socket: BluetoothSocket, data: ByteArray, jobId: String) {
         try {
-            socket = try {
-                device.createRfcommSocketToServiceRecord(SPP)
-            } catch (_: Exception) {
-                val m = device.javaClass.getMethod(
-                    "createRfcommSocket",
-                    Int::class.javaPrimitiveType,
-                )
-                m.invoke(device, 1) as BluetoothSocket
-            }
-            adapter.cancelDiscovery()
-            val connectStartedAt = PrintTiming.now()
-            socket.connect()
-            PrintTiming.phase(jobId, "bluetooth_connect", connectStartedAt)
             val out = socket.outputStream
             val ranges = EscPosChunker.ranges(data)
             val writeStartedAt = PrintTiming.now()
@@ -53,11 +54,18 @@ object EscPosTransport {
             )
         } finally {
             try {
-                socket?.close()
+                socket.close()
             } catch (_: Exception) {
             }
         }
         Log.i(TAG, "Sent ${data.size} bytes")
+    }
+
+    fun sendBluetooth(mac: String, data: ByteArray, jobId: String) {
+        val connectStartedAt = PrintTiming.now()
+        val socket = openBluetooth(mac)
+        PrintTiming.phase(jobId, "bluetooth_connect", connectStartedAt)
+        writeBluetooth(socket, data, jobId)
     }
 
     fun sendNetwork(host: String, port: Int, data: ByteArray, jobId: String) {

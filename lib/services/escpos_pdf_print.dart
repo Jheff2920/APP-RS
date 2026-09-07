@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:isolate';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -9,6 +8,7 @@ import 'package:pdfx/pdfx.dart';
 
 import '../models/paper_width.dart';
 import '../models/saved_printer.dart';
+import '../models/system_print_media.dart';
 import 'escpos_capability_profile.dart';
 import 'escpos_feed.dart';
 import 'escpos_gs_v0.dart';
@@ -22,6 +22,8 @@ class EscPosPdfPrint {
     required String filePath,
     int maxPages = 8,
     PrintTiming? timing,
+    String? systemMediaSizeId,
+    int? mediaWidthMils,
   }) async {
     final file = File(filePath);
     if (!await file.exists()) {
@@ -33,10 +35,13 @@ class EscPosPdfPrint {
       'capability_profile',
       () => EscPosCapabilityProfile.load,
     );
-    final paperSize =
-        printer.paper == PaperWidth.mm58 ? PaperSize.mm58 : PaperSize.mm80;
+    final layout = _layout(
+      printer,
+      systemMediaSizeId: systemMediaSizeId,
+      mediaWidthMils: mediaWidthMils,
+    );
+    final paperSize = _paperSize(layout.paper);
     final generator = Generator(paperSize, profile);
-    final layout = _layout(printer);
 
     // openData evita cuelgues de openFile con paths del PrintService/cache.
     final raw = await _timed(timing, 'read_pdf', file.readAsBytes);
@@ -48,13 +53,7 @@ class EscPosPdfPrint {
         onTimeout: () => throw Exception('Tiempo agotado abriendo el PDF'),
       ),
     );
-    _RasterWorker? worker;
     try {
-      worker = await _timed(
-        timing,
-        'image_worker_start',
-        _RasterWorker.start,
-      );
       final bytes = <int>[...generator.reset()];
 
       final pages = math.min(doc.pagesCount, maxPages);
@@ -72,11 +71,12 @@ class EscPosPdfPrint {
           final band = await _timed(
             timing,
             'encode_page',
-            () => worker!.encode(
+            () async => _encodePngToGsV0(
               pngBytes: png,
               fullWidth: layout.fullWidth,
               leftPad: layout.leftPad,
               contentWidth: layout.contentWidth,
+              trimChromeMargins: layout.chromeFit,
             ),
             fields: {'page': i},
           );
@@ -96,6 +96,7 @@ class EscPosPdfPrint {
           bottomMm: printer.margins.bottomMm,
           paperDotsWidth: layout.fullWidth,
           cut: printer.cut,
+          dotsPerMm: printer.dpi.dotsPerMm,
         ),
       );
       timing?.event('raster_complete', fields: {
@@ -104,7 +105,6 @@ class EscPosPdfPrint {
       });
       return bytes;
     } finally {
-      await worker?.close();
       await doc.close();
     }
   }
@@ -113,24 +113,29 @@ class EscPosPdfPrint {
     SavedPrinter printer, {
     required String filePath,
     PrintTiming? timing,
+    String? systemMediaSizeId,
+    int? mediaWidthMils,
   }) async {
     final data = await _timed(
       timing,
       'read_image',
       () => File(filePath).readAsBytes(),
     );
-    final layout = _layout(printer);
+    final layout = _layout(
+      printer,
+      systemMediaSizeId: systemMediaSizeId,
+      mediaWidthMils: mediaWidthMils,
+    );
 
     final body = await _timed(
       timing,
       'encode_image',
-      () => Isolate.run(
-        () => _encodePngToGsV0(
-          pngBytes: data,
-          fullWidth: layout.fullWidth,
-          leftPad: layout.leftPad,
-          contentWidth: layout.contentWidth,
-        ),
+      () async => _encodePngToGsV0(
+        pngBytes: data,
+        fullWidth: layout.fullWidth,
+        leftPad: layout.leftPad,
+        contentWidth: layout.contentWidth,
+        trimChromeMargins: layout.chromeFit,
       ),
     );
     if (body.isEmpty) {
@@ -142,8 +147,7 @@ class EscPosPdfPrint {
       'capability_profile',
       () => EscPosCapabilityProfile.load,
     );
-    final paperSize =
-        printer.paper == PaperWidth.mm58 ? PaperSize.mm58 : PaperSize.mm80;
+    final paperSize = _paperSize(layout.paper);
     final generator = Generator(paperSize, profile);
 
     final bytes = <int>[
@@ -153,6 +157,7 @@ class EscPosPdfPrint {
         bottomMm: printer.margins.bottomMm,
         paperDotsWidth: layout.fullWidth,
         cut: printer.cut,
+        dotsPerMm: printer.dpi.dotsPerMm,
       ),
     ];
     timing?.event('raster_complete', fields: {
@@ -162,34 +167,44 @@ class EscPosPdfPrint {
     return bytes;
   }
 
-  static _PrintLayout _layout(SavedPrinter printer) {
-    final fullWidth = _dotsWidth(printer.paper);
-    final dotsPerMm = fullWidth / printer.paper.printableWidthMm;
-    final left =
-        (printer.margins.leftMm * dotsPerMm).round().clamp(0, fullWidth - 8);
-    final right =
-        (printer.margins.rightMm * dotsPerMm).round().clamp(0, fullWidth - 8);
-    var contentWidth = fullWidth - left - right;
-    if (contentWidth < 8) contentWidth = 8;
-    contentWidth -= contentWidth % 8;
+  static _PrintLayout _layout(
+    SavedPrinter printer, {
+    String? systemMediaSizeId,
+    int? mediaWidthMils,
+  }) {
+    final media = SystemPrintMedia.fromJob(
+      id: systemMediaSizeId,
+      widthMils: mediaWidthMils,
+    );
+    final paper = media?.paper ?? printer.paper;
+    final fullWidth = printer.dpi.dotsFor(paper);
+    // Del diálogo Imprimir: recortar el ticket y llenar 58/80.
+    // Compartir/POS (sin media): 1:1 sin estirar.
     return _PrintLayout(
       fullWidth: fullWidth,
-      leftPad: left,
-      contentWidth: contentWidth,
+      leftPad: 0,
+      contentWidth: fullWidth,
+      paper: paper,
+      chromeFit: media?.chromeFit ?? false,
+      rasterScale: printer.rasterScale.factor,
     );
   }
 
-  static int _dotsWidth(PaperWidth paper) {
-    final raw = paper == PaperWidth.mm58 ? 384 : 576;
-    return raw - (raw % 8);
+  static PaperSize _paperSize(PaperWidth paper) {
+    return paper == PaperWidth.mm58 ? PaperSize.mm58 : PaperSize.mm80;
+  }
+
+  static double _renderWidthPx(_PrintLayout layout) {
+    return (layout.fullWidth * layout.rasterScale).toDouble();
   }
 
   static Future<Uint8List?> _renderPagePng(
     PdfPage page,
     _PrintLayout layout,
   ) async {
-    final renderWidth = layout.contentWidth.toDouble();
-    final renderHeight = page.height * (renderWidth / page.width);
+    final renderWidth = _renderWidthPx(layout);
+    var renderHeight = page.height * (renderWidth / page.width);
+    if (renderHeight < 8) renderHeight = 8;
     final pageImage = await page
         .render(
           width: renderWidth,
@@ -212,125 +227,149 @@ List<int> _encodePngToGsV0({
   required int fullWidth,
   required int leftPad,
   required int contentWidth,
+  bool trimChromeMargins = false,
 }) {
   final prepared = _prepareBitmap(
     pngBytes,
-    contentWidth: contentWidth,
+    fullWidth: fullWidth,
+    trimChromeMargins: trimChromeMargins,
   );
   if (prepared == null) return const [];
   return EscPosGsV0.encodeLuminance(
     prepared,
     threshold: _thresholdFor(prepared),
     outputWidth: fullWidth,
-    leftPad: leftPad,
+    leftPad: 0,
+    trimVertical: true,
   );
 }
 
+/// Compartir/POS: no recortar ni estirar. Chrome: recortar el ticket y
+/// ajustarlo al ancho del rollo (escala uniforme, no deforma).
 img.Image? _prepareBitmap(
   List<int> bytes, {
-  required int contentWidth,
+  required int fullWidth,
+  bool trimChromeMargins = false,
 }) {
   final decoded = img.decodeImage(Uint8List.fromList(bytes));
   if (decoded == null) return null;
 
-  final canvas = img.Image(
-    width: decoded.width,
-    height: decoded.height,
-    numChannels: 3,
-  );
-  img.fill(canvas, color: img.ColorRgb8(255, 255, 255));
-  img.compositeImage(canvas, decoded);
-
-  // Solo blanco superior/inferior; márgenes L/R los define la config.
-  var work = _cropInkVertical(canvas) ?? canvas;
+  var work = decoded;
+  if (work.numChannels != 3) {
+    final canvas = img.Image(
+      width: work.width,
+      height: work.height,
+      numChannels: 3,
+    );
+    img.fill(canvas, color: img.ColorRgb8(255, 255, 255));
+    img.compositeImage(canvas, work);
+    work = canvas;
+  }
 
   if (_averageLuminance(work) < 90) {
     work = img.invert(work);
   }
 
-  work = img.copyResize(
+  if (trimChromeMargins) {
+    work = _trimInkFrame(work);
+  }
+
+  return _alignToFullWidth(
     work,
-    width: contentWidth,
-    interpolation: img.Interpolation.average,
-  );
-
-  if (work.width != contentWidth) {
-    if (work.width > contentWidth) {
-      work = img.copyCrop(
-        work,
-        x: 0,
-        y: 0,
-        width: contentWidth,
-        height: work.height,
-      );
-    } else {
-      final fitted = img.Image(
-        width: contentWidth,
-        height: work.height,
-        numChannels: 3,
-      );
-      img.fill(fitted, color: img.ColorRgb8(255, 255, 255));
-      img.compositeImage(fitted, work, dstX: 0, dstY: 0);
-      work = fitted;
-    }
-  }
-  return work;
-}
-
-img.Image? _cropInkVertical(img.Image image) {
-  int? minY;
-  for (var y = 0; y < image.height; y++) {
-    for (var x = 0; x < image.width; x++) {
-      final p = image.getPixel(x, y);
-      if (p.r + p.g + p.b <= 750) {
-        minY = y;
-        break;
-      }
-    }
-    if (minY != null) break;
-  }
-  if (minY == null) return null;
-
-  int? maxY;
-  for (var y = image.height - 1; y >= minY; y--) {
-    for (var x = 0; x < image.width; x++) {
-      final p = image.getPixel(x, y);
-      if (p.r + p.g + p.b <= 750) {
-        maxY = y;
-        break;
-      }
-    }
-    if (maxY != null) break;
-  }
-  if (maxY == null) return null;
-
-  maxY = (maxY + 1).clamp(0, image.height - 1);
-  final h = maxY - minY + 1;
-  if (h < 8) return null;
-
-  return img.copyCrop(
-    image,
-    x: 0,
-    y: minY,
-    width: image.width,
-    height: h,
+    fullWidth,
+    scaleToFill: trimChromeMargins || work.width > fullWidth + 8,
   );
 }
 
+/// Recorta el marco de tinta. Gris casi blanco (R+G+B > 720) cuenta como papel.
+img.Image _trimInkFrame(img.Image work) {
+  bool isInk(img.Pixel p) => (p.r + p.g + p.b) <= 720;
+
+  var top = -1;
+  var bottom = -1;
+  for (var y = 0; y < work.height; y++) {
+    var ink = false;
+    for (var x = 0; x < work.width; x++) {
+      if (isInk(work.getPixel(x, y))) {
+        ink = true;
+        break;
+      }
+    }
+    if (ink) {
+      if (top < 0) top = y;
+      bottom = y;
+    }
+  }
+  if (top < 0) return work;
+
+  var left = -1;
+  var right = -1;
+  for (var x = 0; x < work.width; x++) {
+    var ink = false;
+    for (var y = top; y <= bottom; y++) {
+      if (isInk(work.getPixel(x, y))) {
+        ink = true;
+        break;
+      }
+    }
+    if (ink) {
+      if (left < 0) left = x;
+      right = x;
+    }
+  }
+  if (left < 0) return work;
+  final w = right - left + 1;
+  final h = bottom - top + 1;
+  if (w < 8 || h < 8) return work;
+  return img.copyCrop(work, x: left, y: top, width: w, height: h);
+}
+
+img.Image _alignToFullWidth(
+  img.Image work,
+  int fullWidth, {
+  required bool scaleToFill,
+}) {
+  final aligned = fullWidth - (fullWidth % 8);
+  if (work.width == aligned) return work;
+  if (scaleToFill) {
+    final h = (work.height * (aligned / work.width)).round().clamp(8, 24000);
+    return img.copyResize(
+      work,
+      width: aligned,
+      height: h,
+      interpolation: img.Interpolation.linear,
+    );
+  }
+  if (work.width > aligned) {
+    return img.copyCrop(work, x: 0, y: 0, width: aligned, height: work.height);
+  }
+  final sheet = img.Image(
+    width: aligned,
+    height: work.height,
+    numChannels: 3,
+  );
+  img.fill(sheet, color: img.ColorRgb8(255, 255, 255));
+  img.compositeImage(sheet, work, dstX: 0, dstY: 0);
+  return sheet;
+}
+
+/// Promedio del gris (0.25R+0.5G+0.25B), tope 254. Mismo criterio que
+/// el filtro 0 de las térmicas de referencia.
 int _thresholdFor(img.Image work) {
   var sum = 0;
-  var count = 0;
-  for (var y = 0; y < work.height; y += 3) {
-    for (var x = 0; x < work.width; x += 3) {
+  var n = 0;
+  for (var y = 0; y < work.height; y++) {
+    for (var x = 0; x < work.width; x++) {
       final p = work.getPixel(x, y);
-      sum += (0.299 * p.r + 0.587 * p.g + 0.114 * p.b).round();
-      count++;
+      var g = (p.r.toInt() >> 2) + (p.g.toInt() >> 1) + (p.b.toInt() >> 2);
+      if (g > 249) g = 255;
+      sum += g;
+      n++;
     }
   }
-  var threshold = count == 0 ? 140 : sum ~/ count;
-  if (threshold < 100) threshold = 100;
-  if (threshold > 200) threshold = 200;
-  return threshold;
+  if (n == 0) return 254;
+  final mean = sum ~/ n;
+  return mean > 254 ? 254 : mean;
 }
 
 double _averageLuminance(img.Image image) {
@@ -355,112 +394,20 @@ Future<T> _timed<T>(
   return timing?.measure(phase, action, fields: fields) ?? action();
 }
 
-/// Un worker por documento evita pagar el arranque de un isolate por página.
-class _RasterWorker {
-  _RasterWorker(this._isolate, this._requests);
-
-  final Isolate _isolate;
-  final SendPort _requests;
-  bool _closed = false;
-
-  static Future<_RasterWorker> start() async {
-    final ready = ReceivePort();
-    try {
-      final isolate = await Isolate.spawn(_rasterWorkerMain, ready.sendPort);
-      final requests = await ready.first.timeout(const Duration(seconds: 10));
-      return _RasterWorker(isolate, requests as SendPort);
-    } finally {
-      ready.close();
-    }
-  }
-
-  Future<List<int>> encode({
-    required Uint8List pngBytes,
-    required int fullWidth,
-    required int leftPad,
-    required int contentWidth,
-  }) async {
-    if (_closed) throw StateError('Raster worker cerrado');
-    final response = ReceivePort();
-    try {
-      _requests.send(<String, Object>{
-        'command': 'encode',
-        'reply': response.sendPort,
-        'png': TransferableTypedData.fromList([pngBytes]),
-        'fullWidth': fullWidth,
-        'leftPad': leftPad,
-        'contentWidth': contentWidth,
-      });
-      final result = await response.first.timeout(const Duration(seconds: 45));
-      if (result is TransferableTypedData) {
-        return result.materialize().asUint8List();
-      }
-      if (result is Map && result['error'] != null) {
-        throw StateError('Raster worker: ${result['error']}');
-      }
-      throw StateError('Respuesta invalida del raster worker');
-    } finally {
-      response.close();
-    }
-  }
-
-  Future<void> close() async {
-    if (_closed) return;
-    _closed = true;
-    final response = ReceivePort();
-    try {
-      _requests.send(<String, Object>{
-        'command': 'close',
-        'reply': response.sendPort,
-      });
-      await response.first.timeout(const Duration(seconds: 2));
-    } catch (_) {
-      // kill() garantiza limpieza si el worker no responde.
-    } finally {
-      response.close();
-      _isolate.kill(priority: Isolate.immediate);
-    }
-  }
-}
-
-void _rasterWorkerMain(SendPort ready) {
-  final requests = ReceivePort();
-  ready.send(requests.sendPort);
-  requests.listen((dynamic message) {
-    final request = Map<Object?, Object?>.from(message as Map);
-    final reply = request['reply'] as SendPort;
-    if (request['command'] == 'close') {
-      reply.send(true);
-      requests.close();
-      return;
-    }
-
-    try {
-      final png =
-          (request['png'] as TransferableTypedData).materialize().asUint8List();
-      final bytes = _encodePngToGsV0(
-        pngBytes: png,
-        fullWidth: request['fullWidth'] as int,
-        leftPad: request['leftPad'] as int,
-        contentWidth: request['contentWidth'] as int,
-      );
-      reply.send(
-        TransferableTypedData.fromList([Uint8List.fromList(bytes)]),
-      );
-    } catch (error) {
-      reply.send(<String, String>{'error': error.runtimeType.toString()});
-    }
-  });
-}
-
 class _PrintLayout {
   const _PrintLayout({
     required this.fullWidth,
     required this.leftPad,
     required this.contentWidth,
+    required this.paper,
+    this.chromeFit = false,
+    this.rasterScale = 1,
   });
 
   final int fullWidth;
   final int leftPad;
   final int contentWidth;
+  final PaperWidth paper;
+  final bool chromeFit;
+  final int rasterScale;
 }
