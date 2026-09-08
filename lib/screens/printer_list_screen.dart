@@ -170,7 +170,9 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
                 leading: Icon(
                   printer.type == PrinterLinkType.bluetooth
                       ? Icons.bluetooth_connected
-                      : Icons.wifi,
+                      : printer.type == PrinterLinkType.usb
+                          ? Icons.usb
+                          : Icons.wifi,
                 ),
                 title: Text(printer.name),
                 subtitle: Text(
@@ -273,7 +275,9 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
                           child: Icon(
                             p.type == PrinterLinkType.bluetooth
                                 ? Icons.bluetooth
-                                : Icons.wifi,
+                                : p.type == PrinterLinkType.usb
+                                    ? Icons.usb
+                                    : Icons.wifi,
                           ),
                         ),
                         title: Text(p.name),

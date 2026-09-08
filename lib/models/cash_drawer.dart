@@ -20,7 +20,7 @@ enum CashDrawer {
       case CashDrawer.none:
         return 'No envía comando (impresoras sin cajón)';
       case CashDrawer.pin2:
-        return 'Conector habitual; se abre al terminar de imprimir';
+        return 'Conector habitual; el cajon se abre cuando ya salio el ticket';
       case CashDrawer.pin5:
         return 'Segundo conector del cajón';
     }
@@ -36,6 +36,22 @@ enum CashDrawer {
       case CashDrawer.pin5:
         return const [0x1b, 0x70, 0x01, 0x19, 0x78];
     }
+  }
+
+  /// En USB/IMIN el cajón del equipo abre con DLE DC4 `10 14 00 00 00`.
+  List<int> kickBytes({bool usb = false}) {
+    if (this == CashDrawer.none) return const [];
+    if (!usb) return escPosBytes;
+    return <int>[
+      0x1b,
+      0x40,
+      ...escPosBytes,
+      0x10,
+      0x14,
+      0x00,
+      0x00,
+      0x00,
+    ];
   }
 
   static CashDrawer fromName(String name) {

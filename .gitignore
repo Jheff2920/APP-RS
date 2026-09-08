@@ -52,6 +52,7 @@ app.*.map.json
 
 # Reference dumps (not part of the app)
 /apk-ejemplo/
+/apk-imin/
 
 
 # Machine-local / build noise

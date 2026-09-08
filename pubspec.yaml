@@ -1,7 +1,7 @@
 name: hello_world_app
-description: Controlador Android de impresoras termicas (Bluetooth + WiFi) para boletas.
+description: Controlador Android de impresoras termicas (Bluetooth, WiFi y USB) para boletas.
 publish_to: "none"
-version: 1.6.7+24
+version: 1.6.13+30
 
 environment:
   sdk: ^3.5.0

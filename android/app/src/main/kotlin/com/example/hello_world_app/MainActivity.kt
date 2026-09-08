@@ -19,6 +19,7 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         flutterEngine.plugins.add(PrintersNativePrefsPlugin())
+        flutterEngine.plugins.add(UsbPrinterPlugin())
         systemChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             CHANNEL_SYSTEM,

@@ -15,7 +15,7 @@ Ejecutar siempre con el mismo PDF y anotar por separado:
 1. PrintService en frío: cerrar la app y detener el proceso antes de imprimir.
 2. PrintService caliente: repetir sin detener el proceso.
 3. Compartir desde Android.
-4. Bluetooth y TCP, si ambos están disponibles.
+4. Bluetooth, USB y TCP, si están disponibles.
 5. Papel 58 mm y 80 mm.
 
 Cada escenario necesita al menos cinco repeticiones. Usar la mediana, no el
@@ -42,7 +42,8 @@ Referencia local del 2026-09-04 para 576 × 1800 px:
 - `native_raster`: PrintService con PdfRenderer nativo (sin Flutter/pdfx).
 - `open_pdf`, `render_page`, `encode_page`: preparación raster Dart (Compartir / fallback).
 - `bluetooth_connect` / `network_connect`: apertura del transporte.
-- `bluetooth_write` / `network_write`: envío y protección previa al cierre.
+- `bluetooth_write` / `network_write` / `usb_write`: envío del ticket (conexión sigue abierta).
+- `drawer`: espera + segundo write `ESC p` (BT 2.5–8 s, USB 800 ms, TCP 300 ms).
 - `system_total` / `finish`: duración total conocida por la app.
 
 La app no recibe confirmación física de la impresora. Para medir el tiempo

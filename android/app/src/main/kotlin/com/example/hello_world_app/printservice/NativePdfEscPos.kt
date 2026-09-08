@@ -25,6 +25,8 @@ object NativePdfEscPos {
     private const val MAX_PAGES = 8
     private const val BAND_HEIGHT = 48
     private const val NEAR_WHITE_SUM = 720
+    /** Aire superior ~4 mm a 203 dpi. */
+    private const val TOP_AIR_DOTS = 32
 
     fun build(
         pdf: File,
@@ -35,13 +37,14 @@ object NativePdfEscPos {
         cut: String,
         dpi: Int = 203,
         rasterScale: Int = 1,
-        cashDrawer: String = "none",
     ): ByteArray {
         val width = dotsWidth(mediaSizeId, mediaWidthMils, savedPaper, dpi)
         val hi = rasterScale.coerceIn(1, 3)
         val tallChrome = isTallChromePage(mediaSizeId)
         val out = ByteArrayOutputStream()
         out.write(byteArrayOf(0x1b, 0x40))
+        // Retroceso ~8–10 mm (ESC j). Si el firmware lo ignora, no pasa nada.
+        out.write(byteArrayOf(0x1b, 0x6a, 0x40))
 
         ParcelFileDescriptor.open(pdf, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
             PdfRenderer(pfd).use { renderer ->
@@ -65,7 +68,6 @@ object NativePdfEscPos {
 
         appendFeed(out, width, bottomMm, dpi)
         out.write(cutBytes(cut))
-        out.write(drawerBytes(cashDrawer))
         val data = out.toByteArray()
         if (data.size < 16) throw IllegalStateException("Ticket vacio")
         return data
@@ -142,11 +144,12 @@ object NativePdfEscPos {
         )
         page.render(dest, null, matrix, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
         thresholdToBw(dest)
-        return if (step <= 1) {
+        val sheet = if (step <= 1) {
             padToRoll(dest, outW)
         } else {
             downsampleExact(dest, outW, step)
         }
+        return trimLeadingWhite(sheet, TOP_AIR_DOTS)
     }
 
     /** x2/x3: bitmap exactamente aligned*hi; mayoría → ancho del rollo. */
@@ -189,6 +192,38 @@ object NativePdfEscPos {
         val pixels = IntArray(copyW * src.height)
         src.getPixels(pixels, 0, copyW, 0, 0, copyW, src.height)
         sheet.setPixels(pixels, 0, copyW, 0, 0, copyW, src.height)
+        src.recycle()
+        return sheet
+    }
+
+    /** Quita blanco de arriba y deja [keepDots] de aire (~4 mm). */
+    private fun trimLeadingWhite(src: Bitmap, keepDots: Int): Bitmap {
+        val w = src.width
+        val h = src.height
+        if (h <= keepDots) return src
+        val pixels = IntArray(w * h)
+        src.getPixels(pixels, 0, w, 0, 0, w, h)
+        var firstInk = -1
+        for (y in 0 until h) {
+            val row = y * w
+            var ink = false
+            for (x in 0 until w) {
+                if ((pixels[row + x] and 0xff) <= 127) {
+                    ink = true
+                    break
+                }
+            }
+            if (ink) {
+                firstInk = y
+                break
+            }
+        }
+        if (firstInk < 0) return src
+        val start = max(0, firstInk - keepDots)
+        if (start == 0) return src
+        val outH = h - start
+        val sheet = Bitmap.createBitmap(w, outH, Bitmap.Config.ARGB_8888)
+        sheet.setPixels(pixels, start * w, w, 0, 0, w, outH)
         src.recycle()
         return sheet
     }
@@ -252,8 +287,8 @@ object NativePdfEscPos {
     /**
      * Google/Max (58 y 80): página altísima de Chrome. El ticket queda arriba
      * y el encabezado/pie del navegador ensanchan el marco. Se toma el bloque
-     * de tinta más denso (el ticket), se deja un poco de aire para no cortar
-     * el logo y se escala al rollo.
+     * de tinta más denso (el ticket), se deja ~4 mm de aire arriba para no
+     * cortar el logo y se escala al rollo.
      */
     private fun findChromeTicketFrame(bmp: Bitmap): Rect? {
         val w = bmp.width
@@ -352,7 +387,8 @@ object NativePdfEscPos {
         if (left < 0 || right <= left) return null
 
         val padX = max(4, (right - left + 1) / 40)
-        val padTop = max(8, blockH / 28)
+        // ~4 mm si el preview está en puntos PDF (no crece con páginas altas).
+        val padTop = 10
         val padBottom = max(4, blockH / 36)
         return Rect(
             max(0, left - padX),
@@ -474,14 +510,6 @@ object NativePdfEscPos {
             "partialGsVB" -> byteArrayOf(0x1d, 0x56, 0x42, 0x00)
             "partialEscM" -> byteArrayOf(0x1b, 0x6d)
             "partialEscD1" -> byteArrayOf(0x1b, 0x64, 0x01)
-            else -> byteArrayOf()
-        }
-    }
-
-    private fun drawerBytes(cashDrawer: String): ByteArray {
-        return when (cashDrawer) {
-            "pin2" -> byteArrayOf(0x1b, 0x70, 0x00, 0x19, 0x78)
-            "pin5" -> byteArrayOf(0x1b, 0x70, 0x01, 0x19, 0x78)
             else -> byteArrayOf()
         }
     }

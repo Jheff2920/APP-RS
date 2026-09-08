@@ -96,7 +96,6 @@ class EscPosPdfPrint {
           bottomMm: printer.margins.bottomMm,
           paperDotsWidth: layout.fullWidth,
           cut: printer.cut,
-          cashDrawer: printer.cashDrawer,
           dotsPerMm: printer.dpi.dotsPerMm,
         ),
       );
@@ -158,7 +157,6 @@ class EscPosPdfPrint {
         bottomMm: printer.margins.bottomMm,
         paperDotsWidth: layout.fullWidth,
         cut: printer.cut,
-        cashDrawer: printer.cashDrawer,
         dotsPerMm: printer.dpi.dotsPerMm,
       ),
     ];

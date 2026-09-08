@@ -7,11 +7,13 @@ import '../models/saved_printer.dart';
 import '../widgets/print_status_dialog.dart';
 import 'escpos_pdf_print.dart';
 import 'escpos_test_page.dart';
+import 'drawer_wait.dart';
 import 'print_history_store.dart';
 import 'print_timing.dart';
 import 'printer_permissions.dart';
 import 'transports/printer_transport.dart';
 import 'transports/printer_transport_factory.dart';
+import 'usb_printer_channel.dart';
 
 class PrintService {
   PrintService({PrintHistoryStore? history})
@@ -148,6 +150,22 @@ class PrintService {
         () => transport.writeBytes(bytes),
         fields: {'bytes': bytes.length},
       );
+
+      final kick = printer.cashDrawer.kickBytes(
+        usb: printer.type == PrinterLinkType.usb,
+      );
+      if (kick.isNotEmpty) {
+        await Future<void>.delayed(
+          DrawerWait.forPrinter(printer, bytes.length),
+        );
+        await timing.measure('drawer', () async {
+          if (printer.type == PrinterLinkType.usb) {
+            final gpio = await UsbPrinterChannel.openCashBox();
+            if (gpio) return;
+          }
+          await transport.writeBytes(kick);
+        });
+      }
 
       phase(PrintPhase.printing);
       await paint();

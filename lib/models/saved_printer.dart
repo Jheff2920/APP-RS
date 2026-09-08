@@ -7,9 +7,19 @@ import 'raster_scale.dart';
 
 enum PrinterLinkType {
   bluetooth,
-  network;
+  network,
+  usb;
 
-  String get label => this == PrinterLinkType.bluetooth ? 'Bluetooth' : 'WiFi / Red';
+  String get label {
+    switch (this) {
+      case PrinterLinkType.bluetooth:
+        return 'Bluetooth';
+      case PrinterLinkType.network:
+        return 'WiFi / Red';
+      case PrinterLinkType.usb:
+        return 'USB';
+    }
+  }
 
   static PrinterLinkType fromName(String name) {
     return PrinterLinkType.values.firstWhere(
@@ -117,9 +127,13 @@ class SavedPrinter {
   }
 
   String get connectionSummary {
-    if (type == PrinterLinkType.bluetooth) {
-      return 'BT $address';
+    switch (type) {
+      case PrinterLinkType.bluetooth:
+        return 'BT $address';
+      case PrinterLinkType.usb:
+        return 'USB $address';
+      case PrinterLinkType.network:
+        return '$address:$port';
     }
-    return '$address:$port';
   }
 }

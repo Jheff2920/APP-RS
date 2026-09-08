@@ -11,6 +11,7 @@ import '../models/saved_printer.dart';
 import '../services/print_service.dart';
 import '../services/printer_permissions.dart';
 import '../services/printer_store.dart';
+import '../services/usb_printer_channel.dart';
 import '../services/transports/printer_transport.dart';
 import '../widgets/margin_fields.dart';
 import '../widgets/paper_width_selector.dart';
@@ -51,7 +52,9 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
   late bool _isDefault;
 
   List<BluetoothInfo> _paired = [];
+  List<UsbDeviceInfo> _usbDevices = [];
   bool _loadingPaired = false;
+  bool _loadingUsb = false;
   bool _saving = false;
   bool _testing = false;
   bool _firstPrinter = false;
@@ -77,6 +80,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
 
     if (_type == PrinterLinkType.bluetooth) {
       _loadPaired();
+    } else if (_type == PrinterLinkType.usb) {
+      _loadUsb();
     }
     _initDefaultFlag();
   }
@@ -126,6 +131,50 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
       }
     } finally {
       if (mounted) setState(() => _loadingPaired = false);
+    }
+  }
+
+  Future<void> _loadUsb() async {
+    setState(() => _loadingUsb = true);
+    try {
+      final list = await UsbPrinterChannel.listDevices();
+      if (!mounted) return;
+      setState(() => _usbDevices = list);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudieron listar USB: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingUsb = false);
+    }
+  }
+
+  Future<void> _pickUsb(UsbDeviceInfo d) async {
+    try {
+      final ok = await UsbPrinterChannel.requestPermission(d.address);
+      if (!ok) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Permiso USB denegado')),
+          );
+        }
+        return;
+      }
+      if (!mounted) return;
+      setState(() {
+        _addressCtrl.text = d.address;
+        if (_nameCtrl.text.trim().isEmpty) {
+          _nameCtrl.text = d.name;
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('USB: $e')),
+        );
+      }
     }
   }
 
@@ -239,13 +288,18 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
               segments: const [
                 ButtonSegment(
                   value: PrinterLinkType.bluetooth,
-                  label: Text('Bluetooth'),
+                  label: Text('BT'),
                   icon: Icon(Icons.bluetooth),
                 ),
                 ButtonSegment(
                   value: PrinterLinkType.network,
                   label: Text('WiFi'),
                   icon: Icon(Icons.wifi),
+                ),
+                ButtonSegment(
+                  value: PrinterLinkType.usb,
+                  label: Text('USB'),
+                  icon: Icon(Icons.usb),
                 ),
               ],
               selected: {_type},
@@ -254,6 +308,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
                   _type = set.first;
                   if (_type == PrinterLinkType.bluetooth) {
                     _loadPaired();
+                  } else if (_type == PrinterLinkType.usb) {
+                    _loadUsb();
                   }
                 });
               },
@@ -314,6 +370,65 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
                     return 'Selecciona o escribe la MAC';
+                  }
+                  return null;
+                },
+              ),
+            ] else if (_type == PrinterLinkType.usb) ...[
+              Row(
+                children: [
+                  Text(
+                    'Elegir impresora USB',
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: _loadingUsb ? null : _loadUsb,
+                    icon: _loadingUsb
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
+                  ),
+                ],
+              ),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'En IMIN/Falcon usa USB (impresora integrada), no Bluetooth. '
+                  'Concede el permiso al elegir el dispositivo.',
+                ),
+              ),
+              if (_usbDevices.isEmpty && !_loadingUsb)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Text('No hay dispositivos USB con salida de impresora.'),
+                ),
+              ..._usbDevices.map(
+                (d) => ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.usb),
+                  title: Text(d.name),
+                  subtitle: Text(
+                    '${d.address}${d.hasPermission ? '' : ' · sin permiso'}',
+                  ),
+                  selected: _addressCtrl.text == d.address,
+                  onTap: () => _pickUsb(d),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _addressCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'USB vid:pid',
+                  hintText: '1137:85',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Selecciona un dispositivo USB';
                   }
                   return null;
                 },
@@ -434,8 +549,9 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
             Text('Gaveta de dinero', style: theme.textTheme.titleMedium),
             const SizedBox(height: 4),
             Text(
-              'Opcional: al terminar de imprimir se envía un pulso ESC/POS. '
-              'Si la impresora no tiene cajón, deja «Sin gaveta».',
+              'Opcional: el pulso se envía cuando el ticket ya salió. '
+              'En Falcon/USB la gaveta es del equipo (GPIO), no del cable USB. '
+              'Elige Pin 2 o Pin 5. Si no hay cajón, deja «Sin gaveta».',
               style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: 8),

@@ -175,7 +175,6 @@ class BoletaPrintService : PrintService() {
                     row.cut,
                     row.dpi,
                     row.rasterScale,
-                    row.cashDrawer,
                 )
             } catch (nativeError: Exception) {
                 Log.w(TAG, "Native raster fallback to Flutter", nativeError)
@@ -200,17 +199,41 @@ class BoletaPrintService : PrintService() {
 
             mainHandler.post { overlay.setStatus("Enviando a ${row.name}...") }
 
-            if (connectFuture != null) {
-                val socket = try {
-                    connectFuture.get(45, TimeUnit.SECONDS)
-                } catch (e: Exception) {
-                    throw IllegalStateException(
-                        e.cause?.message ?: e.message ?: "No se pudo conectar",
-                    )
+            val drawer = EscPosTransport.drawerBytes(row.cashDrawer, row.type)
+            val waitMs = EscPosTransport.drawerWaitMs(row.type, data.size)
+            if (drawer.isNotEmpty()) {
+                mainHandler.post {
+                    overlay.setStatus("Ticket a ${row.name}, luego gaveta...")
                 }
-                EscPosTransport.writeBluetooth(socket, data, jobId)
-            } else {
-                EscPosTransport.sendNetwork(row.address, row.port, data, jobId)
+            }
+            when (row.type) {
+                "usb" -> EscPosTransport.sendUsb(
+                    applicationContext,
+                    row.address,
+                    data,
+                    jobId,
+                    drawer,
+                    waitMs,
+                )
+                "bluetooth" -> {
+                    val socket = try {
+                        connectFuture?.get(45, TimeUnit.SECONDS)
+                            ?: throw IllegalStateException("Sin conexion Bluetooth")
+                    } catch (e: Exception) {
+                        throw IllegalStateException(
+                            e.cause?.message ?: e.message ?: "No se pudo conectar",
+                        )
+                    }
+                    EscPosTransport.writeBluetooth(socket, data, jobId, drawer, waitMs)
+                }
+                else -> EscPosTransport.sendNetwork(
+                    row.address,
+                    row.port,
+                    data,
+                    jobId,
+                    drawer,
+                    waitMs,
+                )
             }
 
             succeeded = true

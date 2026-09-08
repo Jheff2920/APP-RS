@@ -90,12 +90,11 @@ class EscPosTestPage {
     leftLine(
         'Inf=${margins.bottomMm.toStringAsFixed(0)}mm = avance para cortar.');
 
-    // Margen inferior + corte + gaveta opcional.
+    // Margen inferior + corte (gaveta se envia despues).
     bytes += EscPosFeed.finishJob(
       bottomMm: margins.bottomMm,
       paperDotsWidth: paperDots,
       cut: printer.cut,
-      cashDrawer: printer.cashDrawer,
       dotsPerMm: printer.dpi.dotsPerMm,
     );
     return bytes;

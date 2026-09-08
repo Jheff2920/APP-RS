@@ -209,10 +209,10 @@ class BoletaPrinterDiscoverySession(
                 val paper = o.optString("paper", "mm58")
                 val dpi = if (o.optString("dpi", "dpi203") == "dpi300") 300 else 203
                 val isDefault = o.optBoolean("isDefault", false)
-                val desc = if (type == "bluetooth") {
-                    "BT $address · $paper · ${dpi}dpi"
-                } else {
-                    "$address:$port · $paper · ${dpi}dpi"
+                val desc = when (type) {
+                    "bluetooth" -> "BT $address · $paper · ${dpi}dpi"
+                    "usb" -> "USB $address · $paper · ${dpi}dpi"
+                    else -> "$address:$port · $paper · ${dpi}dpi"
                 }
                 out.add(
                     SavedPrinterRow(
