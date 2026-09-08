@@ -112,9 +112,18 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
                 children: [
                   Card(
                     child: ListTile(
-                      leading: const Icon(Icons.picture_as_pdf),
+                      leading: Icon(
+                        name.toLowerCase().endsWith('.xml')
+                            ? Icons.description
+                            : Icons.picture_as_pdf,
+                      ),
                       title: Text(name),
-                      subtitle: Text(widget.filePath, maxLines: 2),
+                      subtitle: Text(
+                        name.toLowerCase().endsWith('.xml')
+                            ? 'XML SUNAT → boleta ${(_selected?.paper.label ?? '')}'
+                            : widget.filePath,
+                        maxLines: 2,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -126,7 +135,7 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
                   if (_printers.isEmpty)
                     const Text(
                       'No hay impresoras vinculadas. Abre Boleta Print, '
-                      'agrega una impresora y vuelve a compartir el PDF.',
+                      'agrega una impresora y vuelve a compartir el archivo.',
                     )
                   else
                     DropdownButtonFormField<String>(

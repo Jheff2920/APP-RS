@@ -206,34 +206,44 @@ class BoletaPrintService : PrintService() {
                     overlay.setStatus("Ticket a ${row.name}, luego gaveta...")
                 }
             }
-            when (row.type) {
-                "usb" -> EscPosTransport.sendUsb(
-                    applicationContext,
-                    row.address,
-                    data,
-                    jobId,
-                    drawer,
-                    waitMs,
-                )
-                "bluetooth" -> {
-                    val socket = try {
-                        connectFuture?.get(45, TimeUnit.SECONDS)
-                            ?: throw IllegalStateException("Sin conexion Bluetooth")
-                    } catch (e: Exception) {
-                        throw IllegalStateException(
-                            e.cause?.message ?: e.message ?: "No se pudo conectar",
-                        )
+            try {
+                when (row.type) {
+                    "usb" -> EscPosTransport.sendUsb(
+                        applicationContext,
+                        row.address,
+                        data,
+                        jobId,
+                        drawer,
+                        waitMs,
+                    )
+                    "bluetooth" -> {
+                        val socket = try {
+                            connectFuture?.get(45, TimeUnit.SECONDS)
+                                ?: throw IllegalStateException("Sin conexion Bluetooth")
+                        } catch (e: Exception) {
+                            throw IllegalStateException(
+                                e.cause?.message ?: e.message ?: "No se pudo conectar",
+                            )
+                        }
+                        EscPosTransport.writeBluetooth(socket, data, jobId, drawer, waitMs)
                     }
-                    EscPosTransport.writeBluetooth(socket, data, jobId, drawer, waitMs)
+                    else -> EscPosTransport.sendNetwork(
+                        row.address,
+                        row.port,
+                        data,
+                        jobId,
+                        drawer,
+                        waitMs,
+                    )
                 }
-                else -> EscPosTransport.sendNetwork(
-                    row.address,
-                    row.port,
-                    data,
-                    jobId,
-                    drawer,
-                    waitMs,
-                )
+            } catch (sendError: Exception) {
+                if (drawer.isNotEmpty()) {
+                    IminCashBox.open()
+                }
+                throw sendError
+            }
+            if (drawer.isNotEmpty()) {
+                IminCashBox.open()
             }
 
             succeeded = true

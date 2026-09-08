@@ -27,6 +27,8 @@ object NativePdfEscPos {
     private const val NEAR_WHITE_SUM = 720
     /** Aire superior ~4 mm a 203 dpi. */
     private const val TOP_AIR_DOTS = 32
+    /** Tope ~1 m a 203 dpi: Google/ancho de Chrome no dispara un bitmap gigante. */
+    private const val MAX_TICKET_DOTS = 8000
 
     fun build(
         pdf: File,
@@ -40,7 +42,7 @@ object NativePdfEscPos {
     ): ByteArray {
         val width = dotsWidth(mediaSizeId, mediaWidthMils, savedPaper, dpi)
         val hi = rasterScale.coerceIn(1, 3)
-        val tallChrome = isTallChromePage(mediaSizeId)
+        val tallChrome = true
         val out = ByteArrayOutputStream()
         out.write(byteArrayOf(0x1b, 0x40))
         // Retroceso ~8–10 mm (ESC j). Si el firmware lo ignora, no pasa nada.
@@ -95,11 +97,6 @@ object NativePdfEscPos {
         return raw - (raw % 8)
     }
 
-    private fun isTallChromePage(mediaSizeId: String?): Boolean {
-        val id = mediaSizeId?.uppercase().orEmpty()
-        return id.contains("MAX") || id.contains("GOOGLE")
-    }
-
     private fun renderPage(
         page: PdfRenderer.Page,
         targetWidth: Int,
@@ -123,7 +120,10 @@ object NativePdfEscPos {
 
         val contentW = frame.width().coerceAtLeast(1)
         val contentH = frame.height().coerceAtLeast(1)
-        val outH = max(8, (contentH.toLong() * outW / contentW).toInt())
+        val outH = max(
+            8,
+            min(MAX_TICKET_DOTS, (contentH.toLong() * outW / contentW).toInt()),
+        )
         val step = hi.coerceIn(1, 3)
         val hiW = outW * step
         val hiH = outH * step

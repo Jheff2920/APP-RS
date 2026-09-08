@@ -2,9 +2,9 @@
 
 > **Para Cursor / agente IA:** Lee este archivo al inicio de cada sesión nueva.
 
-**Última actualización:** 2026-09-08 (v1.6.13)  
+**Última actualización:** 2026-09-08 (v1.6.15)  
 **Carpeta:** `C:\Users\RS-Soporte\Documents\app`  
-**Versión:** `1.6.13+30`  
+**Versión:** `1.6.15+32`  
 **Package ID:** `com.example.hello_world_app`
 
 ---
@@ -13,9 +13,9 @@
 
 **Boleta Print** — intermediario Android para impresoras térmicas ESC/POS.
 
-- No diseña boletas (las genera el POS).
+- Imprime PDF/imagen del POS, o arma ticket desde **XML UBL SUNAT** (boleta/factura).
 - Bluetooth Classic, TCP :9100 o USB host (impresora integrada IMIN/Falcon).
-- Entradas: **Compartir** y **PrintService** (diálogo Imprimir del sistema).
+- Entradas: **Compartir** (PDF/imagen/XML) y **PrintService** (PDF del sistema).
 
 ---
 
@@ -34,15 +34,16 @@
 - [x] Gaveta opcional en un **segundo envío** tras espera (más larga en BT)
 - [x] USB host bulk OUT (clase impresora o primer bulk); formulario + PrintService + Compartir
 - [x] Falcon: gaveta por GPIO (`/sys/extcon-usb-gpio/cashbox_en`), no ESC/POS USB
+- [x] XML SUNAT UBL Invoice 01/03 → ESC/POS 58/80 + QR (Compartir / Abrir)
 - [ ] v2 — jobs del POS (HTTP / cola)
-- [ ] iOS
+- [ ] iOS · notas de crédito · ZIP SUNAT
 
 ---
 
 ## Flujos de impresión
 
 ### A) Compartir
-`SEND`/`VIEW` → `SharePrintScreen` → `PrintService.printSharedFile` → BT plugin / USB bulk / TCP.
+`SEND`/`VIEW` → `SharePrintScreen` → `PrintService.printSharedFile` → PDF/imagen raster **o** XML SUNAT (`SunatUblParser` + ESC/POS) → BT / USB / TCP.
 
 ### B) Sistema (Imprimir) — camino principal
 1. `BoletaPrintService` recibe el PrintJob y copia el PDF.
@@ -76,6 +77,7 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 | Prefs headless | `SharedPreferences.reload()` en cada `loadAll()` |
 | Build diario | `.\scripts\run-phone.ps1 -InstallOnly` |
 | Referencia | `apk-ejemplo/` RawBT (protocolo, no pegar código) |
+| XML SUNAT | UBL Invoice 01/03; QR `RUC|tipo|serie|nro|IGV|total|fecha|doc|nro`; sin SDK |
 
 ---
 
@@ -113,6 +115,7 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 - `android/.../printservice/PrintSettingsActivity.kt`
 - `android/.../PrintEngineBridge.kt` (fallback)
 - `lib/system_print_main.dart`
+- `lib/services/sunat/` (`sunat_ubl_parser`, `sunat_escpos_print`)
 
 ---
 
@@ -128,5 +131,5 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 
 ## Cómo retomar
 
-> **v1.6.13:** USB Falcon + gaveta GPIO IMIN validada. Ticket por USB; cajón por `cashbox_en`.  
-> Siguiente fase natural: **v2** (jobs del POS por red/cola).
+> **v1.6.15:** Normal/Google usan la misma página alta y recorte que Max; gaveta GPIO + ESC @ tras el ticket.  
+> Siguiente: afinar XML real; **v2** jobs del POS.

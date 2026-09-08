@@ -154,7 +154,8 @@ class BoletaPrinterDiscoverySession(
         private const val TAG = "BoletaDiscovery"
         private const val WIDTH_58_MILS = 3000
         private const val WIDTH_80_MILS = 3150
-        private const val HEIGHT_NORMAL_MILS = 8661
+        /** Misma altura que Max: Chrome no pagina ni recorta el ticket. */
+        private const val HEIGHT_NORMAL_MILS = 32000
         private const val HEIGHT_MAX_MILS = 32000
 
         data class SavedPrinterRow(

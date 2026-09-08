@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
@@ -11,6 +13,8 @@ import 'drawer_wait.dart';
 import 'print_history_store.dart';
 import 'print_timing.dart';
 import 'printer_permissions.dart';
+import 'sunat/sunat_escpos_print.dart';
+import 'sunat/sunat_ubl_parser.dart';
 import 'transports/printer_transport.dart';
 import 'transports/printer_transport_factory.dart';
 import 'usb_printer_channel.dart';
@@ -37,7 +41,7 @@ class PrintService {
     );
   }
 
-  /// Imprime un archivo compartido (PDF o imagen).
+  /// Imprime un archivo compartido (PDF, imagen o XML SUNAT).
   Future<void> printSharedFile({
     required SavedPrinter printer,
     required String filePath,
@@ -71,8 +75,11 @@ class PrintService {
             timing: timing,
           );
         }
+        if (await _isSunatXml(filePath)) {
+          return _buildSunatTicket(printer, filePath);
+        }
         throw PrinterTransportException(
-          'Formato no soportado aun. Usa PDF o imagen (PNG/JPG).',
+          'Formato no soportado. Usa PDF, imagen (PNG/JPG) o XML SUNAT.',
         );
       },
     );
@@ -217,6 +224,40 @@ class PrintService {
         // El historial no debe convertir una impresión enviada en un fallo.
       }
     });
+  }
+
+  static Future<List<int>> _buildSunatTicket(
+    SavedPrinter printer,
+    String filePath,
+  ) async {
+    try {
+      final xml = await File(filePath).readAsString(encoding: utf8);
+      final ticket = SunatUblParser.parse(xml);
+      return SunatEscPosPrint.build(printer, ticket);
+    } on SunatXmlException catch (e) {
+      throw PrinterTransportException(e.message);
+    } on FileSystemException {
+      throw PrinterTransportException('No se pudo leer el XML.');
+    }
+  }
+
+  static Future<bool> _isSunatXml(String path) async {
+    if (path.toLowerCase().endsWith('.xml')) return true;
+    try {
+      final file = File(path);
+      if (!await file.exists()) return false;
+      final raf = await file.open();
+      try {
+        final n = await raf.length() < 400 ? await raf.length() : 400;
+        final bytes = await raf.read(n);
+        final head = utf8.decode(bytes, allowMalformed: true).trimLeft();
+        return head.startsWith('<?xml') || head.contains('<Invoice');
+      } finally {
+        await raf.close();
+      }
+    } catch (_) {
+      return false;
+    }
   }
 
   static bool _isImage(String path) {

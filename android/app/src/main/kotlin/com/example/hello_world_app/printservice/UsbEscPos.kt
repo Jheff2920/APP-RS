@@ -85,18 +85,23 @@ object UsbEscPos {
                     mapOf("bytes" to data.size),
                 )
                 if (drawer.isNotEmpty()) {
-                    Thread.sleep(drawerWaitMs.coerceAtLeast(80))
-                    val gpio = IminCashBox.open()
-                    PrintTiming.event(
-                        jobId,
-                        "usb_drawer",
-                        mapOf("gpio" to gpio),
-                    )
-                    if (!gpio) {
-                        writeBulk(conn, ifaceEp.second, drawer)
-                        Thread.sleep(80)
+                    try {
+                        Thread.sleep(drawerWaitMs.coerceAtLeast(80))
+                        val gpio = IminCashBox.open()
+                        PrintTiming.event(
+                            jobId,
+                            "usb_drawer",
+                            mapOf("gpio" to gpio),
+                        )
+                        if (!gpio) {
+                            writeBulk(conn, ifaceEp.second, drawer)
+                            Thread.sleep(80)
+                        }
+                        Log.i(TAG, "USB drawer gpio=$gpio")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Gaveta USB falló; el ticket ya salió", e)
+                        IminCashBox.open()
                     }
-                    Log.i(TAG, "USB drawer gpio=$gpio")
                 }
             } finally {
                 conn.releaseInterface(ifaceEp.first)

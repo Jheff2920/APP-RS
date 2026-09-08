@@ -41,17 +41,9 @@ enum CashDrawer {
   /// En USB/IMIN el cajón del equipo abre con DLE DC4 `10 14 00 00 00`.
   List<int> kickBytes({bool usb = false}) {
     if (this == CashDrawer.none) return const [];
-    if (!usb) return escPosBytes;
-    return <int>[
-      0x1b,
-      0x40,
-      ...escPosBytes,
-      0x10,
-      0x14,
-      0x00,
-      0x00,
-      0x00,
-    ];
+    final wake = <int>[0x1b, 0x40, ...escPosBytes];
+    if (!usb) return wake;
+    return <int>[...wake, 0x10, 0x14, 0x00, 0x00, 0x00];
   }
 
   static CashDrawer fromName(String name) {

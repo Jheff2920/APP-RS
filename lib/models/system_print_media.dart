@@ -44,7 +44,7 @@ class SystemPrintMedia {
     if (paper == null) return null;
     return SystemPrintMedia(
       paper: paper,
-      previewMax: upper.contains('MAX') || upper.contains('GOOGLE'),
+      previewMax: true,
       chromeFit: true,
       rawId: id,
     );

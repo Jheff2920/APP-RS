@@ -1,10 +1,10 @@
 # Boleta Print
 
 Controlador Android de impresoras térmicas ESC/POS (58 y 80 mm).  
-**No diseña boletas** — el POS las genera (PDF/imagen); esta app las imprime.
+Imprime PDF/imagen del POS **o** convierte el **XML UBL de SUNAT** (boleta/factura) a ticket 58/80 mm.
 
 **Repo:** https://github.com/Jheff2920/APP-RS  
-**Versión:** 1.6.13+30 · Package ID: `com.example.hello_world_app`  
+**Versión:** 1.6.15+32 · Package ID: `com.example.hello_world_app`  
 **Rama estable:** `main` · **Rama de pruebas:** `test/pruebas`
 
 > Memoria técnica: [CONTEXTO.md](CONTEXTO.md) · Rendimiento: [docs/PRINT_PERFORMANCE.md](docs/PRINT_PERFORMANCE.md)
@@ -16,10 +16,11 @@ Controlador Android de impresoras térmicas ESC/POS (58 y 80 mm).
 - Raster nativo (`NativePdfEscPos`): recorte de tinta + umbral promedio + `GS v 0`.
 - **Nitidez x1/x2/x3** imprime al **mismo tamaño** (384/576). x2/x3 solo rasterizan el recorte a más puntos (no aplastan Google/Max).
 - Chrome 58 mm: ancho 3000 mils (~76 mm) para que el ticket no se encoja a la mitad. 80 mm sigue en 3150.
-- Google/Max (58 y 80): recorte del ticket Chrome; geometría fija al rollo.
+- Todos los rollos 58/80 (Normal, Max, Google): misma página alta + recorte Chrome, como **80 mm Max**.
 - Gaveta **después** del ticket (espera extra en Bluetooth; en LAN ~0.3 s).
 - USB host (impresora integrada IMIN/Falcon): lista, permiso `vid:pid` y envío bulk ESC/POS.
 - En Falcon la gaveta **no va por USB**: se pulsa el GPIO del equipo (`cashbox_en`), como el plugin IMIN. En BT/LAN se sigue usando `ESC p`.
+- **XML SUNAT** (boleta 03 / factura 01): Compartir o Abrir el `.xml` → ticket ESC/POS al ancho de la impresora + QR.
 
 ---
 
@@ -39,12 +40,12 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 ---
 
-## Estado actual (v1.6.13)
+## Estado actual (v1.6.15)
 
 | Hecho | Pendiente |
 |-------|-----------|
 | Bluetooth Classic + WiFi TCP :9100 + USB host | v2: jobs HTTP/cola del POS |
-| Compartir PDF/imagen → imprimir | iOS |
+| Compartir PDF/imagen **o XML SUNAT** → imprimir | iOS · notas de crédito · ZIP SUNAT |
 | PrintService + overlay flotante | |
 | Papel 58 / 80 mm + DPI 203/300 + nitidez x1/x2/x3 | |
 | Márgenes L/R/inf + corte + gaveta **después** del papel | |
@@ -59,9 +60,9 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 1. Vincular impresoras BT (emparejadas en Android), WiFi o **USB** (Falcon/IMIN integrada).
 2. Configurar antes de guardar: rollo, DPI, nitidez, márgenes, corte, gaveta, predeterminada.
-3. Compartir PDF/imagen → imprimir.
-4. Diálogo **Imprimir** del sistema → overlay sin saltar de app.
-5. Raster `GS v 0` (Compartir y PrintService).
+3. Compartir PDF/imagen → imprimir tal cual (raster).
+4. Compartir / Abrir **XML SUNAT** (boleta o factura) → ticket 58 u 80 mm + QR.
+5. Diálogo **Imprimir** del sistema (PDF) → overlay sin saltar de app.
 
 ---
 
@@ -89,16 +90,22 @@ En **Imprimir** elige el ancho del papel. El PDF se imprime **tal cual** (sin es
 
 | Tamaño | Ancho | Vista previa |
 |--------|--------|----------------|
-| Rollo 58 mm | 384 puntos | Página corta (ancho Chrome 76 mm) |
-| Rollo 58 mm Max | 384 puntos | Página larga (PDF completo) |
-| Rollo 58 mm Google | 384 puntos | Chrome: evita el encogimiento a la mitad |
-| Rollo 80 mm | 576 puntos | Página corta |
-| Rollo 80 mm Max | 576 puntos | Página larga (PDF completo) |
-| Rollo 80 mm Google | 576 puntos | Chrome: página extra ancha, ticket 80 mm |
+| Rollo 58 mm / Max / Google | 384 puntos | Página alta + recorte al rollo (igual que 80 Max) |
+| Rollo 80 mm / Max / Google | 576 puntos | Página alta + recorte al rollo |
 
 Desde **Google/Chrome** usa **Rollo 80 mm Google** (o 58). La app **recorta el blanco y ajusta el ticket al rollo**. x1, x2 y x3 salen del mismo largo y ancho; x2/x3 solo afinan el dibujo.
 
 Usa **Max** si en Chrome no se ve toda la boleta y no quieres la medida Google. Max no cambia el ancho: solo alarga la preview.
+
+---
+
+## XML SUNAT (boleta / factura)
+
+Desde **Archivos** o la consulta CPE: **Compartir** o **Abrir con → Boleta Print** el `.xml`.
+
+- Solo UBL `Invoice` tipo **03** (boleta) o **01** (factura). El ancho es el de la impresora elegida (58 o 80 mm).
+- Se imprime emisor, tipo/serie, cliente, ítems, IGV/total y QR SUNAT (`RUC|tipo|serie|numero|IGV|total|fecha|doc|nro`).
+- El diálogo Imprimir del sistema sigue siendo para PDF; el XML entra por Compartir.
 
 ---
 
@@ -145,7 +152,7 @@ C:\flutter\bin\cache\dart-sdk\bin\dart.exe run tool\benchmark_escpos.dart
 ## Estructura relevante
 
 ```
-lib/services/     escpos_pdf_print, escpos_gs_v0, print_timing, transports/, usb_printer_channel
+lib/services/     escpos_pdf_print, sunat/, print_timing, transports/, usb_printer_channel
 android/.../printservice/   BoletaPrintService, EscPosTransport, UsbEscPos, IminCashBox
 docs/PRINT_PERFORMANCE.md
 tool/benchmark_escpos.dart
@@ -155,6 +162,6 @@ tool/benchmark_escpos.dart
 
 ## Roadmap
 
-1. **v1.6.13** — USB Falcon + gaveta GPIO IMIN (validado en equipo)
+1. **v1.6.15** — Gaveta en todos los tamaños 58/80 (como Max); XML SUNAT + USB Falcon
 2. **v2** — jobs del POS por red/cola
 3. iOS

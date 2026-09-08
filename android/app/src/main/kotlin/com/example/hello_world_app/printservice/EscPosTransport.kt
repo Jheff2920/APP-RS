@@ -24,11 +24,13 @@ object EscPosTransport {
             else -> byteArrayOf()
         }
         if (escP.isEmpty()) return escP
-        // IMIN/Falcon USB: el RJ12 del equipo responde a DLE DC4 00 00 00, no a ESC p.
+        // ESC @ despierta el parser si el corte ya dejó la impresora en reposo
+        // (tickets cortos: Normal/Google). En Falcon USB también DLE DC4.
+        val wake = byteArrayOf(0x1b, 0x40) + escP
         if (linkType == "usb") {
-            return byteArrayOf(0x1b, 0x40) + escP + byteArrayOf(0x10, 0x14, 0x00, 0x00, 0x00)
+            return wake + byteArrayOf(0x10, 0x14, 0x00, 0x00, 0x00)
         }
-        return escP
+        return wake
     }
 
     /** Espera a que salga el papel antes de pulsar la gaveta. */
@@ -158,10 +160,14 @@ object EscPosTransport {
         }
         out.flush()
         if (drawer.isNotEmpty()) {
-            Thread.sleep(drawerWaitMs.coerceAtLeast(80))
-            out.write(drawer)
-            out.flush()
-            Thread.sleep(80)
+            try {
+                Thread.sleep(drawerWaitMs.coerceAtLeast(80))
+                out.write(drawer)
+                out.flush()
+                Thread.sleep(80)
+            } catch (e: Exception) {
+                Log.w(TAG, "Gaveta ESC/POS falló; el ticket ya salió", e)
+            }
         } else {
             Thread.sleep(80)
         }
