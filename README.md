@@ -4,7 +4,7 @@ Controlador Android de impresoras térmicas ESC/POS (58 y 80 mm).
 **No diseña boletas** — el POS las genera (PDF/imagen); esta app las imprime.
 
 **Repo:** https://github.com/Jheff2920/APP-RS  
-**Versión:** 1.6.6+23 · Package ID: `com.example.hello_world_app`  
+**Versión:** 1.6.7+24 · Package ID: `com.example.hello_world_app`  
 **Rama estable:** `main` · **Rama de pruebas:** `test/pruebas`
 
 > Memoria técnica: [CONTEXTO.md](CONTEXTO.md) · Rendimiento: [docs/PRINT_PERFORMANCE.md](docs/PRINT_PERFORMANCE.md)
@@ -17,6 +17,7 @@ Controlador Android de impresoras térmicas ESC/POS (58 y 80 mm).
 - **Nitidez x1/x2/x3** imprime al **mismo tamaño** (384/576). x2/x3 solo rasterizan el recorte a más puntos (no aplastan Google/Max).
 - Chrome 58 mm: ancho 3000 mils (~76 mm) para que el ticket no se encoja a la mitad. 80 mm sigue en 3150.
 - Google/Max (58 y 80): recorte del ticket Chrome; geometría fija al rollo.
+- Gaveta de dinero opcional (Pin 2 / Pin 5) al terminar de imprimir; default «Sin gaveta».
 
 ---
 
@@ -36,7 +37,7 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 ---
 
-## Estado actual (v1.6.6)
+## Estado actual (v1.6.7)
 
 | Hecho | Pendiente |
 |-------|-----------|
@@ -44,7 +45,7 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 | Compartir PDF/imagen → imprimir | USB/OTG |
 | PrintService + overlay flotante | iOS |
 | Papel 58 / 80 mm + DPI 203/300 + nitidez x1/x2/x3 | |
-| Márgenes L/R/inf + corte (config manda en PDF y prueba) | |
+| Márgenes L/R/inf + corte + gaveta opcional | |
 | Dedupe impresoras (ID estable + MAC) | |
 | Pipeline más rápido + métricas `BoletaPrintTiming` | |
 | Tests GS v0 / EscPosChunker + benchmark local | |
@@ -55,7 +56,7 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 ## Qué hace
 
 1. Vincular impresoras BT (emparejadas en Android) o WiFi.
-2. Configurar antes de guardar: rollo, DPI, nitidez, márgenes, corte, predeterminada.
+2. Configurar antes de guardar: rollo, DPI, nitidez, márgenes, corte, gaveta, predeterminada.
 3. Compartir PDF/imagen → imprimir.
 4. Diálogo **Imprimir** del sistema → overlay sin saltar de app.
 5. Raster `GS v 0` (Compartir y PrintService).
@@ -72,8 +73,9 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 | Márgenes L/R | Blanco en el área imprimible |
 | Margen inferior | Avance al terminar |
 | Corte | Después del margen inferior |
+| Gaveta | Opcional: pulso Pin 2 o Pin 5 al terminar (default off) |
 
-**contenido → avance inferior → corte**. Guardar tras cambiar ajustes.
+**contenido → avance inferior → corte → gaveta**. Guardar tras cambiar ajustes.
 
 ---
 
@@ -98,7 +100,7 @@ Usa **Max** si en Chrome no se ve toda la boleta y no quieres la medida Google. 
 
 ## Pipeline PDF (resumen)
 
-Preview + recorte → geometría 384/576 → raster del recorte (x2/x3 a más puntos) → umbral GS v0 → feed + corte → BT/TCP.
+Preview + recorte → geometría 384/576 → raster del recorte (x2/x3 a más puntos) → umbral GS v0 → feed + corte + gaveta → BT/TCP.
 
 Detalle y cómo medir tiempos: [docs/PRINT_PERFORMANCE.md](docs/PRINT_PERFORMANCE.md).
 
@@ -148,6 +150,6 @@ tool/benchmark_escpos.dart
 
 ## Roadmap
 
-1. **v1.6.6** — estable en `main` (raster nativo, nitidez sin deformar, Chrome 58/80)
+1. **v1.6.7** — estable en `main` (raster nativo, nitidez, Chrome 58/80, gaveta opcional)
 2. **v2** — jobs del POS por red/cola
 3. USB/OTG, iOS

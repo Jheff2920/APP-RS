@@ -2,9 +2,9 @@
 
 > **Para Cursor / agente IA:** Lee este archivo al inicio de cada sesión nueva.
 
-**Última actualización:** 2026-09-08 (v1.6.6)  
+**Última actualización:** 2026-09-08 (v1.6.7)  
 **Carpeta:** `C:\Users\RS-Soporte\Documents\app`  
-**Versión:** `1.6.6+23`  
+**Versión:** `1.6.7+24`  
 **Package ID:** `com.example.hello_world_app`
 
 ---
@@ -31,6 +31,7 @@
 - [x] Márgenes de config mandan en PDF e imagen (prefs.reload + pad L/R; inferior + corte)
 - [x] Raster nativo `NativePdfEscPos` (preview → marco → geometría 384/576 → Matrix hi → umbral → GS v 0)
 - [x] Ajustes: DPI 203/300 y nitidez x1/x2/x3 (misma medida; x2/x3 = más puntos en el recorte)
+- [x] Gaveta opcional (ESC p Pin 2/5) después del corte; default none
 - [ ] v2 — jobs del POS (HTTP / cola)
 - [ ] USB/OTG, iOS
 
@@ -67,7 +68,8 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 | Chrome 58 mm | 3000 mils (~76 mm) para que el margen de Chrome no encoja el ticket |
 | Nitidez x2/x3 | No escala la página alta; Matrix solo sobre el recorte |
 | Duplicados al guardar | ID estable en el formulario + dedupe por MAC/IP |
-| Márgenes PDF | Misma config que prueba: L/R en sheet; inferior luego corte |
+| Márgenes PDF | Misma config que prueba: L/R en sheet; inferior luego corte luego gaveta |
+| Gaveta | Default off; ESC p pin 2 o 5 al terminar cada impresión |
 | Prefs headless | `SharedPreferences.reload()` en cada `loadAll()` |
 | Build diario | `.\scripts\run-phone.ps1 -InstallOnly` |
 | Referencia | `apk-ejemplo/` RawBT (protocolo, no pegar código) |
@@ -90,7 +92,7 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 1. Preview 1:1 + recorte (`findChromeTicketFrame` en Google/Max 58 y 80; si no, `findInkFrame`).
 2. Geometría fija: `outW` = 384/576, `outH` proporcional al recorte (igual en x1/x2/x3).
 3. Raster del recorte con Matrix a `outW*hi × outH*hi`. Umbral promedio; si hi>1, mayoría al rollo.
-4. `GS v 0` franjas 48 → margen inferior → corte.
+4. `GS v 0` franjas 48 → margen inferior → corte → gaveta opcional (`ESC p`).
 
 ---
 
@@ -119,5 +121,5 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 
 ## Cómo retomar
 
-> **v1.6.6:** Geometría fija al rollo; x2/x3 no aplastan Google/Max. Chrome 58 mm a 3000 mils.  
+> **v1.6.7:** Gaveta opcional (Pin 2/5) al imprimir. Geometría fija; x2/x3 no aplastan Google/Max.  
 > Siguiente fase natural: **v2** (jobs del POS por red/cola).

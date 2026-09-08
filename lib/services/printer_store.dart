@@ -164,6 +164,7 @@ class PrinterStore {
         dpi: p.dpi,
         rasterScale: p.rasterScale,
         cut: p.cut,
+        cashDrawer: p.cashDrawer,
         margins: p.margins,
         name: p.name.isNotEmpty ? p.name : prev.name,
       );

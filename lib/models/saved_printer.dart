@@ -1,3 +1,4 @@
+import 'cash_drawer.dart';
 import 'cut_mode.dart';
 import 'paper_width.dart';
 import 'print_margins.dart';
@@ -29,6 +30,7 @@ class SavedPrinter {
     this.dpi = PrinterDpi.dpi203,
     this.margins = const PrintMargins(),
     this.cut = CutMode.fullGsV0,
+    this.cashDrawer = CashDrawer.none,
     this.rasterScale = RasterScale.x1,
     this.isDefault = false,
   });
@@ -43,6 +45,8 @@ class SavedPrinter {
   final PrintMargins margins;
   /// Corte automatico (RawBT cutCommand). Default: corte total GS V 0.
   final CutMode cut;
+  /// Gaveta: none = no enviar ESC p. Default off.
+  final CashDrawer cashDrawer;
   final RasterScale rasterScale;
   final bool isDefault;
 
@@ -58,6 +62,7 @@ class SavedPrinter {
     PrinterDpi? dpi,
     PrintMargins? margins,
     CutMode? cut,
+    CashDrawer? cashDrawer,
     RasterScale? rasterScale,
     bool? isDefault,
   }) {
@@ -71,6 +76,7 @@ class SavedPrinter {
       dpi: dpi ?? this.dpi,
       margins: margins ?? this.margins,
       cut: cut ?? this.cut,
+      cashDrawer: cashDrawer ?? this.cashDrawer,
       rasterScale: rasterScale ?? this.rasterScale,
       isDefault: isDefault ?? this.isDefault,
     );
@@ -86,6 +92,7 @@ class SavedPrinter {
         'dpi': dpi.name,
         'margins': margins.toJson(),
         'cut': cut.name,
+        'cashDrawer': cashDrawer.name,
         'rasterScale': rasterScale.name,
         'isDefault': isDefault,
       };
@@ -103,6 +110,7 @@ class SavedPrinter {
         Map<String, dynamic>.from(json['margins'] as Map? ?? {}),
       ),
       cut: CutMode.fromName(json['cut'] as String? ?? 'fullGsV0'),
+      cashDrawer: CashDrawer.fromName(json['cashDrawer'] as String? ?? 'none'),
       rasterScale: RasterScale.fromName(json['rasterScale'] as String? ?? 'x1'),
       isDefault: json['isDefault'] as bool? ?? false,
     );

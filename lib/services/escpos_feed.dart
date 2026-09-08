@@ -1,9 +1,10 @@
 import 'package:image/image.dart' as img;
 
+import '../models/cash_drawer.dart';
 import '../models/cut_mode.dart';
 import 'escpos_gs_v0.dart';
 
-/// Avance de papel y cierre de ticket (margen inferior + corte).
+/// Avance de papel y cierre de ticket (margen inferior + corte + gaveta).
 class EscPosFeed {
   /// ~203 dpi → ~8 puntos por mm.
   static const double dotsPerMm203 = 8;
@@ -33,11 +34,12 @@ class EscPosFeed {
     return out;
   }
 
-  /// Cierre de ticket: margen inferior (ajustes) y luego corte.
+  /// Cierre de ticket: margen inferior, corte y gaveta opcional.
   static List<int> finishJob({
     required double bottomMm,
     required int paperDotsWidth,
     CutMode cut = CutMode.none,
+    CashDrawer cashDrawer = CashDrawer.none,
     double dotsPerMm = dotsPerMm203,
   }) {
     final out = <int>[];
@@ -52,6 +54,9 @@ class EscPosFeed {
     }
     if (cut != CutMode.none) {
       out.addAll(cut.escPosBytes);
+    }
+    if (cashDrawer != CashDrawer.none) {
+      out.addAll(cashDrawer.escPosBytes);
     }
     return out;
   }

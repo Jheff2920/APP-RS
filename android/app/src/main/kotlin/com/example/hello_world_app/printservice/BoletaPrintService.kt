@@ -175,6 +175,7 @@ class BoletaPrintService : PrintService() {
                     row.cut,
                     row.dpi,
                     row.rasterScale,
+                    row.cashDrawer,
                 )
             } catch (nativeError: Exception) {
                 Log.w(TAG, "Native raster fallback to Flutter", nativeError)
@@ -403,6 +404,7 @@ class BoletaPrintService : PrintService() {
                     paper = o.optString("paper", "mm58"),
                     bottomMm = margins?.optDouble("bottomMm", 10.0) ?: 10.0,
                     cut = o.optString("cut", "fullGsV0"),
+                    cashDrawer = o.optString("cashDrawer", "none"),
                     dpi = if (o.optString("dpi", "dpi203") == "dpi300") 300 else 203,
                     rasterScale = when (o.optString("rasterScale", "x1")) {
                         "x3" -> 3
@@ -451,6 +453,7 @@ class BoletaPrintService : PrintService() {
         val paper: String,
         val bottomMm: Double,
         val cut: String,
+        val cashDrawer: String,
         val dpi: Int,
         val rasterScale: Int,
     )

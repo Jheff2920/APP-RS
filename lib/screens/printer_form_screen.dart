@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
+import '../models/cash_drawer.dart';
 import '../models/cut_mode.dart';
 import '../models/paper_width.dart';
 import '../models/print_margins.dart';
@@ -45,6 +46,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
   late PrinterDpi _dpi;
   late PrintMargins _margins;
   late CutMode _cut;
+  late CashDrawer _cashDrawer;
   late RasterScale _rasterScale;
   late bool _isDefault;
 
@@ -69,6 +71,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
     _dpi = e?.dpi ?? PrinterDpi.dpi203;
     _margins = e?.margins ?? const PrintMargins();
     _cut = e?.cut ?? CutMode.fullGsV0;
+    _cashDrawer = e?.cashDrawer ?? CashDrawer.none;
     _rasterScale = e?.rasterScale ?? RasterScale.x1;
     _isDefault = e?.isDefault ?? false;
 
@@ -138,6 +141,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
       dpi: _dpi,
       margins: _margins,
       cut: _cut,
+      cashDrawer: _cashDrawer,
       rasterScale: _rasterScale,
       isDefault: _isDefault || _firstPrinter,
     );
@@ -425,6 +429,35 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
             if (_cut != CutMode.none) ...[
               const SizedBox(height: 6),
               Text(_cut.hint, style: theme.textTheme.labelMedium),
+            ],
+            const SizedBox(height: 20),
+            Text('Gaveta de dinero', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              'Opcional: al terminar de imprimir se envía un pulso ESC/POS. '
+              'Si la impresora no tiene cajón, deja «Sin gaveta».',
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            DropdownMenu<CashDrawer>(
+              initialSelection: _cashDrawer,
+              expandedInsets: EdgeInsets.zero,
+              label: const Text('Comando de gaveta'),
+              dropdownMenuEntries: CashDrawer.values
+                  .map(
+                    (m) => DropdownMenuEntry(
+                      value: m,
+                      label: m.label,
+                    ),
+                  )
+                  .toList(),
+              onSelected: (v) {
+                if (v != null) setState(() => _cashDrawer = v);
+              },
+            ),
+            if (_cashDrawer != CashDrawer.none) ...[
+              const SizedBox(height: 6),
+              Text(_cashDrawer.hint, style: theme.textTheme.labelMedium),
             ],
             const SizedBox(height: 20),
             Text('Nitidez', style: theme.textTheme.titleMedium),

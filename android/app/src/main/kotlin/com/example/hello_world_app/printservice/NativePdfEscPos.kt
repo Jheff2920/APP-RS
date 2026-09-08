@@ -35,6 +35,7 @@ object NativePdfEscPos {
         cut: String,
         dpi: Int = 203,
         rasterScale: Int = 1,
+        cashDrawer: String = "none",
     ): ByteArray {
         val width = dotsWidth(mediaSizeId, mediaWidthMils, savedPaper, dpi)
         val hi = rasterScale.coerceIn(1, 3)
@@ -64,6 +65,7 @@ object NativePdfEscPos {
 
         appendFeed(out, width, bottomMm, dpi)
         out.write(cutBytes(cut))
+        out.write(drawerBytes(cashDrawer))
         val data = out.toByteArray()
         if (data.size < 16) throw IllegalStateException("Ticket vacio")
         return data
@@ -472,6 +474,14 @@ object NativePdfEscPos {
             "partialGsVB" -> byteArrayOf(0x1d, 0x56, 0x42, 0x00)
             "partialEscM" -> byteArrayOf(0x1b, 0x6d)
             "partialEscD1" -> byteArrayOf(0x1b, 0x64, 0x01)
+            else -> byteArrayOf()
+        }
+    }
+
+    private fun drawerBytes(cashDrawer: String): ByteArray {
+        return when (cashDrawer) {
+            "pin2" -> byteArrayOf(0x1b, 0x70, 0x00, 0x19, 0x78)
+            "pin5" -> byteArrayOf(0x1b, 0x70, 0x01, 0x19, 0x78)
             else -> byteArrayOf()
         }
     }
