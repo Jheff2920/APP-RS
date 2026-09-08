@@ -2,7 +2,9 @@ package com.example.hello_world_app.printservice
 
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import java.io.ByteArrayOutputStream
@@ -12,19 +14,16 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * Raster térmico al mismo flujo que las apps ESC/POS de referencia:
- * 1) PdfRenderer a tamaño nativo, fondo blanco
- * 2) Recorte del marco de tinta (ignora gris casi blanco)
- * 3) Segunda pasada: escala al ancho del rollo (203/300 dpi)
- * 4) x2/x3: render extra y bilinear al rollo (sin agrandar el ticket)
- * 5) Umbral = promedio del gris (tope 254), sin dither
- * 6) GS v 0 en franjas de 48
+ * Raster térmico al estilo de las apps ESC/POS de referencia:
+ * 1) Preview 1:1 y recorte del ticket
+ * 2) Geometría fija: 384/576 × alto proporcional (igual en x1/x2/x3)
+ * 3) Nitidez: raster del recorte a hi× con Matrix (no escalar la página alta)
+ * 4) Umbral promedio → GS v 0 en franjas de 48
  */
 object NativePdfEscPos {
 
     private const val MAX_PAGES = 8
     private const val BAND_HEIGHT = 48
-    private const val MAX_HEIGHT = 16000
     private const val NEAR_WHITE_SUM = 720
 
     fun build(
@@ -39,6 +38,7 @@ object NativePdfEscPos {
     ): ByteArray {
         val width = dotsWidth(mediaSizeId, mediaWidthMils, savedPaper, dpi)
         val hi = rasterScale.coerceIn(1, 3)
+        val tallChrome = isTallChromePage(mediaSizeId)
         val out = ByteArrayOutputStream()
         out.write(byteArrayOf(0x1b, 0x40))
 
@@ -48,7 +48,7 @@ object NativePdfEscPos {
                 if (pages < 1) throw IllegalStateException("PDF sin paginas")
                 for (i in 0 until pages) {
                     renderer.openPage(i).use { page ->
-                        val bmp = renderPage(page, width, hi)
+                        val bmp = renderPage(page, width, hi, tallChrome)
                         try {
                             encodeGsV0(bmp, out, width)
                         } finally {
@@ -79,7 +79,7 @@ object NativePdfEscPos {
         val is80 = when {
             id.contains("80") -> true
             id.contains("58") -> false
-            mediaWidthMils != null && mediaWidthMils >= 2700 -> true
+            mediaWidthMils != null && mediaWidthMils >= 3100 -> true
             mediaWidthMils != null && mediaWidthMils >= 1800 -> false
             else -> savedPaper == "mm80"
         }
@@ -91,73 +91,81 @@ object NativePdfEscPos {
         return raw - (raw % 8)
     }
 
+    private fun isTallChromePage(mediaSizeId: String?): Boolean {
+        val id = mediaSizeId?.uppercase().orEmpty()
+        return id.contains("MAX") || id.contains("GOOGLE")
+    }
+
     private fun renderPage(
         page: PdfRenderer.Page,
         targetWidth: Int,
         hi: Int,
+        tallChrome: Boolean,
     ): Bitmap {
         val pw = page.width.coerceAtLeast(1)
         val ph = page.height.coerceAtLeast(1)
-        val aligned = targetWidth - (targetWidth % 8)
+        val outW = targetWidth - (targetWidth % 8)
 
         val preview = Bitmap.createBitmap(pw, ph, Bitmap.Config.ARGB_8888)
         preview.setHasAlpha(false)
         preview.eraseColor(Color.WHITE)
         page.render(preview, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
-        val frame = findInkFrame(preview) ?: Rect(0, 0, pw, ph)
+        val frame = if (tallChrome) {
+            findChromeTicketFrame(preview) ?: findInkFrame(preview)
+        } else {
+            findInkFrame(preview)
+        } ?: Rect(0, 0, pw, ph)
         preview.recycle()
 
         val contentW = frame.width().coerceAtLeast(1)
-        val scale = aligned.toDouble() * hi / contentW.toDouble()
-        val fullW = max(8, (pw * scale).roundToInt().coerceAtMost(8192))
-        val fullH = max(8, (ph * scale).roundToInt().coerceAtMost(MAX_HEIGHT))
-        val full = Bitmap.createBitmap(fullW, fullH, Bitmap.Config.ARGB_8888)
-        full.setHasAlpha(false)
-        full.eraseColor(Color.WHITE)
-        page.render(full, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
+        val contentH = frame.height().coerceAtLeast(1)
+        val outH = max(8, (contentH.toLong() * outW / contentW).toInt())
+        val step = hi.coerceIn(1, 3)
+        val hiW = outW * step
+        val hiH = outH * step
 
-        val left = (frame.left * scale).roundToInt().coerceIn(0, fullW - 1)
-        val top = (frame.top * scale).roundToInt().coerceIn(0, fullH - 1)
-        val cropW = (frame.width() * scale).roundToInt().coerceIn(8, fullW - left)
-        val cropH = (frame.height() * scale).roundToInt().coerceIn(8, fullH - top)
-        val cropped = Bitmap.createBitmap(full, left, top, cropW, cropH)
-        if (cropped !== full) full.recycle()
-
-        thresholdToBw(cropped)
-        return if (hi <= 1) {
-            padToRoll(fitToRoll(cropped, aligned), aligned)
+        val dest = Bitmap.createBitmap(hiW, hiH, Bitmap.Config.ARGB_8888)
+        dest.setHasAlpha(false)
+        dest.eraseColor(Color.WHITE)
+        val matrix = Matrix()
+        matrix.setRectToRect(
+            RectF(
+                frame.left.toFloat(),
+                frame.top.toFloat(),
+                frame.right.toFloat(),
+                frame.bottom.toFloat(),
+            ),
+            RectF(0f, 0f, hiW.toFloat(), hiH.toFloat()),
+            Matrix.ScaleToFit.FILL,
+        )
+        page.render(dest, null, matrix, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
+        thresholdToBw(dest)
+        return if (step <= 1) {
+            padToRoll(dest, outW)
         } else {
-            downsampleBwToRoll(cropped, aligned, hi)
+            downsampleExact(dest, outW, step)
         }
     }
 
-    private fun fitToRoll(src: Bitmap, aligned: Int): Bitmap {
-        if (src.width == aligned) return src
-        val h = max(8, (src.height.toLong() * aligned / src.width).toInt())
-        val scaled = Bitmap.createScaledBitmap(src, aligned, h, true)
-        if (scaled !== src) src.recycle()
-        return scaled
-    }
-
-    /** x2/x3: ya está en B/N a alta res; mayoría al ancho real del rollo. */
-    private fun downsampleBwToRoll(src: Bitmap, aligned: Int, hi: Int): Bitmap {
-        val step = hi.coerceIn(2, 3)
+    /** x2/x3: bitmap exactamente aligned*hi; mayoría → ancho del rollo. */
+    private fun downsampleExact(src: Bitmap, aligned: Int, step: Int): Bitmap {
         val outH = max(8, src.height / step)
-        val usable = min(src.width / step, aligned)
         val sheet = Bitmap.createBitmap(aligned, outH, Bitmap.Config.ARGB_8888)
         sheet.eraseColor(Color.WHITE)
         val srcPx = IntArray(src.width * src.height)
         src.getPixels(srcPx, 0, src.width, 0, 0, src.width, src.height)
         val dst = IntArray(aligned * outH) { Color.WHITE }
         val need = (step * step + 1) / 2
+        val srcW = src.width
+        val srcH = src.height
         for (y in 0 until outH) {
-            for (x in 0 until usable) {
+            for (x in 0 until aligned) {
                 var dark = 0
                 for (dy in 0 until step) {
-                    val yy = min(y * step + dy, src.height - 1)
-                    val row = yy * src.width
+                    val yy = min(y * step + dy, srcH - 1)
+                    val row = yy * srcW
                     for (dx in 0 until step) {
-                        val xx = min(x * step + dx, src.width - 1)
+                        val xx = min(x * step + dx, srcW - 1)
                         if ((srcPx[row + xx] and 0xff) <= 127) dark++
                     }
                 }
@@ -237,6 +245,119 @@ object NativePdfEscPos {
         }
         if (left < 0) return null
         return Rect(left, top, right + 1, bottom + 1)
+    }
+
+    /**
+     * Google/Max (58 y 80): página altísima de Chrome. El ticket queda arriba
+     * y el encabezado/pie del navegador ensanchan el marco. Se toma el bloque
+     * de tinta más denso (el ticket), se deja un poco de aire para no cortar
+     * el logo y se escala al rollo.
+     */
+    private fun findChromeTicketFrame(bmp: Bitmap): Rect? {
+        val w = bmp.width
+        val h = bmp.height
+        val pixels = IntArray(w * h)
+        bmp.getPixels(pixels, 0, w, 0, 0, w, h)
+        for (i in pixels.indices) {
+            val c = pixels[i]
+            val r = (c shr 16) and 0xff
+            val g = (c shr 8) and 0xff
+            val b = c and 0xff
+            // Más sensible que 720: el logo LIMAFAC en páginas altas sale pálido.
+            if (r + g + b > 780) {
+                pixels[i] = Color.WHITE
+            }
+        }
+
+        val minInk = max(4, w / 36)
+        val inkRow = IntArray(h)
+        for (y in 0 until h) {
+            val row = y * w
+            var n = 0
+            for (x in 0 until w) {
+                if (pixels[row + x] != Color.WHITE) n++
+            }
+            inkRow[y] = n
+        }
+
+        val maxGap = min(64, max(20, h / 100))
+        var bestTop = -1
+        var bestBottom = -1
+        var bestLen = -1
+        var runTop = -1
+        var gap = 0
+        for (y in 0 until h) {
+            if (inkRow[y] >= minInk) {
+                if (runTop < 0) runTop = y
+                gap = 0
+            } else if (runTop >= 0) {
+                gap++
+                if (gap > maxGap) {
+                    val bottom = y - gap - 1
+                    val len = bottom - runTop
+                    if (len > bestLen) {
+                        bestLen = len
+                        bestTop = runTop
+                        bestBottom = bottom
+                    }
+                    runTop = -1
+                    gap = 0
+                }
+            }
+        }
+        if (runTop >= 0) {
+            val bottom = h - 1
+            val len = bottom - runTop
+            if (len > bestLen) {
+                bestTop = runTop
+                bestBottom = bottom
+            }
+        }
+        if (bestTop < 0 || bestBottom < bestTop) return null
+
+        val blockH = bestBottom - bestTop + 1
+        val colInk = IntArray(w)
+        val fullBleed = w * 82 / 100
+        var usedRows = 0
+        for (y in bestTop..bestBottom) {
+            if (inkRow[y] > fullBleed) continue
+            usedRows++
+            val row = y * w
+            for (x in 0 until w) {
+                if (pixels[row + x] != Color.WHITE) colInk[x]++
+            }
+        }
+        if (usedRows < 4) {
+            colInk.fill(0)
+            for (y in bestTop..bestBottom) {
+                val row = y * w
+                for (x in 0 until w) {
+                    if (pixels[row + x] != Color.WHITE) colInk[x]++
+                }
+            }
+        }
+
+        var peak = 1
+        for (c in colInk) if (c > peak) peak = c
+        val colThresh = max(2, peak / 10)
+        var left = -1
+        var right = -1
+        for (x in 0 until w) {
+            if (colInk[x] < colThresh) continue
+            if (left < 0) left = x
+            right = x
+        }
+        if (left < 0 || right <= left) return null
+
+        val padX = max(4, (right - left + 1) / 40)
+        val padTop = max(8, blockH / 28)
+        val padBottom = max(4, blockH / 36)
+        return Rect(
+            max(0, left - padX),
+            max(0, bestTop - padTop),
+            min(w, right + 1 + padX),
+            min(h, bestBottom + 1 + padBottom),
+        )
     }
 
     /** Gris 0.25R+0.5G+0.25B; tinta si gris ≤ promedio (máx. 254). */

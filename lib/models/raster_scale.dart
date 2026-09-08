@@ -20,9 +20,9 @@ enum RasterScale {
       case RasterScale.x1:
         return 'Igual que RawBT; el mas rapido';
       case RasterScale.x2:
-        return 'Dibuja al doble y procesa cada punto. Tarda 2–4 s';
+        return 'Misma medida que x1; mas nítido. Tarda un poco';
       case RasterScale.x3:
-        return 'Dibuja al triple. Tarda mas; maxima nitidez';
+        return 'Misma medida que x1; maxima nitidez';
     }
   }
 

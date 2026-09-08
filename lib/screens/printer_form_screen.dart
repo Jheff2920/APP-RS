@@ -430,9 +430,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen> {
             Text('Nitidez', style: theme.textTheme.titleMedium),
             const SizedBox(height: 4),
             Text(
-              'x2 y x3 dibujan el PDF mas grande y lo bajan al rollo '
-              '(no agrandan el ticket). Sirve para comparar si sale mas nítido; '
-              'tardan mas.',
+              'x1, x2 y x3 imprimen al mismo tamaño (384/576). '
+              'x2 y x3 solo afinan el dibujo; tardan un poco mas.',
               style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: 8),

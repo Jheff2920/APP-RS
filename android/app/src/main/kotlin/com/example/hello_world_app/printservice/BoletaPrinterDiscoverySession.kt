@@ -85,9 +85,10 @@ class BoletaPrinterDiscoverySession(
         paper: String,
         dpi: Int,
     ): PrinterCapabilitiesInfo {
-        // Ancho en mils. Normal ~220 mm; Max/Google ~810 mm para preview.
-        // Google: mismo ancho 58/80; la app recorta el ticket y lo ajusta
-        // al rollo (Chrome deja el contenido a ~58 mm centrado).
+        // Ancho en mils. 58 mm físico = 2283, pero Chrome pone ~0,5" de
+        // margen y el ticket se encoge a la mitad. RawBT usa 3000 mils
+        // (~76 mm) para que el contenido útil siga en ~58 mm.
+        // 80 mm (3150) ya deja bastante caja; no se toca.
         val roll58 = PrintAttributes.MediaSize(
             "BOLETA_ROLL_58",
             "Rollo 58 mm",
@@ -151,7 +152,7 @@ class BoletaPrinterDiscoverySession(
 
     companion object {
         private const val TAG = "BoletaDiscovery"
-        private const val WIDTH_58_MILS = 2283
+        private const val WIDTH_58_MILS = 3000
         private const val WIDTH_80_MILS = 3150
         private const val HEIGHT_NORMAL_MILS = 8661
         private const val HEIGHT_MAX_MILS = 32000

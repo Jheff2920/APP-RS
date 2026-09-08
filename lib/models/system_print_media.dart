@@ -22,8 +22,8 @@ class SystemPrintMedia {
     final parsed = fromId(id);
     if (parsed != null) return parsed;
     if (widthMils == null || widthMils < 1000) return null;
-    // 80 mm = 3150 mils; página Google extra ancha quedaba ~4150.
-    final paper = widthMils >= 2700 ? PaperWidth.mm80 : PaperWidth.mm58;
+    // 58 mm Chrome = 3000 mils; 80 mm = 3150. No usar 2700: 3000 pasaría a 80.
+    final paper = widthMils >= 3100 ? PaperWidth.mm80 : PaperWidth.mm58;
     return SystemPrintMedia(
       paper: paper,
       previewMax: true,

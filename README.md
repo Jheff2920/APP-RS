@@ -4,19 +4,19 @@ Controlador Android de impresoras térmicas ESC/POS (58 y 80 mm).
 **No diseña boletas** — el POS las genera (PDF/imagen); esta app las imprime.
 
 **Repo:** https://github.com/Jheff2920/APP-RS  
-**Versión:** 1.6.1+18 · Package ID: `com.example.hello_world_app`  
+**Versión:** 1.6.6+23 · Package ID: `com.example.hello_world_app`  
 **Rama estable:** `main` · **Rama de pruebas:** `test/pruebas`
 
 > Memoria técnica: [CONTEXTO.md](CONTEXTO.md) · Rendimiento: [docs/PRINT_PERFORMANCE.md](docs/PRINT_PERFORMANCE.md)
 
 ---
 
-## Dónde quedamos (2026-09-07)
+## Dónde quedamos (2026-09-08)
 
-- Raster nativo (`NativePdfEscPos`) alineado a RawBT: recorte de tinta + umbral promedio.
-- Calidad verificada contra RawBT (mismo look a x1).
-- Ajustes: **DPI 203/300** y **nitidez x1/x2/x3** (x2/x3 tarda más y puede verse más nítido).
-- Chrome/Google: recorta el ticket y llena el rollo 58/80.
+- Raster nativo (`NativePdfEscPos`): recorte de tinta + umbral promedio + `GS v 0`.
+- **Nitidez x1/x2/x3** imprime al **mismo tamaño** (384/576). x2/x3 solo rasterizan el recorte a más puntos (no aplastan Google/Max).
+- Chrome 58 mm: ancho 3000 mils (~76 mm) para que el ticket no se encoja a la mitad. 80 mm sigue en 3150.
+- Google/Max (58 y 80): recorte del ticket Chrome; geometría fija al rollo.
 
 ---
 
@@ -36,7 +36,7 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 ---
 
-## Estado actual (v1.6.1)
+## Estado actual (v1.6.6)
 
 | Hecho | Pendiente |
 |-------|-----------|
@@ -68,7 +68,7 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 |--------|--------|
 | Papel 58 / 80 mm | Ancho del rollo |
 | DPI 203 / 300 | Puntos del cabezal (203: 384/576; 300: 576/832) |
-| Nitidez x1 / x2 / x3 | x1 rápido (RawBT); x2/x3 más nítido y más lento |
+| Nitidez x1 / x2 / x3 | Misma medida que x1; x2/x3 más nítido y un poco más lento |
 | Márgenes L/R | Blanco en el área imprimible |
 | Margen inferior | Avance al terminar |
 | Corte | Después del margen inferior |
@@ -83,14 +83,14 @@ En **Imprimir** elige el ancho del papel. El PDF se imprime **tal cual** (sin es
 
 | Tamaño | Ancho | Vista previa |
 |--------|--------|----------------|
-| Rollo 58 mm | 384 puntos | Página corta |
+| Rollo 58 mm | 384 puntos | Página corta (ancho Chrome 76 mm) |
 | Rollo 58 mm Max | 384 puntos | Página larga (PDF completo) |
-| Rollo 58 mm Google | 384 puntos | Chrome: página extra ancha, ticket 58 mm |
+| Rollo 58 mm Google | 384 puntos | Chrome: evita el encogimiento a la mitad |
 | Rollo 80 mm | 576 puntos | Página corta |
 | Rollo 80 mm Max | 576 puntos | Página larga (PDF completo) |
 | Rollo 80 mm Google | 576 puntos | Chrome: página extra ancha, ticket 80 mm |
 
-Desde **Google/Chrome** usa **Rollo 80 mm Google** (o 58). Chrome deja el ticket de LIMAFAC a ~58 mm y centrado. Esa medida **recorta el blanco y ajusta el ticket al rollo** (escala uniforme, el texto no se deforma).
+Desde **Google/Chrome** usa **Rollo 80 mm Google** (o 58). La app **recorta el blanco y ajusta el ticket al rollo**. x1, x2 y x3 salen del mismo largo y ancho; x2/x3 solo afinan el dibujo.
 
 Usa **Max** si en Chrome no se ve toda la boleta y no quieres la medida Google. Max no cambia el ancho: solo alarga la preview.
 
@@ -98,7 +98,7 @@ Usa **Max** si en Chrome no se ve toda la boleta y no quieres la medida Google. 
 
 ## Pipeline PDF (resumen)
 
-Render al ancho útil → umbral/empaquetado GS v0 → márgenes → feed + corte → envío BT/TCP (chunks seguros).
+Preview + recorte → geometría 384/576 → raster del recorte (x2/x3 a más puntos) → umbral GS v0 → feed + corte → BT/TCP.
 
 Detalle y cómo medir tiempos: [docs/PRINT_PERFORMANCE.md](docs/PRINT_PERFORMANCE.md).
 
@@ -148,6 +148,6 @@ tool/benchmark_escpos.dart
 
 ## Roadmap
 
-1. **v1.5.6** — estable en `main` (impresión + rendimiento + repo limpio)
+1. **v1.6.6** — estable en `main` (raster nativo, nitidez sin deformar, Chrome 58/80)
 2. **v2** — jobs del POS por red/cola
 3. USB/OTG, iOS

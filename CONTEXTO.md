@@ -2,9 +2,9 @@
 
 > **Para Cursor / agente IA:** Lee este archivo al inicio de cada sesión nueva.
 
-**Última actualización:** 2026-09-07 (v1.6.1)  
+**Última actualización:** 2026-09-08 (v1.6.6)  
 **Carpeta:** `C:\Users\RS-Soporte\Documents\app`  
-**Versión:** `1.6.1+18`  
+**Versión:** `1.6.6+23`  
 **Package ID:** `com.example.hello_world_app`
 
 ---
@@ -29,8 +29,8 @@
 - [x] Formulario: configurar rollo antes de guardar; sin duplicar al Probar/Guardar
 - [x] Corte automatico ESC/POS configurable (tabla RawBT GS V / ESC i / ESC m)
 - [x] Márgenes de config mandan en PDF e imagen (prefs.reload + pad L/R; inferior + corte)
-- [x] Raster nativo `NativePdfEscPos` (PdfRenderer → recorte tinta → umbral promedio → GS v 0)
-- [x] Ajustes: DPI 203/300 y nitidez x1/x2/x3 (x2/x3 = alta res + mayoría al rollo)
+- [x] Raster nativo `NativePdfEscPos` (preview → marco → geometría 384/576 → Matrix hi → umbral → GS v 0)
+- [x] Ajustes: DPI 203/300 y nitidez x1/x2/x3 (misma medida; x2/x3 = más puntos en el recorte)
 - [ ] v2 — jobs del POS (HTTP / cola)
 - [ ] USB/OTG, iOS
 
@@ -64,6 +64,8 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 | PDF | Nativo `PdfRenderer` + `GS v 0` (Dart/`pdfx` solo fallback o Compartir) |
 | PrintService | Raster nativo + envío nativo; Dart si el nativo falla |
 | Preview 80 mm angosta | Chrome centra el ticket; la app recorta blanco y ajusta a 58/80 |
+| Chrome 58 mm | 3000 mils (~76 mm) para que el margen de Chrome no encoja el ticket |
+| Nitidez x2/x3 | No escala la página alta; Matrix solo sobre el recorte |
 | Duplicados al guardar | ID estable en el formulario + dedupe por MAC/IP |
 | Márgenes PDF | Misma config que prueba: L/R en sheet; inferior luego corte |
 | Prefs headless | `SharedPreferences.reload()` en cada `loadAll()` |
@@ -85,11 +87,10 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 
 ## Pipeline PDF
 
-1. Preview nativo + recorte del marco de tinta (gris casi blanco = papel).
-2. Segunda pasada al ancho del rollo (203: 384/576; 300: 576/832).
-3. x1: umbral promedio del gris. x2/x3: mismo umbral a alta res y mayoría al rollo.
+1. Preview 1:1 + recorte (`findChromeTicketFrame` en Google/Max 58 y 80; si no, `findInkFrame`).
+2. Geometría fija: `outW` = 384/576, `outH` proporcional al recorte (igual en x1/x2/x3).
+3. Raster del recorte con Matrix a `outW*hi × outH*hi`. Umbral promedio; si hi>1, mayoría al rollo.
 4. `GS v 0` franjas 48 → margen inferior → corte.
-5. Chrome/Google: recorta el ticket y llena 58/80 (escala uniforme).
 
 ---
 
@@ -118,5 +119,5 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 
 ## Cómo retomar
 
-> **v1.6.1:** Raster nativo estilo RawBT + DPI + nitidez x1/x2/x3 (validado vs RawBT).  
+> **v1.6.6:** Geometría fija al rollo; x2/x3 no aplastan Google/Max. Chrome 58 mm a 3000 mils.  
 > Siguiente fase natural: **v2** (jobs del POS por red/cola).
