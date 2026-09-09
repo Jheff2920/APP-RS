@@ -5,6 +5,10 @@ import UIKit
 enum IncomingFileBridge {
   static var channel: FlutterMethodChannel?
   static var pendingPath: String?
+  static var lastIngestedUrl: String?
+  static var lastIngestedAt: Date?
+  static var ingestingUrl: String?
+  private static let dedupeWindow: TimeInterval = 2
 
   static func attach(messenger: FlutterBinaryMessenger) {
     let channel = FlutterMethodChannel(
@@ -21,13 +25,25 @@ enum IncomingFileBridge {
         result(FlutterMethodNotImplemented)
       }
     }
-    if let pendingPath {
-      channel.invokeMethod("opened", arguments: pendingPath)
-      self.pendingPath = nil
-    }
+    // No enviar "opened" aquí: Dart aún no registra el handler en un cold start.
+    // takePending() recoge pendingPath cuando la app ya está lista.
   }
 
   static func ingest(url: URL) {
+    let key = url.absoluteString
+    // AppDelegate + SceneDelegate disparan el mismo URL al abrir; no bloquear
+    // reabrir el mismo archivo más tarde, ni un reintento si la copia falló.
+    if ingestingUrl == key {
+      return
+    }
+    if lastIngestedUrl == key,
+       let at = lastIngestedAt,
+       Date().timeIntervalSince(at) < dedupeWindow {
+      return
+    }
+    ingestingUrl = key
+    defer { ingestingUrl = nil }
+
     let accessed = url.startAccessingSecurityScopedResource()
     defer {
       if accessed {
@@ -43,6 +59,8 @@ enum IncomingFileBridge {
         try FileManager.default.removeItem(at: dest)
       }
       try FileManager.default.copyItem(at: url, to: dest)
+      lastIngestedUrl = key
+      lastIngestedAt = Date()
       send(path: dest.path)
     } catch {
       NSLog("IncomingFile copy failed: \(error.localizedDescription)")
@@ -50,10 +68,7 @@ enum IncomingFileBridge {
   }
 
   private static func send(path: String) {
-    if let channel {
-      channel.invokeMethod("opened", arguments: path)
-    } else {
-      pendingPath = path
-    }
+    pendingPath = path
+    channel?.invokeMethod("opened", arguments: path)
   }
 }

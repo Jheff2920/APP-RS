@@ -80,6 +80,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
   }
 
   Future<void> _reload() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     final all = await widget.store.loadAll();
     if (!mounted) return;
@@ -102,7 +103,10 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
       if (_expanded) {
         setState(() => _detailIsAddForm = existing == null);
         final nav = _detailNavKey.currentState;
-        if (nav == null) return;
+        if (nav == null) {
+          if (mounted) setState(() => _detailIsAddForm = false);
+          return;
+        }
         final result = await nav.push<bool>(
           MaterialPageRoute(builder: (_) => form),
         );

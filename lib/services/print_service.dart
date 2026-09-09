@@ -167,11 +167,15 @@ class PrintService {
           DrawerWait.forPrinter(printer, bytes.length),
         );
         await timing.measure('drawer', () async {
-          if (printer.type == PrinterLinkType.usb) {
-            final gpio = await UsbPrinterChannel.openCashBox();
-            if (gpio) return;
+          try {
+            if (printer.type == PrinterLinkType.usb) {
+              final gpio = await UsbPrinterChannel.openCashBox();
+              if (gpio) return;
+            }
+            await transport.writeBytes(kick);
+          } catch (_) {
+            // El ticket ya salió; la gaveta no debe marcar el trabajo como fallido.
           }
-          await transport.writeBytes(kick);
         });
       }
 
@@ -234,7 +238,7 @@ class PrintService {
     try {
       final xml = await SunatXmlSource.load(filePath);
       final ticket = SunatUblParser.parse(xml);
-      return SunatEscPosPrint.build(printer, ticket);
+      return await SunatEscPosPrint.build(printer, ticket);
     } on SunatXmlException catch (e) {
       throw PrinterTransportException(e.message);
     } on FileSystemException {

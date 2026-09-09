@@ -90,6 +90,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     _isDefault = e?.isDefault ?? false;
     if (!PlatformCaps.supportsUsb && _type == PrinterLinkType.usb) {
       _type = PrinterLinkType.network;
+      _addressCtrl.text = '';
     }
 
     if (_type == PrinterLinkType.bluetooth) {
@@ -129,19 +130,19 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   }
 
   Future<void> _loadPaired() async {
+    if (!mounted) return;
     setState(() => _loadingPaired = true);
     try {
       final ok = await PrinterPermissions.ensureBluetooth();
+      if (!mounted) return;
       if (!ok) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Concede permisos de Bluetooth para ver dispositivos emparejados.',
-              ),
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Concede permisos de Bluetooth para ver dispositivos emparejados.',
             ),
-          );
-        }
+          ),
+        );
         return;
       }
       if (PlatformCaps.isIOS) {
@@ -940,8 +941,8 @@ class _AddBtDeviceSheetState extends State<_AddBtDeviceSheet> {
       }
     });
     try {
-      await BluetoothBondChannel.startScan();
-      if (mounted) setState(() => _scanning = true);
+      final started = await BluetoothBondChannel.startScan();
+      if (mounted) setState(() => _scanning = started);
     } on BluetoothBondException catch (e) {
       if (!mounted) return;
       setState(() {

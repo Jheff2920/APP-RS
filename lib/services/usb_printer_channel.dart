@@ -55,6 +55,8 @@ class UsbPrinterChannel {
       return ok == true;
     } on MissingPluginException {
       return false;
+    } on PlatformException {
+      return false;
     }
   }
 
@@ -85,6 +87,8 @@ class UsbPrinterChannel {
       final ok = await _ch.invokeMethod<bool>('openCashBox');
       return ok == true;
     } on MissingPluginException {
+      return false;
+    } on PlatformException {
       return false;
     }
   }

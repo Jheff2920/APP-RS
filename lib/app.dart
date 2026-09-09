@@ -33,6 +33,8 @@ class _BoletaPrintAppState extends State<BoletaPrintApp> {
   StreamSubscription? _shareSub;
   StreamSubscription? _incomingSub;
   bool _handlingShare = false;
+  String? _lastSharePath;
+  DateTime? _lastShareAt;
 
   @override
   void initState() {
@@ -73,7 +75,16 @@ class _BoletaPrintAppState extends State<BoletaPrintApp> {
   }
 
   Future<void> _openSharedPath(String path) async {
-    if (path.isEmpty || _handlingShare) return;
+    if (path.isEmpty) return;
+    final now = DateTime.now();
+    if (_lastSharePath == path &&
+        _lastShareAt != null &&
+        now.difference(_lastShareAt!) < const Duration(seconds: 2)) {
+      return;
+    }
+    if (_handlingShare) return;
+    _lastSharePath = path;
+    _lastShareAt = now;
     _handlingShare = true;
     try {
       await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -105,7 +116,7 @@ class _BoletaPrintAppState extends State<BoletaPrintApp> {
       return copied;
     }
     if (await SharedIncoming.isReadable(sharedPath)) return sharedPath;
-    return copied ?? sharedPath;
+    return '';
   }
 
   @override

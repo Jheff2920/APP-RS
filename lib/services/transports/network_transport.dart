@@ -34,10 +34,19 @@ class NetworkTransport implements PrinterTransport {
     }
 
     const chunkSize = 8192;
-    for (var i = 0; i < bytes.length; i += chunkSize) {
-      final end = (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
-      socket.add(Uint8List.fromList(bytes.sublist(i, end)));
-      await socket.flush();
+    try {
+      for (var i = 0; i < bytes.length; i += chunkSize) {
+        final end =
+            (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
+        socket.add(Uint8List.fromList(bytes.sublist(i, end)));
+        await socket.flush();
+      }
+    } on SocketException catch (e) {
+      throw PrinterTransportException(
+        'Se cortó la conexión WiFi/TCP. ${e.message}',
+      );
+    } on Exception catch (e) {
+      throw PrinterTransportException('Error de red al enviar: $e');
     }
   }
 

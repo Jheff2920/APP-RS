@@ -31,6 +31,7 @@ class _PrintHistoryScreenState extends State<PrintHistoryScreen> {
   }
 
   Future<void> _reload() async {
+    if (!mounted) return;
     setState(() => _loading = true);
     final jobs = await widget.history.loadAll(printerId: widget.printer?.id);
     if (!mounted) return;

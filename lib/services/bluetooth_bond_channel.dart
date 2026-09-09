@@ -61,7 +61,10 @@ class BluetoothBondChannel {
         }
         _controller.add(map);
       },
-      onError: (_) {},
+      onError: (_) {
+        _nativeSub = null;
+        _ready = null;
+      },
     );
   }
 
@@ -77,13 +80,14 @@ class BluetoothBondChannel {
     }
   }
 
-  static Future<void> startScan() async {
-    if (!isSupported) return;
+  static Future<bool> startScan() async {
+    if (!isSupported) return false;
     await ensureReady();
     try {
-      await _ch.invokeMethod<void>('startScan');
+      final ok = await _ch.invokeMethod<bool>('startScan');
+      return ok == true;
     } on MissingPluginException {
-      return;
+      return false;
     } on PlatformException catch (e) {
       throw BluetoothBondException(e.code, e.message ?? e.code);
     }
