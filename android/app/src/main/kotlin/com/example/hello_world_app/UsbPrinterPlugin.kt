@@ -125,14 +125,9 @@ class UsbPrinterPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallH
             result.success(true)
             return
         }
-        val act = activity
-        if (act == null) {
-            result.error("no_activity", "Abre la app para conceder USB", null)
-            return
-        }
         pendingPermission?.success(false)
         pendingPermission = result
-        mgr.requestPermission(device, UsbEscPos.permissionIntent(act))
+        mgr.requestPermission(device, UsbEscPos.permissionIntent(ctx))
     }
 
     private fun runIo(result: MethodChannel.Result, block: () -> Any?) {

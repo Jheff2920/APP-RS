@@ -19,6 +19,7 @@ Imprime PDF/imagen del POS **o** convierte el **XML/ZIP UBL de SUNAT** (boleta, 
 - Todos los rollos 58/80 (Normal, Max, Google): misma página alta + recorte Chrome, como **80 mm Max**.
 - Gaveta **después** del ticket (espera extra en Bluetooth; en LAN ~0.3 s).
 - USB host (impresora integrada IMIN/Falcon): lista, permiso `vid:pid` y envío bulk ESC/POS.
+- **USB tras apagar:** Android olvida el permiso USB (solo USB, no BT/WiFi). La impresora sigue vinculada. Al abrir la app o al imprimir (también desde Chrome) se pide otra vez el aviso; no hay que volver a vincular.
 - En Falcon la gaveta **no va por USB**: se pulsa el GPIO del equipo (`cashbox_en`), como el plugin IMIN. En BT/LAN se sigue usando `ESC p`.
 - **XML/ZIP SUNAT:** Compartir o Abrir el CPE. En Android 10+ se copia a caché (Descargas no es legible). El CDR (`R-...`) no se imprime.
 - **iOS:** misma app. Imprime por **WiFi TCP :9100**. USB, PrintService y GPIO Falcon quedan en Android. Abrir PDF/XML/ZIP desde la app o “Abrir en Boleta Print”.
@@ -52,6 +53,7 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 | iOS: WiFi TCP :9100 + XML/PDF/ZIP (Bluetooth BLE/MFi si el hardware lo permite) | En iOS no se puede olvidar el BT desde la app (Ajustes) |
 | Compartir o Abrir PDF/imagen **o XML/ZIP SUNAT** → imprimir | |
 | PrintService + overlay flotante (**solo Android**) | |
+| USB IMIN: vuelve a pedir permiso tras apagar (PrintService + al abrir la app) | |
 | Papel 58 / 80 mm + DPI 203/300 + nitidez x1/x2/x3 | |
 | Márgenes L/R/inf + corte + gaveta **después** del papel | |
 | Shell adaptativo (teléfono / tablet) + scan BT sin jank | |
@@ -86,6 +88,17 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 - No hay Bluetooth Classic SPP. Si la impresora no es BLE/MFi, usa **WiFi :9100**.
 - Apple no deja olvidar el vínculo desde la app; hay que hacerlo en Ajustes > Bluetooth.
+
+---
+
+## USB (IMIN / Falcon)
+
+Solo Android. Bluetooth y WiFi **no** pierden el vínculo al apagar.
+
+- Al apagar el equipo, Android borra el permiso USB. La impresora **sigue vinculada** en Boleta Print.
+- Al encender: abrir la app o imprimir (también desde Google). Aparece el aviso de USB; hay que aceptarlo. No hace falta vincular de nuevo.
+- Si niegan el aviso, verán “Sin permiso USB”.
+- Gaveta en Falcon: GPIO `cashbox_en`, no el cable USB.
 
 ---
 
@@ -191,7 +204,7 @@ C:\flutter\bin\cache\dart-sdk\bin\dart.exe run tool\benchmark_escpos.dart
 |--------|------------|--------|
 | Xiaomi | `863d005830483132385114e3efc08c` | default del script |
 | Lenovo YT-X705F | `HA1KL54R` | Android 10 · overlay + ubicación para scan BT |
-| IMIN Falcon 1 | (ADB del equipo) | 2 GB RAM · impresora integrada por **USB** |
+| IMIN Falcon 1 | (ADB del equipo) | 2 GB RAM · USB integrado; tras apagar hay que aceptar el aviso USB |
 
 > Debug local y Docker usan keystores distintos → no mezclar installs.
 

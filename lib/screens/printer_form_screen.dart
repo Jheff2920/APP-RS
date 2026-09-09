@@ -587,7 +587,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                 padding: EdgeInsets.only(bottom: 8),
                 child: Text(
                   'En IMIN/Falcon usa USB (impresora integrada), no Bluetooth. '
-                  'Concede el permiso al elegir el dispositivo.',
+                      'Android pide el permiso USB otra vez después de apagar el equipo.',
                 ),
               ),
               if (_usbDevices.isEmpty && !_loadingUsb)

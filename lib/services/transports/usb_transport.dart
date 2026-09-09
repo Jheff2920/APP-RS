@@ -21,7 +21,7 @@ class UsbTransport implements PrinterTransport {
     final ok = await UsbPrinterChannel.requestPermission(address);
     if (!ok) {
       throw PrinterTransportException(
-        'Sin permiso USB. Elige de nuevo la impresora en Boleta Print.',
+        'Sin permiso USB. Tras encender el equipo acepta el aviso de USB.',
       );
     }
     try {

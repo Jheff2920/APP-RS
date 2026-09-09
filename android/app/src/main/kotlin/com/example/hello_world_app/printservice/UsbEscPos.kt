@@ -1,7 +1,10 @@
 package com.example.hello_world_app.printservice
 
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbDeviceConnection
@@ -10,6 +13,12 @@ import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
 import android.os.Build
 import android.util.Log
+import androidx.core.content.ContextCompat
+import com.example.hello_world_app.PrintersNativePrefsPlugin
+import org.json.JSONArray
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * ESC/POS por USB host (impresora integrada IMIN/Falcon, clase impresora o bulk OUT).
@@ -20,6 +29,8 @@ object UsbEscPos {
     const val ACTION_USB_PERMISSION = "com.example.hello_world_app.USB_PERMISSION"
 
     private val lock = Any()
+    private val permissionLock = Any()
+    private val warmed = AtomicBoolean(false)
     private var held: Held? = null
 
     private class Held(
@@ -62,9 +73,9 @@ object UsbEscPos {
         val mgr = usbManager(context)
         val device = findDevice(mgr, address)
             ?: throw IllegalStateException("USB no encontrado ($address)")
-        if (!mgr.hasPermission(device)) {
+        if (!ensurePermission(context, address)) {
             throw IllegalStateException(
-                "Sin permiso USB. Abre Boleta Print y vuelve a elegir el dispositivo.",
+                "Sin permiso USB. Tras encender el equipo hay que aceptar el aviso de USB.",
             )
         }
         val ifaceEp = findInterfaceAndOut(device)
@@ -118,9 +129,9 @@ object UsbEscPos {
         val mgr = usbManager(context)
         val device = findDevice(mgr, address)
             ?: throw IllegalStateException("USB no encontrado ($address)")
-        if (!mgr.hasPermission(device)) {
+        if (!ensurePermission(context, address)) {
             throw IllegalStateException(
-                "Sin permiso USB. Abre Boleta Print y vuelve a elegir el dispositivo.",
+                "Sin permiso USB. Tras encender el equipo hay que aceptar el aviso de USB.",
             )
         }
         val ifaceEp = findInterfaceAndOut(device)
@@ -156,6 +167,73 @@ object UsbEscPos {
             session.conn.close()
         } catch (_: Exception) {
         }
+    }
+
+    /**
+     * Android olvida el permiso USB al apagar. Pide el diálogo del sistema
+     * (no hace falta Activity) y espera la respuesta.
+     * Llamar fuera del hilo UI si el timeout es largo.
+     */
+    fun ensurePermission(
+        context: Context,
+        address: String,
+        timeoutMs: Long = 60_000L,
+    ): Boolean {
+        val app = context.applicationContext
+        val mgr = usbManager(app)
+        val device = findDevice(mgr, address) ?: return false
+        if (mgr.hasPermission(device)) return true
+        synchronized(permissionLock) {
+            if (mgr.hasPermission(device)) return true
+            val latch = CountDownLatch(1)
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(ctx: Context?, intent: Intent?) {
+                    if (intent?.action != ACTION_USB_PERMISSION) return
+                    latch.countDown()
+                }
+            }
+            ContextCompat.registerReceiver(
+                app,
+                receiver,
+                IntentFilter(ACTION_USB_PERMISSION),
+                ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
+            try {
+                mgr.requestPermission(device, permissionIntent(app))
+                latch.await(timeoutMs, TimeUnit.MILLISECONDS)
+            } catch (e: Exception) {
+                Log.w(TAG, "USB permission wait failed", e)
+            } finally {
+                try {
+                    app.unregisterReceiver(receiver)
+                } catch (_: Exception) {
+                }
+            }
+            return mgr.hasPermission(device)
+        }
+    }
+
+    /** Tras un reinicio, vuelve a pedir USB de las impresoras ya vinculadas. */
+    fun warmSavedUsbPermissions(context: Context) {
+        if (!warmed.compareAndSet(false, true)) return
+        Thread({
+            try {
+                val raw = context.applicationContext
+                    .getSharedPreferences(PrintersNativePrefsPlugin.PREFS, Context.MODE_PRIVATE)
+                    .getString(PrintersNativePrefsPlugin.KEY, null)
+                if (raw.isNullOrEmpty()) return@Thread
+                val arr = JSONArray(raw)
+                for (i in 0 until arr.length()) {
+                    val obj = arr.optJSONObject(i) ?: continue
+                    if (obj.optString("type") != "usb") continue
+                    val address = obj.optString("address")
+                    if (address.isEmpty()) continue
+                    ensurePermission(context, address, 45_000)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "USB warm failed", e)
+            }
+        }, "usb-warm").start()
     }
 
     fun findDevice(mgr: UsbManager, address: String): UsbDevice? {

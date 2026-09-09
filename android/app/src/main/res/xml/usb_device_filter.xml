@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Impresoras USB (clase 7). El permiso se pierde al apagar; al reaparecer el dispositivo pedimos de nuevo. -->
+    <usb-device class="7" />
+</resources>

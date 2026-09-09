@@ -3,6 +3,7 @@ package com.example.hello_world_app
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import com.example.hello_world_app.printservice.UsbEscPos
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -58,6 +59,12 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleSystemPrintIntent(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Tras apagar el equipo Android olvida el USB; pide el aviso al abrir.
+        UsbEscPos.warmSavedUsbPermissions(this)
     }
 
     override fun onNewIntent(intent: Intent) {

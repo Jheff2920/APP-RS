@@ -79,7 +79,7 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 | Duplicados al guardar | ID estable en el formulario + dedupe por MAC/IP |
 | Márgenes PDF | Misma config que prueba: L/R en sheet; inferior luego corte; gaveta después |
 | Gaveta | Default off; BT/LAN: ESC p tras espera; Falcon USB: GPIO `cashbox_en` |
-| USB Falcon | `vid:pid`; permiso al elegir; bulk OUT; gaveta GPIO (criterio plugin IMIN, sin su SDK) |
+| USB Falcon | `vid:pid`; permiso USB se pierde al apagar. Pedirlo al imprimir (PrintService) y al abrir la app (`warmSavedUsbPermissions`), no solo al vincular. Gaveta GPIO. |
 | Prefs headless | `SharedPreferences.reload()` en cada `loadAll()` |
 | Build diario | `.\scripts\run-phone.ps1 -InstallOnly` |
 | Referencia | `apk-ejemplo/` RawBT (protocolo, no pegar código) |
