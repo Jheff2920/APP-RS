@@ -28,7 +28,7 @@ class SunatEscPosPrint {
     bytes += generator.reset();
 
     void left(String text, {PosStyles styles = const PosStyles()}) {
-      for (final part in _wrap(text, usable)) {
+      for (final part in _wrap(latin1Safe(text), usable)) {
         bytes += generator.text(
           '${' ' * safeLeft}$part',
           styles: styles,
@@ -37,7 +37,7 @@ class SunatEscPosPrint {
     }
 
     void center(String text, {PosStyles styles = const PosStyles()}) {
-      for (final part in _wrap(text, usable)) {
+      for (final part in _wrap(latin1Safe(text), usable)) {
         bytes += generator.text(
           part,
           styles: PosStyles(
@@ -74,6 +74,9 @@ class SunatEscPosPrint {
     if (ticket.issueDate.isNotEmpty) {
       left('Fecha: ${_formatDate(ticket.issueDate)}');
     }
+    if (ticket.referenceId.isNotEmpty) {
+      left('Afecta: ${ticket.referenceId}');
+    }
 
     sep();
     left('Cliente: ${ticket.customerName.ifBlank('---')}');
@@ -82,16 +85,20 @@ class SunatEscPosPrint {
       if (ticket.customerDoc.isNotEmpty) ticket.customerDoc,
     ].join(' ');
     if (doc.isNotEmpty) left(doc);
+    for (final detail in ticket.details) {
+      left(detail);
+    }
 
     sep();
-    if (wide) {
+    final money = ticket.showTotals;
+    if (wide && money) {
       left(_cols(['CANT', 'DESCRIPCION', 'P.U.', 'IMP'], [5, usable - 22, 8, 9]));
     } else {
       left('CANT  DESCRIPCION');
     }
     for (final line in ticket.lines) {
       final qty = _qty(line.quantity);
-      if (wide) {
+      if (wide && money) {
         final descW = (usable - 22).clamp(8, usable);
         final descLines = _wrap(line.description, descW);
         left(
@@ -109,18 +116,22 @@ class SunatEscPosPrint {
             .skip(1)) {
           left('${' ' * (qty.length + 1)}$extra');
         }
-        left(_right(usable, '${_money(line.unitPrice)}  ${_money(line.amount)}'));
+        if (money) {
+          left(_right(usable, '${_money(line.unitPrice)}  ${_money(line.amount)}'));
+        }
       }
     }
 
-    sep();
-    final cur = ticket.currencySymbol;
-    left(_pair(usable, 'OP. GRAVADA', '$cur ${_money(ticket.subtotal)}'));
-    left(_pair(usable, 'IGV', '$cur ${_money(ticket.igv)}'));
-    left(
-      _pair(usable, 'TOTAL', '$cur ${_money(ticket.total)}'),
-      styles: const PosStyles(bold: true),
-    );
+    if (money) {
+      sep();
+      final cur = ticket.currencySymbol;
+      left(_pair(usable, 'OP. GRAVADA', '$cur ${_money(ticket.subtotal)}'));
+      left(_pair(usable, 'IGV', '$cur ${_money(ticket.igv)}'));
+      left(
+        _pair(usable, 'TOTAL', '$cur ${_money(ticket.total)}'),
+        styles: const PosStyles(bold: true),
+      );
+    }
     if (ticket.legend.isNotEmpty) {
       left(ticket.legend);
     }
@@ -143,6 +154,38 @@ class SunatEscPosPrint {
       dotsPerMm: printer.dpi.dotsPerMm,
     );
     return bytes;
+  }
+
+  /// CP437/latin1 de las térmicas no trae comillas tipográficas del XML SUNAT.
+  static String latin1Safe(String text) {
+    var t = text
+        .replaceAll('\u201c', '"')
+        .replaceAll('\u201d', '"')
+        .replaceAll('\u201e', '"')
+        .replaceAll('\u00ab', '"')
+        .replaceAll('\u00bb', '"')
+        .replaceAll('\u2018', "'")
+        .replaceAll('\u2019', "'")
+        .replaceAll('\u201a', "'")
+        .replaceAll('\u2013', '-')
+        .replaceAll('\u2014', '-')
+        .replaceAll('\u2212', '-')
+        .replaceAll('\u2026', '...')
+        .replaceAll('\u00a0', ' ')
+        .replaceAll('\u200b', '');
+    final out = StringBuffer();
+    for (final r in t.runes) {
+      if (r == 0x09 ||
+          r == 0x0A ||
+          r == 0x0D ||
+          (r >= 0x20 && r <= 0x7E) ||
+          (r >= 0xA0 && r <= 0xFF)) {
+        out.writeCharCode(r);
+      } else {
+        out.write('?');
+      }
+    }
+    return out.toString();
   }
 
   static int _charsForMm(PaperWidth paper, double mm) {

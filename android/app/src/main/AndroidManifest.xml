@@ -82,9 +82,17 @@
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="content" />
                 <data android:scheme="file" />
                 <data android:pathPattern=".*\\.xml" />
+                <data android:pathPattern=".*\\.zip" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />

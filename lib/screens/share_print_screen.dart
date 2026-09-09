@@ -113,14 +113,14 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
                   Card(
                     child: ListTile(
                       leading: Icon(
-                        name.toLowerCase().endsWith('.xml')
+                        _isXmlLike(name)
                             ? Icons.description
                             : Icons.picture_as_pdf,
                       ),
                       title: Text(name),
                       subtitle: Text(
-                        name.toLowerCase().endsWith('.xml')
-                            ? 'XML SUNAT → boleta ${(_selected?.paper.label ?? '')}'
+                        _isXmlLike(name)
+                            ? 'XML SUNAT → ticket ${(_selected?.paper.label ?? '')}'
                             : widget.filePath,
                         maxLines: 2,
                       ),
@@ -177,5 +177,10 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
               ),
             ),
     );
+  }
+
+  bool _isXmlLike(String name) {
+    final lower = name.toLowerCase();
+    return lower.endsWith('.xml') || lower.endsWith('.zip');
   }
 }

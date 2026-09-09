@@ -2,9 +2,9 @@
 
 > **Para Cursor / agente IA:** Lee este archivo al inicio de cada sesión nueva.
 
-**Última actualización:** 2026-09-08 (v1.6.15)  
+**Última actualización:** 2026-09-09 (v1.6.18)  
 **Carpeta:** `C:\Users\RS-Soporte\Documents\app`  
-**Versión:** `1.6.15+32`  
+**Versión:** `1.6.18+35`  
 **Package ID:** `com.example.hello_world_app`
 
 ---
@@ -13,7 +13,7 @@
 
 **Boleta Print** — intermediario Android para impresoras térmicas ESC/POS.
 
-- Imprime PDF/imagen del POS, o arma ticket desde **XML UBL SUNAT** (boleta/factura).
+- Imprime PDF/imagen del POS, o arma ticket desde **XML/ZIP UBL SUNAT** (boleta, factura, NC/ND, guía, retención).
 - Bluetooth Classic, TCP :9100 o USB host (impresora integrada IMIN/Falcon).
 - Entradas: **Compartir** (PDF/imagen/XML) y **PrintService** (PDF del sistema).
 
@@ -34,9 +34,10 @@
 - [x] Gaveta opcional en un **segundo envío** tras espera (más larga en BT)
 - [x] USB host bulk OUT (clase impresora o primer bulk); formulario + PrintService + Compartir
 - [x] Falcon: gaveta por GPIO (`/sys/extcon-usb-gpio/cashbox_en`), no ESC/POS USB
-- [x] XML SUNAT UBL Invoice 01/03 → ESC/POS 58/80 + QR (Compartir / Abrir)
+- [x] XML SUNAT del ZIP CPE: 01/03/04/07/08/09/20/31/40 → ticket (ignora CDR)
+- [x] Compartir/Abrir XML o ZIP CPE: copia a caché (Android 10 scoped storage)
 - [ ] v2 — jobs del POS (HTTP / cola)
-- [ ] iOS · notas de crédito · ZIP SUNAT
+- [ ] iOS
 
 ---
 
@@ -77,7 +78,7 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 | Prefs headless | `SharedPreferences.reload()` en cada `loadAll()` |
 | Build diario | `.\scripts\run-phone.ps1 -InstallOnly` |
 | Referencia | `apk-ejemplo/` RawBT (protocolo, no pegar código) |
-| XML SUNAT | UBL Invoice 01/03; QR `RUC|tipo|serie|nro|IGV|total|fecha|doc|nro`; sin SDK |
+| XML SUNAT | ZIP CPE: Invoice/CreditNote/DebitNote/DespatchAdvice/Retention/Perception; ignora CDR `R-`; copia URI a caché |
 
 ---
 
@@ -131,5 +132,5 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 
 ## Cómo retomar
 
-> **v1.6.15:** Normal/Google usan la misma página alta y recorte que Max; gaveta GPIO + ESC @ tras el ticket.  
-> Siguiente: afinar XML real; **v2** jobs del POS.
+> **v1.6.18:** ZIP SUNAT: boleta, factura, NC/ND, guía de remisión, retención/percepción.  
+> Siguiente: **v2** jobs del POS.

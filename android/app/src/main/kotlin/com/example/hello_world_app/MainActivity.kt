@@ -45,6 +45,9 @@ class MainActivity : FlutterActivity() {
                         pendingSystemPrint = null
                         result.success(pending)
                     }
+                    "copyFromIntent" -> {
+                        result.success(SharedIncomingFile.copyFromIntent(this))
+                    }
                     else -> result.notImplemented()
                 }
             }

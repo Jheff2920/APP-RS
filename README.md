@@ -1,17 +1,17 @@
 # Boleta Print
 
 Controlador Android de impresoras térmicas ESC/POS (58 y 80 mm).  
-Imprime PDF/imagen del POS **o** convierte el **XML UBL de SUNAT** (boleta/factura) a ticket 58/80 mm.
+Imprime PDF/imagen del POS **o** convierte el **XML/ZIP UBL de SUNAT** (boleta, factura, NC/ND, guía de remisión, retención/percepción) a ticket 58/80 mm.
 
 **Repo:** https://github.com/Jheff2920/APP-RS  
-**Versión:** 1.6.15+32 · Package ID: `com.example.hello_world_app`  
+**Versión:** 1.6.18+35 · Package ID: `com.example.hello_world_app`  
 **Rama estable:** `main` · **Rama de pruebas:** `test/pruebas`
 
 > Memoria técnica: [CONTEXTO.md](CONTEXTO.md) · Rendimiento: [docs/PRINT_PERFORMANCE.md](docs/PRINT_PERFORMANCE.md)
 
 ---
 
-## Dónde quedamos (2026-09-08)
+## Dónde quedamos (2026-09-09)
 
 - Raster nativo (`NativePdfEscPos`): recorte de tinta + umbral promedio + `GS v 0`.
 - **Nitidez x1/x2/x3** imprime al **mismo tamaño** (384/576). x2/x3 solo rasterizan el recorte a más puntos (no aplastan Google/Max).
@@ -20,7 +20,7 @@ Imprime PDF/imagen del POS **o** convierte el **XML UBL de SUNAT** (boleta/factu
 - Gaveta **después** del ticket (espera extra en Bluetooth; en LAN ~0.3 s).
 - USB host (impresora integrada IMIN/Falcon): lista, permiso `vid:pid` y envío bulk ESC/POS.
 - En Falcon la gaveta **no va por USB**: se pulsa el GPIO del equipo (`cashbox_en`), como el plugin IMIN. En BT/LAN se sigue usando `ESC p`.
-- **XML SUNAT** (boleta 03 / factura 01): Compartir o Abrir el `.xml` → ticket ESC/POS al ancho de la impresora + QR.
+- **XML/ZIP SUNAT:** Compartir o Abrir el CPE. En Android 10+ se copia a caché (Descargas no es legible). El CDR (`R-...`) no se imprime.
 
 ---
 
@@ -40,12 +40,12 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 ---
 
-## Estado actual (v1.6.15)
+## Estado actual (v1.6.18)
 
 | Hecho | Pendiente |
 |-------|-----------|
 | Bluetooth Classic + WiFi TCP :9100 + USB host | v2: jobs HTTP/cola del POS |
-| Compartir PDF/imagen **o XML SUNAT** → imprimir | iOS · notas de crédito · ZIP SUNAT |
+| Compartir PDF/imagen **o XML/ZIP SUNAT** → imprimir | iOS |
 | PrintService + overlay flotante | |
 | Papel 58 / 80 mm + DPI 203/300 + nitidez x1/x2/x3 | |
 | Márgenes L/R/inf + corte + gaveta **después** del papel | |
@@ -61,7 +61,7 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 1. Vincular impresoras BT (emparejadas en Android), WiFi o **USB** (Falcon/IMIN integrada).
 2. Configurar antes de guardar: rollo, DPI, nitidez, márgenes, corte, gaveta, predeterminada.
 3. Compartir PDF/imagen → imprimir tal cual (raster).
-4. Compartir / Abrir **XML SUNAT** (boleta o factura) → ticket 58 u 80 mm + QR.
+4. Compartir / Abrir **XML o ZIP SUNAT** (boleta, factura, NC, guía, etc.) → ticket 58 u 80 mm + QR.
 5. Diálogo **Imprimir** del sistema (PDF) → overlay sin saltar de app.
 
 ---
@@ -99,13 +99,27 @@ Usa **Max** si en Chrome no se ve toda la boleta y no quieres la medida Google. 
 
 ---
 
-## XML SUNAT (boleta / factura)
+## XML / ZIP SUNAT
 
-Desde **Archivos** o la consulta CPE: **Compartir** o **Abrir con → Boleta Print** el `.xml`.
+Desde **Archivos** o la consulta CPE: **Compartir** o **Abrir con → Boleta Print** el `.xml` o el `.zip`.
 
-- Solo UBL `Invoice` tipo **03** (boleta) o **01** (factura). El ancho es el de la impresora elegida (58 o 80 mm).
-- Se imprime emisor, tipo/serie, cliente, ítems, IGV/total y QR SUNAT (`RUC|tipo|serie|numero|IGV|total|fecha|doc|nro`).
-- El diálogo Imprimir del sistema sigue siendo para PDF; el XML entra por Compartir.
+| Código | Comprobante | Raíz UBL |
+|--------|-------------|----------|
+| 01 | Factura | `Invoice` |
+| 03 | Boleta | `Invoice` |
+| 04 | Liquidación de compra | `Invoice` |
+| 07 | Nota de crédito | `CreditNote` |
+| 08 | Nota de débito | `DebitNote` |
+| 09 | Guía de remisión remitente | `DespatchAdvice` |
+| 31 | Guía de remisión transportista | `DespatchAdvice` |
+| 20 | Retención | `Retention` |
+| 40 | Percepción | `Perception` |
+
+- El ZIP de SUNAT trae el CPE y el CDR (`R-...xml` / `ApplicationResponse`). Solo se imprime el CPE.
+- El ancho es el de la impresora (58 o 80 mm). QR SUNAT: `RUC|tipo|serie|numero|IGV|total|fecha|doc|nro`.
+- NC/ND muestran el documento afectado (`Afecta: F002-...`). La guía muestra motivo, placa, partida y llegada (sin IGV/total).
+- En Android 10+ hay que **Compartir** o **Abrir con**; la app copia el archivo a su caché (no lee Descargas directo).
+- El diálogo Imprimir del sistema sigue siendo para PDF.
 
 ---
 
@@ -154,6 +168,7 @@ C:\flutter\bin\cache\dart-sdk\bin\dart.exe run tool\benchmark_escpos.dart
 ```
 lib/services/     escpos_pdf_print, sunat/, print_timing, transports/, usb_printer_channel
 android/.../printservice/   BoletaPrintService, EscPosTransport, UsbEscPos, IminCashBox
+android/.../SharedIncomingFile.kt   copia URI Compartir/Abrir a caché
 docs/PRINT_PERFORMANCE.md
 tool/benchmark_escpos.dart
 ```
@@ -162,6 +177,9 @@ tool/benchmark_escpos.dart
 
 ## Roadmap
 
-1. **v1.6.15** — Gaveta en todos los tamaños 58/80 (como Max); XML SUNAT + USB Falcon
-2. **v2** — jobs del POS por red/cola
-3. iOS
+1. **v1.6.18** — CPE del ZIP SUNAT: boleta, factura, NC/ND, guía, retención/percepción; copia a caché en Android 10
+2. **v1.6.17** — Compartir XML/ZIP como IMPRIMIRSUNAT (caché + latin1)
+3. **v1.6.16** — Nota de crédito 07 y débito 08
+4. **v1.6.15** — Gaveta en todos los tamaños 58/80; XML SUNAT + USB Falcon
+5. **v2** — jobs del POS por red/cola
+6. iOS

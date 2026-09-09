@@ -15,6 +15,7 @@ import 'print_timing.dart';
 import 'printer_permissions.dart';
 import 'sunat/sunat_escpos_print.dart';
 import 'sunat/sunat_ubl_parser.dart';
+import 'sunat/sunat_xml_source.dart';
 import 'transports/printer_transport.dart';
 import 'transports/printer_transport_factory.dart';
 import 'usb_printer_channel.dart';
@@ -75,7 +76,7 @@ class PrintService {
             timing: timing,
           );
         }
-        if (await _isSunatXml(filePath)) {
+        if (await _isSunatXml(filePath) || lower.endsWith('.zip')) {
           return _buildSunatTicket(printer, filePath);
         }
         throw PrinterTransportException(
@@ -231,18 +232,24 @@ class PrintService {
     String filePath,
   ) async {
     try {
-      final xml = await File(filePath).readAsString(encoding: utf8);
+      final xml = await SunatXmlSource.load(filePath);
       final ticket = SunatUblParser.parse(xml);
       return SunatEscPosPrint.build(printer, ticket);
     } on SunatXmlException catch (e) {
       throw PrinterTransportException(e.message);
     } on FileSystemException {
-      throw PrinterTransportException('No se pudo leer el XML.');
+      throw PrinterTransportException(
+        'No se pudo leer el XML. En Android 10+ comparte el archivo '
+        'o usa Abrir con Boleta Print (no la ruta de Descargas).',
+      );
+    } catch (e) {
+      throw PrinterTransportException('No se pudo armar el ticket SUNAT: $e');
     }
   }
 
   static Future<bool> _isSunatXml(String path) async {
     if (path.toLowerCase().endsWith('.xml')) return true;
+    if (path.toLowerCase().endsWith('.zip')) return true;
     try {
       final file = File(path);
       if (!await file.exists()) return false;
@@ -251,7 +258,14 @@ class PrintService {
         final n = await raf.length() < 400 ? await raf.length() : 400;
         final bytes = await raf.read(n);
         final head = utf8.decode(bytes, allowMalformed: true).trimLeft();
-        return head.startsWith('<?xml') || head.contains('<Invoice');
+        return head.startsWith('<?xml') ||
+            head.startsWith('PK') ||
+            head.contains('<Invoice') ||
+            head.contains('<CreditNote') ||
+            head.contains('<DebitNote') ||
+            head.contains('<DespatchAdvice') ||
+            head.contains('<Retention') ||
+            head.contains('<Perception');
       } finally {
         await raf.close();
       }

@@ -30,12 +30,17 @@ class SunatTicket {
     required this.igv,
     required this.total,
     required this.legend,
+    this.referenceId = '',
+    this.details = const [],
+    this.showTotals = true,
   });
 
-  /// `01` factura, `03` boleta.
+  /// Catalogo 01: 01 factura, 03 boleta, 07 NC, 08 ND, 09/31 guia, 20 retencion, 40 percepcion.
   final String documentTypeCode;
   final String series;
   final String number;
+  /// Comprobante afectado o relacionado (NC/ND/guia).
+  final String referenceId;
   final String issueDate;
   final String currency;
   final String supplierRuc;
@@ -49,6 +54,12 @@ class SunatTicket {
   final double igv;
   final double total;
   final String legend;
+  /// Extra de guia/retencion (motivo, placa, partida, llegada).
+  final List<String> details;
+  final bool showTotals;
+
+  bool get isDespatch =>
+      documentTypeCode == '09' || documentTypeCode == '31';
 
   String get documentTypeLabel {
     switch (documentTypeCode) {
@@ -56,6 +67,20 @@ class SunatTicket {
         return 'FACTURA ELECTRONICA';
       case '03':
         return 'BOLETA DE VENTA';
+      case '04':
+        return 'LIQUIDACION DE COMPRA';
+      case '07':
+        return 'NOTA DE CREDITO ELECTRONICA';
+      case '08':
+        return 'NOTA DE DEBITO ELECTRONICA';
+      case '09':
+        return 'GUIA DE REMISION REMITENTE';
+      case '20':
+        return 'COMPROBANTE DE RETENCION';
+      case '31':
+        return 'GUIA DE REMISION TRANSPORTISTA';
+      case '40':
+        return 'COMPROBANTE DE PERCEPCION';
       default:
         return 'COMPROBANTE $documentTypeCode';
     }
