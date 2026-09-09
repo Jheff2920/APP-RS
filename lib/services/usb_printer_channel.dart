@@ -1,6 +1,6 @@
-import 'dart:typed_data';
-
 import 'package:flutter/services.dart';
+
+import '../platform_caps.dart';
 
 class UsbDeviceInfo {
   UsbDeviceInfo({
@@ -32,38 +32,69 @@ class UsbPrinterChannel {
   static const _ch = MethodChannel('boleta_print/usb');
 
   static Future<List<UsbDeviceInfo>> listDevices() async {
-    final raw = await _ch.invokeMethod<List<dynamic>>('listDevices');
-    if (raw == null) return const [];
-    return raw
-        .whereType<Map>()
-        .map(UsbDeviceInfo.fromMap)
-        .toList();
+    if (!PlatformCaps.supportsUsb) return const [];
+    try {
+      final raw = await _ch.invokeMethod<List<dynamic>>('listDevices');
+      if (raw == null) return const [];
+      return raw
+          .whereType<Map>()
+          .map(UsbDeviceInfo.fromMap)
+          .toList();
+    } on MissingPluginException {
+      return const [];
+    }
   }
 
   static Future<bool> requestPermission(String address) async {
-    final ok = await _ch.invokeMethod<bool>(
-      'requestPermission',
-      {'address': address},
-    );
-    return ok == true;
+    if (!PlatformCaps.supportsUsb) return false;
+    try {
+      final ok = await _ch.invokeMethod<bool>(
+        'requestPermission',
+        {'address': address},
+      );
+      return ok == true;
+    } on MissingPluginException {
+      return false;
+    }
   }
 
   static Future<void> open(String address) async {
+    _requireUsb();
     await _ch.invokeMethod<void>('open', {'address': address});
   }
 
   static Future<void> write(List<int> bytes) async {
+    _requireUsb();
     await _ch.invokeMethod<void>('write', {
       'bytes': Uint8List.fromList(bytes),
     });
   }
 
   static Future<void> close() async {
-    await _ch.invokeMethod<void>('close');
+    if (!PlatformCaps.supportsUsb) return;
+    try {
+      await _ch.invokeMethod<void>('close');
+    } on MissingPluginException {
+      return;
+    }
   }
 
   static Future<bool> openCashBox() async {
-    final ok = await _ch.invokeMethod<bool>('openCashBox');
-    return ok == true;
+    if (!PlatformCaps.supportsUsb) return false;
+    try {
+      final ok = await _ch.invokeMethod<bool>('openCashBox');
+      return ok == true;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  static void _requireUsb() {
+    if (!PlatformCaps.supportsUsb) {
+      throw PlatformException(
+        code: 'unsupported',
+        message: 'USB solo está disponible en Android.',
+      );
+    }
   }
 }

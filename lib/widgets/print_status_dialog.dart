@@ -37,7 +37,7 @@ extension PrintPhaseLabel on PrintPhase {
       case PrintPhase.printing:
         return 'Imprimiendo...';
       case PrintPhase.done:
-        return 'Impresion enviada';
+        return 'Impresión enviada';
     }
   }
 
@@ -68,10 +68,15 @@ class PrintStatusDialog extends StatelessWidget {
             height: 48,
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),
+              switchInCurve: Curves.linear,
+              switchOutCurve: Curves.linear,
+              transitionBuilder: (child, animation) {
+                return FadeTransition(opacity: animation, child: child);
+              },
               child: phase.showSpinner
-                  ? const CircularProgressIndicator(
+                  ? const RepaintBoundary(
                       key: ValueKey('spin'),
-                      strokeWidth: 3,
+                      child: CircularProgressIndicator(strokeWidth: 3),
                     )
                   : Icon(
                       Icons.check_circle,
@@ -82,26 +87,18 @@ class PrintStatusDialog extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            child: Text(
-              phase.title,
-              key: ValueKey(phase.title),
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-              textAlign: TextAlign.center,
+          Text(
+            phase.title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            child: Text(
-              phase.message,
-              key: ValueKey(phase.message),
-              style: theme.textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
+          Text(
+            phase.message,
+            style: theme.textTheme.bodyMedium,
+            textAlign: TextAlign.center,
           ),
           if (printerName != null && printerName!.isNotEmpty) ...[
             const SizedBox(height: 12),

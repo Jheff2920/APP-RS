@@ -2,20 +2,22 @@
 
 > **Para Cursor / agente IA:** Lee este archivo al inicio de cada sesión nueva.
 
-**Última actualización:** 2026-09-09 (v1.6.18)  
+**Última actualización:** 2026-09-09 (v1.7.0)  
 **Carpeta:** `C:\Users\RS-Soporte\Documents\app`  
-**Versión:** `1.6.18+35`  
-**Package ID:** `com.example.hello_world_app`
+**Versión:** `1.7.0+36`  
+**Package ID:** `com.example.hello_world_app`  
+**iOS bundle:** `com.example.helloWorldApp`
 
 ---
 
 ## Objetivo
 
-**Boleta Print** — intermediario Android para impresoras térmicas ESC/POS.
+**Boleta Print** — intermediario Android **e iOS** para impresoras térmicas ESC/POS.
 
 - Imprime PDF/imagen del POS, o arma ticket desde **XML/ZIP UBL SUNAT** (boleta, factura, NC/ND, guía, retención).
-- Bluetooth Classic, TCP :9100 o USB host (impresora integrada IMIN/Falcon).
-- Entradas: **Compartir** (PDF/imagen/XML) y **PrintService** (PDF del sistema).
+- Android: Bluetooth Classic, TCP :9100 o USB host (impresora integrada IMIN/Falcon).
+- iOS: TCP :9100 (camino fiable). Bluetooth solo BLE/MFi; no hay USB host ni PrintService.
+- Entradas: **Compartir** / **Abrir archivo** (PDF/imagen/XML/ZIP). PrintService solo Android.
 
 ---
 
@@ -36,17 +38,21 @@
 - [x] Falcon: gaveta por GPIO (`/sys/extcon-usb-gpio/cashbox_en`), no ESC/POS USB
 - [x] XML SUNAT del ZIP CPE: 01/03/04/07/08/09/20/31/40 → ticket (ignora CDR)
 - [x] Compartir/Abrir XML o ZIP CPE: copia a caché (Android 10 scoped storage)
+- [x] iOS: WiFi :9100 + abrir PDF/XML/ZIP; USB/PrintService/GPIO ocultos
+- [x] Android: emparejar Classic desde la app (`createBond` + PIN del sistema) y olvidar al desvincular (`removeBond`)
+- [x] Formulario BT: emparejados vs Agregar dispositivo; scan pide ubicación en Android 10
+- [x] Shell adaptativo (lista/detalle tablet) + scan BT sin relayout de toda la hoja
+- [ ] Validar `flutter run` en Mac / iPhone
 - [ ] v2 — jobs del POS (HTTP / cola)
-- [ ] iOS
 
 ---
 
 ## Flujos de impresión
 
-### A) Compartir
-`SEND`/`VIEW` → `SharePrintScreen` → `PrintService.printSharedFile` → PDF/imagen raster **o** XML SUNAT (`SunatUblParser` + ESC/POS) → BT / USB / TCP.
+### A) Compartir / Abrir archivo
+`SEND`/`VIEW` (Android) o Abrir en / file picker (iOS) → `SharePrintScreen` → `PrintService.printSharedFile` → PDF/imagen raster **o** XML SUNAT (`SunatUblParser` + ESC/POS) → BT / USB / TCP.
 
-### B) Sistema (Imprimir) — camino principal
+### B) Sistema (Imprimir) — Android
 1. `BoletaPrintService` recibe el PrintJob y copia el PDF.
 2. Si hay overlay (`SYSTEM_ALERT_WINDOW`): recuadro flotante sobre la app actual.
 3. `NativePdfEscPos` rasteriza en nativo (BT conecta en paralelo). Flutter solo si falla.
@@ -56,9 +62,8 @@
 Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUiHandler`).
 
 ### Activación usuario
-1. Vincular impresora en la app (papel 58/80 + márgenes). En Falcon usa **USB**, no Bluetooth.
-2. Permitir **Mostrar sobre otras apps**.
-3. Ajustes → Impresión → activar **Boleta Print**.
+1. Vincular impresora en la app (papel 58/80 + márgenes). En Falcon usa **USB**, no Bluetooth. En iPhone/iPad usa **WiFi :9100**.
+2. En Android: permitir **Mostrar sobre otras apps** y activar **Boleta Print** en Ajustes → Impresión.
 
 ---
 
@@ -79,6 +84,10 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 | Build diario | `.\scripts\run-phone.ps1 -InstallOnly` |
 | Referencia | `apk-ejemplo/` RawBT (protocolo, no pegar código) |
 | XML SUNAT | ZIP CPE: Invoice/CreditNote/DebitNote/DespatchAdvice/Retention/Perception; ignora CDR `R-`; copia URI a caché |
+| iOS | WiFi TCP 9100; BT solo BLE/MFi; USB/PrintService/GPIO Android-only; Abrir archivo + document types |
+| Caps | `lib/platform_caps.dart` — no llamar canales USB en iOS |
+| BT Android | Plugin `BluetoothBondPlugin`: scan Classic, `createBond`, `removeBond`, `listBonded`. Sin `neverForLocation`. Location on + permiso para discovery. Desvincular también olvida el bond. iOS no puede unpair por API. |
+| UI | `BoletaPage` + lista/detalle ≥840 dp. Scan BT: lista altura fija + `ValueNotifier`, no `shrinkWrap`. |
 
 ---
 
@@ -117,6 +126,10 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 - `android/.../PrintEngineBridge.kt` (fallback)
 - `lib/system_print_main.dart`
 - `lib/services/sunat/` (`sunat_ubl_parser`, `sunat_escpos_print`)
+- `lib/platform_caps.dart`
+- `lib/services/bluetooth_bond_channel.dart`
+- `android/.../BluetoothBondPlugin.kt`
+- `ios/Runner/IncomingFile.swift` (Abrir con → tmp)
 
 ---
 
@@ -128,9 +141,17 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 .\scripts\run-phone.ps1
 ```
 
+iOS (Mac + Xcode):
+
+```bash
+flutter pub get
+cd ios && pod install && cd ..
+flutter run -d <iphone>
+```
+
 ---
 
 ## Cómo retomar
 
-> **v1.6.18:** ZIP SUNAT: boleta, factura, NC/ND, guía de remisión, retención/percepción.  
-> Siguiente: **v2** jobs del POS.
+> **v1.7.0:** Android + iOS. Emparejar/olvidar BT Classic en Android desde la app. iOS imprime por WiFi :9100 y abre XML/PDF/ZIP. USB/PrintService/GPIO siguen en Android.  
+> Compilar iOS requiere un Mac. Siguiente: validar en iPhone, luego **v2** jobs del POS.

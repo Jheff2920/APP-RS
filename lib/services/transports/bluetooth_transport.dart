@@ -1,6 +1,7 @@
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import '../../models/saved_printer.dart';
+import '../../platform_caps.dart';
 import 'printer_transport.dart';
 
 class BluetoothTransport implements PrinterTransport {
@@ -25,7 +26,7 @@ class BluetoothTransport implements PrinterTransport {
     if (!ok) {
       throw PrinterTransportException(
         'No se pudo conectar por Bluetooth a ${printer.address}. '
-        'Empareja la impresora en Ajustes de Android primero.',
+        '${PlatformCaps.isIOS ? 'En iPhone/iPad el Bluetooth Classic de impresoras genéricas no está disponible. Usa WiFi (IP y puerto 9100) o una impresora BLE/MFi.' : 'Empareja la impresora en Ajustes de Android primero.'}',
       );
     }
     _connected = true;

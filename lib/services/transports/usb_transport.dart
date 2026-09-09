@@ -1,4 +1,5 @@
 import '../../models/saved_printer.dart';
+import '../../platform_caps.dart';
 import '../usb_printer_channel.dart';
 import 'printer_transport.dart';
 
@@ -7,6 +8,12 @@ class UsbTransport implements PrinterTransport {
 
   @override
   Future<void> connect(SavedPrinter printer) async {
+    if (!PlatformCaps.supportsUsb) {
+      throw PrinterTransportException(
+        'USB solo está disponible en Android (impresora integrada IMIN/Falcon). '
+        'En iPhone/iPad usa WiFi (TCP 9100).',
+      );
+    }
     final address = printer.address.trim();
     if (address.isEmpty) {
       throw PrinterTransportException('Selecciona un dispositivo USB.');

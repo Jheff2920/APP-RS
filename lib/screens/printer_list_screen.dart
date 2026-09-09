@@ -1,13 +1,21 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../models/saved_printer.dart';
+import '../platform_caps.dart';
+import '../services/bluetooth_bond_channel.dart';
 import '../services/print_service.dart';
 import '../services/printer_permissions.dart';
 import '../services/printer_store.dart';
 import '../services/transports/printer_transport.dart';
+import '../widgets/boleta_page.dart';
 import '../widgets/print_status_dialog.dart';
 import 'print_history_screen.dart';
 import 'printer_form_screen.dart';
+import 'share_print_screen.dart';
+
+const _expandedBreakpoint = 840.0;
 
 class PrinterListScreen extends StatefulWidget {
   const PrinterListScreen({
@@ -24,9 +32,14 @@ class PrinterListScreen extends StatefulWidget {
 }
 
 class _PrinterListScreenState extends State<PrinterListScreen> {
+  final _detailNavKey = GlobalKey<NavigatorState>();
   List<SavedPrinter> _printers = [];
   bool _loading = true;
   String? _busyId;
+  bool _detailIsAddForm = false;
+  bool _openingForm = false;
+
+  bool get _expanded => MediaQuery.sizeOf(context).width >= _expandedBreakpoint;
 
   @override
   void initState() {
@@ -36,6 +49,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
   }
 
   Future<void> _maybeAskOverlay() async {
+    if (!PlatformCaps.supportsSystemPrint) return;
     if (!mounted) return;
     final ok = await PrinterPermissions.hasSystemOverlay();
     if (ok || !mounted) return;
@@ -76,16 +90,58 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
   }
 
   Future<void> _openForm({SavedPrinter? existing}) async {
-    final result = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => PrinterFormScreen(
-          store: widget.store,
-          printService: widget.printService,
-          existing: existing,
-        ),
-      ),
+    if (_openingForm) return;
+    if (existing == null && _detailIsAddForm) return;
+    _openingForm = true;
+    final form = PrinterFormScreen(
+      store: widget.store,
+      printService: widget.printService,
+      existing: existing,
     );
-    if (result == true) await _reload();
+    try {
+      if (_expanded) {
+        setState(() => _detailIsAddForm = existing == null);
+        final nav = _detailNavKey.currentState;
+        if (nav == null) return;
+        final result = await nav.push<bool>(
+          MaterialPageRoute(builder: (_) => form),
+        );
+        if (mounted) setState(() => _detailIsAddForm = false);
+        if (result == true) await _reload();
+        return;
+      }
+      final result = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => form),
+      );
+      if (result == true) await _reload();
+    } finally {
+      _openingForm = false;
+    }
+  }
+
+  Future<void> _openSharedFile() async {
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['pdf', 'xml', 'zip', 'png', 'jpg', 'jpeg'],
+      );
+      final path = picked?.files.single.path;
+      if (path == null || path.isEmpty || !mounted) return;
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(
+          builder: (_) => SharePrintScreen(
+            filePath: path,
+            printerStore: widget.store,
+            printService: widget.printService,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo abrir el archivo: $e')),
+      );
+    }
   }
 
   Future<void> _testPrint(SavedPrinter printer) async {
@@ -121,13 +177,17 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
   }
 
   Future<void> _unlink(SavedPrinter printer) async {
+    final bluetoothNote = printer.type != PrinterLinkType.bluetooth
+        ? ''
+        : PlatformCaps.isAndroid
+            ? '\nTambién se olvidará del Bluetooth del teléfono.'
+            : '\nEn iPhone/iPad hay que olvidarla en Ajustes > Bluetooth.';
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Desvincular impresora'),
         content: Text(
-          '¿Quitar "${printer.name}" de Boleta Print?\n'
-          '(No borra el emparejado Bluetooth del sistema Android.)',
+          '¿Quitar "${printer.name}" de Boleta Print?$bluetoothNote',
         ),
         actions: [
           TextButton(
@@ -142,18 +202,50 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
       ),
     );
     if (ok != true) return;
+    String? bluetoothError;
+    if (printer.type == PrinterLinkType.bluetooth) {
+      try {
+        if (PlatformCaps.isAndroid) {
+          final permitted = await PrinterPermissions.ensureBluetooth();
+          if (!permitted) {
+            bluetoothError =
+                'Se quitó de la app, pero faltan permisos para olvidarla del Bluetooth.';
+          } else {
+            await BluetoothBondChannel.forget(printer.address);
+          }
+        } else {
+          await BluetoothBondChannel.forget(printer.address);
+        }
+      } catch (e) {
+        bluetoothError =
+            'Se quitó de la app, pero no se pudo olvidar del Bluetooth: $e';
+      }
+    }
     await widget.store.delete(printer.id);
+    if (_expanded) {
+      _detailNavKey.currentState?.popUntil((route) => route.isFirst);
+      if (mounted) setState(() => _detailIsAddForm = false);
+    }
     await _reload();
+    if (!mounted || bluetoothError == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(bluetoothError)),
+    );
   }
 
   void _openHistory({SavedPrinter? printer}) {
+    final screen = PrintHistoryScreen(
+      history: widget.printService.history,
+      printer: printer,
+    );
+    if (_expanded) {
+      _detailNavKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => screen),
+      );
+      return;
+    }
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => PrintHistoryScreen(
-          history: widget.printService.history,
-          printer: printer,
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => screen),
     );
   }
 
@@ -184,7 +276,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
               const Divider(height: 1),
               ListTile(
                 leading: const Icon(Icons.print),
-                title: const Text('Probar impresion'),
+                title: const Text('Probar impresión'),
                 onTap: () {
                   Navigator.pop(ctx);
                   _testPrint(printer);
@@ -235,12 +327,87 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
     );
   }
 
+  Widget _listBody() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_printers.isEmpty) {
+      return _EmptyState(
+        showUsb: PlatformCaps.supportsUsb,
+        onAdd: () => _openForm(),
+        onOpenFile: _openSharedFile,
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+      scrollCacheExtent: const ScrollCacheExtent.pixels(280),
+      itemCount: _printers.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, index) {
+        final p = _printers[index];
+        final busy = _busyId == p.id;
+        return Card(
+          child: RepaintBoundary(
+            child: ListTile(
+            leading: CircleAvatar(
+              child: Icon(
+                p.type == PrinterLinkType.bluetooth
+                    ? Icons.bluetooth
+                    : p.type == PrinterLinkType.usb
+                        ? Icons.usb
+                        : Icons.wifi,
+              ),
+            ),
+            title: Text(p.name),
+            subtitle: Text(
+              p.isDefault
+                  ? 'Predeterminada · ${p.type.label} · ${p.paper.label}'
+                  : '${p.type.label} · ${p.paper.label}',
+            ),
+            trailing: busy
+                ? const SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : IconButton(
+                    tooltip: 'Opciones',
+                    icon: const Icon(Icons.more_vert),
+                    onPressed: () => _showPrinterActions(p),
+                  ),
+            onTap: () => _showPrinterActions(p),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _detailPane() {
+    return Navigator(
+      key: _detailNavKey,
+      onGenerateRoute: (settings) {
+        return MaterialPageRoute<void>(
+          builder: (context) => const _DetailPlaceholder(),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final expanded = _expanded;
+    final hideFab = expanded && _detailIsAddForm;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Boleta Print'),
         actions: [
+          IconButton(
+            tooltip: 'Abrir archivo',
+            onPressed: _openSharedFile,
+            icon: const Icon(Icons.folder_open),
+          ),
           IconButton(
             tooltip: 'Historial',
             onPressed: () => _openHistory(),
@@ -253,96 +420,98 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openForm(),
-        icon: const Icon(Icons.add),
-        label: const Text('Vincular'),
+      floatingActionButton: hideFab
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: _openingForm ? null : () => _openForm(),
+              icon: const Icon(Icons.add),
+              label: const Text('Vincular'),
+            ),
+      body: expanded
+          ? Row(
+              children: [
+                Expanded(flex: 2, child: _listBody()),
+                const VerticalDivider(width: 1),
+                Expanded(flex: 3, child: _detailPane()),
+              ],
+            )
+          : _listBody(),
+    );
+  }
+}
+
+class _DetailPlaceholder extends StatelessWidget {
+  const _DetailPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surface,
+      child: Center(
+        child: Icon(
+          Icons.print,
+          size: 48,
+          color: Theme.of(context).colorScheme.outline,
+        ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _printers.isEmpty
-              ? _EmptyState(onAdd: () => _openForm())
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
-                  itemCount: _printers.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final p = _printers[index];
-                    final busy = _busyId == p.id;
-                    return Card(
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          child: Icon(
-                            p.type == PrinterLinkType.bluetooth
-                                ? Icons.bluetooth
-                                : p.type == PrinterLinkType.usb
-                                    ? Icons.usb
-                                    : Icons.wifi,
-                          ),
-                        ),
-                        title: Text(p.name),
-                        subtitle: Text(
-                          p.isDefault
-                              ? 'Predeterminada · ${p.type.label} · ${p.paper.label}'
-                              : '${p.type.label} · ${p.paper.label}',
-                        ),
-                        trailing: busy
-                            ? const SizedBox(
-                                width: 28,
-                                height: 28,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : IconButton(
-                                tooltip: 'Opciones',
-                                icon: const Icon(Icons.more_vert),
-                                onPressed: () => _showPrinterActions(p),
-                              ),
-                        onTap: () => _showPrinterActions(p),
-                      ),
-                    );
-                  },
-                ),
     );
   }
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onAdd});
+  const _EmptyState({
+    required this.onAdd,
+    required this.onOpenFile,
+    required this.showUsb,
+  });
 
   final VoidCallback onAdd;
+  final VoidCallback onOpenFile;
+  final bool showUsb;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.print_disabled,
-              size: 64,
-              color: Theme.of(context).colorScheme.outline,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Sin impresoras vinculadas',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Vincula una impresora termica (Bluetooth o WiFi). '
-              'El historial de trabajos se ve en el icono de reloj o en las opciones de cada impresora.\n\n'
-              'Tambien puedes compartir un PDF hacia esta app desde otras apps.',
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: onAdd,
-              icon: const Icon(Icons.add_link),
-              label: const Text('Vincular impresora'),
-            ),
-          ],
+    final types = showUsb
+        ? '${PrinterLinkType.bluetooth.label}, ${PrinterLinkType.network.label} o ${PrinterLinkType.usb.label}'
+        : '${PrinterLinkType.bluetooth.label} o ${PrinterLinkType.network.label}';
+    return BoletaPage(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.print_disabled,
+                size: 64,
+                color: Theme.of(context).colorScheme.outline,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Sin impresoras vinculadas',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Vincula una impresora térmica ($types). '
+                'El historial de trabajos se ve en el icono de reloj o en las opciones de cada impresora.\n\n'
+                '${showUsb ? 'También puedes compartir un PDF hacia esta app desde otras apps.' : 'En iPhone/iPad imprime por WiFi (TCP 9100). Abre un PDF, XML o ZIP SUNAT con el botón de carpeta.'}',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: onAdd,
+                icon: const Icon(Icons.add_link),
+                label: const Text('Vincular impresora'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: onOpenFile,
+                icon: const Icon(Icons.folder_open),
+                label: const Text('Abrir archivo'),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -3,13 +3,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
+import 'platform_caps.dart';
 import 'screens/print_history_screen.dart';
 import 'screens/printer_list_screen.dart';
 import 'screens/share_print_screen.dart';
+import 'services/incoming_files.dart';
 import 'services/print_service.dart';
 import 'services/printer_store.dart';
 import 'services/shared_incoming.dart';
 import 'system_print_main.dart';
+import 'theme.dart';
 
 class BoletaPrintApp extends StatefulWidget {
   const BoletaPrintApp({
@@ -28,6 +31,7 @@ class BoletaPrintApp extends StatefulWidget {
 class _BoletaPrintAppState extends State<BoletaPrintApp> {
   final _navKey = GlobalKey<NavigatorState>();
   StreamSubscription? _shareSub;
+  StreamSubscription? _incomingSub;
   bool _handlingShare = false;
 
   @override
@@ -44,24 +48,32 @@ class _BoletaPrintAppState extends State<BoletaPrintApp> {
   }
 
   void _listenShares() {
-    // App ya abierta.
-    _shareSub = ReceiveSharingIntent.instance.getMediaStream().listen(
-      (files) => _onShared(files),
-      onError: (e) => debugPrint('share stream error: $e'),
-    );
+    if (PlatformCaps.usesShareIntent) {
+      _shareSub = ReceiveSharingIntent.instance.getMediaStream().listen(
+        (files) => _onShared(files),
+        onError: (e) => debugPrint('share stream error: $e'),
+      );
+      ReceiveSharingIntent.instance.getInitialMedia().then((files) {
+        _onShared(files);
+        ReceiveSharingIntent.instance.reset();
+      });
+    }
 
-    // App abierta desde Compartir / cerrada.
-    ReceiveSharingIntent.instance.getInitialMedia().then((files) {
-      _onShared(files);
-      ReceiveSharingIntent.instance.reset();
-    });
+    _incomingSub = IncomingFiles.stream.listen(_openSharedPath);
+    unawaited(IncomingFiles.takePending().then((path) {
+      if (path != null) unawaited(_openSharedPath(path));
+    }));
   }
 
   Future<void> _onShared(List<SharedMediaFile> files) async {
-    if (files.isEmpty || _handlingShare) return;
+    if (files.isEmpty) return;
     final resolved = await _resolveSharedPath(files.first.path);
     if (resolved.isEmpty) return;
+    await _openSharedPath(resolved);
+  }
 
+  Future<void> _openSharedPath(String path) async {
+    if (path.isEmpty || _handlingShare) return;
     _handlingShare = true;
     try {
       await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -71,7 +83,7 @@ class _BoletaPrintAppState extends State<BoletaPrintApp> {
       await nav.push(
         MaterialPageRoute(
           builder: (_) => SharePrintScreen(
-            filePath: resolved,
+            filePath: path,
             printerStore: widget.store,
             printService: widget.printService,
           ),
@@ -79,7 +91,9 @@ class _BoletaPrintAppState extends State<BoletaPrintApp> {
       );
     } finally {
       _handlingShare = false;
-      ReceiveSharingIntent.instance.reset();
+      if (PlatformCaps.usesShareIntent) {
+        ReceiveSharingIntent.instance.reset();
+      }
     }
   }
 
@@ -97,6 +111,7 @@ class _BoletaPrintAppState extends State<BoletaPrintApp> {
   @override
   void dispose() {
     _shareSub?.cancel();
+    _incomingSub?.cancel();
     super.dispose();
   }
 
@@ -105,10 +120,7 @@ class _BoletaPrintAppState extends State<BoletaPrintApp> {
     return MaterialApp(
       navigatorKey: _navKey,
       title: 'Boleta Print',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        useMaterial3: true,
-      ),
+      theme: boletaPrintTheme,
       home: PrinterListScreen(
         store: widget.store,
         printService: widget.printService,

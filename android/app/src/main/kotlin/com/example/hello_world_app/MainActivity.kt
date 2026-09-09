@@ -20,6 +20,7 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         flutterEngine.plugins.add(PrintersNativePrefsPlugin())
         flutterEngine.plugins.add(UsbPrinterPlugin())
+        flutterEngine.plugins.add(BluetoothBondPlugin())
         systemChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             CHANNEL_SYSTEM,

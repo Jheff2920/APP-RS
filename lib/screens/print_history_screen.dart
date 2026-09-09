@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../models/print_job_record.dart';
 import '../models/saved_printer.dart';
 import '../services/print_history_store.dart';
+import '../widgets/boleta_page.dart';
 
 class PrintHistoryScreen extends StatefulWidget {
   const PrintHistoryScreen({
@@ -45,7 +47,7 @@ class _PrintHistoryScreenState extends State<PrintHistoryScreen> {
         title: const Text('Borrar historial'),
         content: Text(
           widget.printer == null
-              ? '¿Borrar todo el historial de impresion?'
+              ? '¿Borrar todo el historial de impresión?'
               : '¿Borrar el historial de "${widget.printer!.name}"?',
         ),
         actions: [
@@ -68,7 +70,7 @@ class _PrintHistoryScreenState extends State<PrintHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final title = widget.printer == null
-        ? 'Historial de impresion'
+        ? 'Historial de impresión'
         : 'Historial · ${widget.printer!.name}';
 
     return Scaffold(
@@ -84,40 +86,45 @@ class _PrintHistoryScreenState extends State<PrintHistoryScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _jobs.isEmpty
-              ? const Center(
-                  child: Text('Sin trabajos de impresion todavia.'),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _jobs.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final j = _jobs[index];
-                    final icon = switch (j.status) {
-                      PrintJobStatus.success => Icons.check_circle,
-                      PrintJobStatus.failed => Icons.error,
-                      PrintJobStatus.queued => Icons.hourglass_bottom,
-                    };
-                    final color = switch (j.status) {
-                      PrintJobStatus.success => Colors.green,
-                      PrintJobStatus.failed => Colors.red,
-                      PrintJobStatus.queued => Colors.orange,
-                    };
-                    return Card(
-                      child: ListTile(
-                        leading: Icon(icon, color: color),
-                        title: Text(j.title),
-                        subtitle: Text(
-                          '${j.printerName}\n'
-                          '${j.status.label} · ${j.source} · '
-                          '${j.createdAt.toLocal()}',
-                        ),
-                        isThreeLine: true,
-                      ),
-                    );
-                  },
-                ),
+          : BoletaPage(
+              child: _jobs.isEmpty
+                  ? const Center(
+                      child: Text('Sin trabajos de impresión todavía.'),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      scrollCacheExtent: const ScrollCacheExtent.pixels(280),
+                      itemCount: _jobs.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final j = _jobs[index];
+                        final icon = switch (j.status) {
+                          PrintJobStatus.success => Icons.check_circle,
+                          PrintJobStatus.failed => Icons.error,
+                          PrintJobStatus.queued => Icons.hourglass_bottom,
+                        };
+                        final color = switch (j.status) {
+                          PrintJobStatus.success => Colors.green,
+                          PrintJobStatus.failed => Colors.red,
+                          PrintJobStatus.queued => Colors.orange,
+                        };
+                        return Card(
+                          child: RepaintBoundary(
+                            child: ListTile(
+                              leading: Icon(icon, color: color),
+                              title: Text(j.title),
+                              subtitle: Text(
+                                '${j.printerName}\n'
+                                '${j.status.label} · ${j.source} · '
+                                '${j.createdAt.toLocal()}',
+                              ),
+                              isThreeLine: true,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
     );
   }
 }

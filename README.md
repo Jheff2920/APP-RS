@@ -1,10 +1,10 @@
 # Boleta Print
 
-Controlador Android de impresoras térmicas ESC/POS (58 y 80 mm).  
+Controlador **Android e iOS** de impresoras térmicas ESC/POS (58 y 80 mm).  
 Imprime PDF/imagen del POS **o** convierte el **XML/ZIP UBL de SUNAT** (boleta, factura, NC/ND, guía de remisión, retención/percepción) a ticket 58/80 mm.
 
 **Repo:** https://github.com/Jheff2920/APP-RS  
-**Versión:** 1.6.18+35 · Package ID: `com.example.hello_world_app`  
+**Versión:** 1.7.0+36 · Package ID: `com.example.hello_world_app`  
 **Rama estable:** `main` · **Rama de pruebas:** `test/pruebas`
 
 > Memoria técnica: [CONTEXTO.md](CONTEXTO.md) · Rendimiento: [docs/PRINT_PERFORMANCE.md](docs/PRINT_PERFORMANCE.md)
@@ -21,6 +21,9 @@ Imprime PDF/imagen del POS **o** convierte el **XML/ZIP UBL de SUNAT** (boleta, 
 - USB host (impresora integrada IMIN/Falcon): lista, permiso `vid:pid` y envío bulk ESC/POS.
 - En Falcon la gaveta **no va por USB**: se pulsa el GPIO del equipo (`cashbox_en`), como el plugin IMIN. En BT/LAN se sigue usando `ESC p`.
 - **XML/ZIP SUNAT:** Compartir o Abrir el CPE. En Android 10+ se copia a caché (Descargas no es legible). El CDR (`R-...`) no se imprime.
+- **iOS:** misma app. Imprime por **WiFi TCP :9100**. USB, PrintService y GPIO Falcon quedan en Android. Abrir PDF/XML/ZIP desde la app o “Abrir en Boleta Print”.
+- **Bluetooth Android:** emparejar desde la app (PIN del sistema). La pestaña lista solo equipos ya vinculados; **Agregar dispositivo** busca cercanos. **Desvincular** también olvida el vínculo del teléfono. En Android 10 el scan Classic pide ubicación encendida.
+- **UI:** lista + detalle en tablet (≥840 dp), Guardar/Probar fijos abajo, scan BT sin tirones al ir apareciendo equipos.
 
 ---
 
@@ -40,15 +43,18 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 ---
 
-## Estado actual (v1.6.18)
+## Estado actual (v1.7.0)
 
 | Hecho | Pendiente |
 |-------|-----------|
-| Bluetooth Classic + WiFi TCP :9100 + USB host | v2: jobs HTTP/cola del POS |
-| Compartir PDF/imagen **o XML/ZIP SUNAT** → imprimir | iOS |
-| PrintService + overlay flotante | |
+| Android: Bluetooth Classic + WiFi TCP :9100 + USB host | v2: jobs HTTP/cola del POS |
+| Emparejar / olvidar BT desde la app (PIN del sistema; `removeBond`) | Validar build en Mac / iPhone |
+| iOS: WiFi TCP :9100 + XML/PDF/ZIP (Bluetooth BLE/MFi si el hardware lo permite) | En iOS no se puede olvidar el BT desde la app (Ajustes) |
+| Compartir o Abrir PDF/imagen **o XML/ZIP SUNAT** → imprimir | |
+| PrintService + overlay flotante (**solo Android**) | |
 | Papel 58 / 80 mm + DPI 203/300 + nitidez x1/x2/x3 | |
 | Márgenes L/R/inf + corte + gaveta **después** del papel | |
+| Shell adaptativo (teléfono / tablet) + scan BT sin jank | |
 | Dedupe impresoras (ID estable + MAC / USB vid:pid) | |
 | Pipeline más rápido + métricas `BoletaPrintTiming` | |
 | Tests GS v0 / EscPosChunker + benchmark local | |
@@ -58,11 +64,47 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 ## Qué hace
 
-1. Vincular impresoras BT (emparejadas en Android), WiFi o **USB** (Falcon/IMIN integrada).
-2. Configurar antes de guardar: rollo, DPI, nitidez, márgenes, corte, gaveta, predeterminada.
-3. Compartir PDF/imagen → imprimir tal cual (raster).
-4. Compartir / Abrir **XML o ZIP SUNAT** (boleta, factura, NC, guía, etc.) → ticket 58 u 80 mm + QR.
-5. Diálogo **Imprimir** del sistema (PDF) → overlay sin saltar de app.
+1. Vincular impresoras: **WiFi** (ambas plataformas), **Bluetooth** (Classic en Android; BLE/MFi en iOS) o **USB** (solo Android, Falcon/IMIN).
+2. En Android, emparejar el Bluetooth **dentro de la app** (diálogo PIN del sistema). Desvincular también olvida el equipo del Bluetooth del teléfono.
+3. Configurar antes de guardar: rollo, DPI, nitidez, márgenes, corte, gaveta, predeterminada.
+4. Compartir PDF/imagen → imprimir tal cual (raster). En iOS también **Abrir archivo** o “Abrir en Boleta Print”.
+5. Compartir / Abrir **XML o ZIP SUNAT** (boleta, factura, NC, guía, etc.) → ticket 58 u 80 mm + QR.
+6. En Android, diálogo **Imprimir** del sistema (PDF) → overlay sin saltar de app.
+
+---
+
+## Bluetooth
+
+**Android (Classic SPP, el que usan las térmicas genéricas):**
+
+- En el formulario, **Dispositivos emparejados** solo muestra lo ya vinculado en el sistema.
+- **Agregar dispositivo** busca cercanos y llama a `createBond`. El PIN lo pide Android (suele ser `0000` o `1234`).
+- **Desvincular** quita la impresora de Boleta Print **y** del Bluetooth del teléfono (`removeBond`).
+- En Android 10 (tablet Lenovo) hace falta permiso de **ubicación** y el interruptor de Ubicación encendido para listar cercanos. No uses `neverForLocation` en `BLUETOOTH_SCAN`.
+
+**iOS:**
+
+- No hay Bluetooth Classic SPP. Si la impresora no es BLE/MFi, usa **WiFi :9100**.
+- Apple no deja olvidar el vínculo desde la app; hay que hacerlo en Ajustes > Bluetooth.
+
+---
+
+## iOS (hace falta un Mac)
+
+En Windows no se puede compilar ni firmar iOS. En un Mac con Xcode:
+
+```bash
+cd app
+flutter pub get
+cd ios && pod install && cd ..
+flutter devices
+flutter run -d <id-del-iphone>
+# o: open ios/Runner.xcworkspace
+```
+
+- Camino de impresión fiable: impresora en la **misma WiFi**, IP y puerto **9100**.
+- USB integrado / PrintService / overlay / GPIO `cashbox_en` son **solo Android**.
+- Bundle ID actual: `com.example.helloWorldApp` (cámbialo en Xcode antes de App Store).
 
 ---
 
@@ -101,7 +143,7 @@ Usa **Max** si en Chrome no se ve toda la boleta y no quieres la medida Google. 
 
 ## XML / ZIP SUNAT
 
-Desde **Archivos** o la consulta CPE: **Compartir** o **Abrir con → Boleta Print** el `.xml` o el `.zip`.
+Desde **Archivos** o la consulta CPE: **Compartir** o **Abrir con → Boleta Print** el `.xml` o el `.zip`. En iOS también el botón **Abrir archivo** de la lista.
 
 | Código | Comprobante | Raíz UBL |
 |--------|-------------|----------|
@@ -148,7 +190,7 @@ C:\flutter\bin\cache\dart-sdk\bin\dart.exe run tool\benchmark_escpos.dart
 | Equipo | Serial ADB | Notas |
 |--------|------------|--------|
 | Xiaomi | `863d005830483132385114e3efc08c` | default del script |
-| Lenovo YT-X705F | `HA1KL54R` | Android 10 · overlay obligatorio |
+| Lenovo YT-X705F | `HA1KL54R` | Android 10 · overlay + ubicación para scan BT |
 | IMIN Falcon 1 | (ADB del equipo) | 2 GB RAM · impresora integrada por **USB** |
 
 > Debug local y Docker usan keystores distintos → no mezclar installs.
@@ -166,9 +208,15 @@ C:\flutter\bin\cache\dart-sdk\bin\dart.exe run tool\benchmark_escpos.dart
 ## Estructura relevante
 
 ```
+lib/platform_caps.dart
+lib/theme.dart
+lib/widgets/boleta_page.dart
 lib/services/     escpos_pdf_print, sunat/, print_timing, transports/, usb_printer_channel
+lib/services/bluetooth_bond_channel.dart
+android/.../BluetoothBondPlugin.kt   createBond / removeBond / listBonded + scan Classic
 android/.../printservice/   BoletaPrintService, EscPosTransport, UsbEscPos, IminCashBox
 android/.../SharedIncomingFile.kt   copia URI Compartir/Abrir a caché
+ios/Runner/   Info.plist, IncomingFile.swift, AppDelegate, SceneDelegate
 docs/PRINT_PERFORMANCE.md
 tool/benchmark_escpos.dart
 ```
@@ -177,9 +225,9 @@ tool/benchmark_escpos.dart
 
 ## Roadmap
 
-1. **v1.6.18** — CPE del ZIP SUNAT: boleta, factura, NC/ND, guía, retención/percepción; copia a caché en Android 10
-2. **v1.6.17** — Compartir XML/ZIP como IMPRIMIRSUNAT (caché + latin1)
-3. **v1.6.16** — Nota de crédito 07 y débito 08
-4. **v1.6.15** — Gaveta en todos los tamaños 58/80; XML SUNAT + USB Falcon
-5. **v2** — jobs del POS por red/cola
-6. iOS
+1. **v1.7.0** — iOS WiFi + XML/PDF/ZIP; emparejar/olvidar BT en Android; shell tablet
+2. **v1.6.18** — CPE del ZIP SUNAT: boleta, factura, NC/ND, guía, retención/percepción; copia a caché en Android 10
+3. **v1.6.17** — Compartir XML/ZIP como IMPRIMIRSUNAT (caché + latin1)
+4. **v1.6.16** — Nota de crédito 07 y débito 08
+5. **v1.6.15** — Gaveta en todos los tamaños 58/80; XML SUNAT + USB Falcon
+6. **v2** — jobs del POS por red/cola

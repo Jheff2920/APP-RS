@@ -6,6 +6,7 @@ import '../services/print_service.dart';
 import '../services/printer_permissions.dart';
 import '../services/printer_store.dart';
 import '../services/transports/printer_transport.dart';
+import '../widgets/boleta_page.dart';
 import '../widgets/print_status_dialog.dart';
 
 class SharePrintScreen extends StatefulWidget {
@@ -105,10 +106,23 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
       appBar: AppBar(title: const Text('Imprimir archivo')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+          : BoletaPage(
+              bottomBar: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _printing || _selected == null ? null : _print,
+                  icon: _printing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.print),
+                  label: const Text('Imprimir'),
+                ),
+              ),
+              child: ListView(
+                padding: const EdgeInsets.all(16),
                 children: [
                   Card(
                     child: ListTile(
@@ -135,7 +149,7 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
                   if (_printers.isEmpty)
                     const Text(
                       'No hay impresoras vinculadas. Abre Boleta Print, '
-                      'agrega una impresora y vuelve a compartir el archivo.',
+                      'agrega una impresora y vuelve a abrir el archivo.',
                     )
                   else
                     DropdownButtonFormField<String>(
@@ -156,23 +170,11 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
                           ? null
                           : (id) {
                               setState(() {
-                                _selected = _printers.firstWhere((p) => p.id == id);
+                                _selected =
+                                    _printers.firstWhere((p) => p.id == id);
                               });
                             },
                     ),
-                  const Spacer(),
-                  FilledButton.icon(
-                    onPressed:
-                        _printing || _selected == null ? null : _print,
-                    icon: _printing
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.print),
-                    label: const Text('Imprimir'),
-                  ),
                 ],
               ),
             ),
