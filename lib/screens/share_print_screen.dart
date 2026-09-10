@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
+import '../brand.dart';
 import '../models/saved_printer.dart';
 import '../services/print_service.dart';
 import '../services/printer_permissions.dart';
 import '../services/printer_store.dart';
+import '../services/redpos/redpos_license.dart';
 import '../services/transports/printer_transport.dart';
 import '../widgets/boleta_page.dart';
 import '../widgets/print_status_dialog.dart';
+import '../widgets/redpos_ad_banner.dart';
 
 class SharePrintScreen extends StatefulWidget {
   const SharePrintScreen({
@@ -30,6 +33,7 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
   SavedPrinter? _selected;
   bool _loading = true;
   bool _printing = false;
+  bool _adsFree = false;
 
   @override
   void initState() {
@@ -39,10 +43,13 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
 
   Future<void> _load() async {
     final all = await widget.printerStore.loadAll();
+    final adsFree =
+        await RedPosLicenseStore.instance.isAdsFree(reloadDisk: false);
     if (!mounted) return;
     setState(() {
       _printers = all;
       _selected = PrinterStore.findByIdOrDefault(all, '');
+      _adsFree = adsFree;
       _loading = false;
     });
   }
@@ -124,6 +131,12 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  RedPosAdBanner(
+                    adsFree: _adsFree,
+                    store: widget.printerStore,
+                    onActivated: _load,
+                  ),
+                  if (!_adsFree) const SizedBox(height: 8),
                   Card(
                     child: ListTile(
                       leading: Icon(
@@ -148,7 +161,7 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
                   const SizedBox(height: 8),
                   if (_printers.isEmpty)
                     const Text(
-                      'No hay impresoras vinculadas. Abre Boleta Print, '
+                      'No hay impresoras vinculadas. Abre ${AppBrand.name}, '
                       'agrega una impresora y vuelve a abrir el archivo.',
                     )
                   else

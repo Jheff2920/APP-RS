@@ -83,7 +83,7 @@ if ($InstallOnly -or $Release) {
     Write-Host "Instalando en $Serial ..." -ForegroundColor Cyan
     & $adb -s $Serial install -r $apk
     if ($LASTEXITCODE -ne 0) { throw "adb install fallo" }
-    & $adb -s $Serial shell am start -n com.example.hello_world_app/.MainActivity
+    & $adb -s $Serial shell am start -n com.redpos.service/com.example.hello_world_app.MainActivity
     Write-Host "Listo." -ForegroundColor Green
     return
 }

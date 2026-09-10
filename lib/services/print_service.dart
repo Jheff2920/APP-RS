@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import '../brand.dart';
 import '../models/print_job_record.dart';
 import '../models/saved_printer.dart';
 import '../widgets/print_status_dialog.dart';
@@ -19,6 +20,8 @@ import 'sunat/sunat_xml_source.dart';
 import 'transports/printer_transport.dart';
 import 'transports/printer_transport_factory.dart';
 import 'usb_printer_channel.dart';
+import 'redpos/redpos_ad_escpos.dart';
+import 'redpos/redpos_license.dart';
 
 class PrintService {
   PrintService({PrintHistoryStore? history})
@@ -147,6 +150,13 @@ class PrintService {
       );
       final bytes = await bytesFuture;
       byteCount = bytes.length;
+      final adsFree = await RedPosLicenseStore.instance.isAdsFree();
+      final payload = RedPosAdEscPos.maybeWrap(
+        bytes,
+        printer: printer,
+        adsFree: adsFree,
+      );
+      byteCount = payload.length;
       phase(PrintPhase.connecting);
       await paint();
       await connectFuture;
@@ -155,8 +165,8 @@ class PrintService {
       await paint();
       await timing.measure(
         'write',
-        () => transport.writeBytes(bytes),
-        fields: {'bytes': bytes.length},
+        () => transport.writeBytes(payload),
+        fields: {'bytes': payload.length},
       );
 
       final kick = printer.cashDrawer.kickBytes(
@@ -244,7 +254,7 @@ class PrintService {
     } on FileSystemException {
       throw PrinterTransportException(
         'No se pudo leer el XML. En Android 10+ comparte el archivo '
-        'o usa Abrir con Boleta Print (no la ruta de Descargas).',
+        'o usa Abrir con ${AppBrand.name} (no la ruta de Descargas).',
       );
     } catch (e) {
       throw PrinterTransportException('No se pudo armar el ticket SUNAT: $e');

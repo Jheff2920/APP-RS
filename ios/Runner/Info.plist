@@ -2,12 +2,19 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>https</string>
+		<string>http</string>
+		<string>mailto</string>
+		<string>whatsapp</string>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Boleta Print</string>
+	<string>RedPOS Service</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -70,7 +77,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>hello_world_app</string>
+	<string>RedPOS Service</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -86,11 +93,11 @@
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<false/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Boleta Print usa Bluetooth para conectar impresoras térmicas BLE o MFi cercanas.</string>
+	<string>RedPOS Service usa Bluetooth para conectar impresoras térmicas BLE o MFi cercanas.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>Boleta Print usa Bluetooth para enviar tickets a la impresora térmica.</string>
+	<string>RedPOS Service usa Bluetooth para enviar tickets a la impresora térmica.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Boleta Print se conecta a impresoras térmicas en la WiFi local por TCP 9100.</string>
+	<string>RedPOS Service se conecta a impresoras térmicas en la WiFi local por TCP 9100.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_ipp._tcp.</string>

@@ -1,5 +1,5 @@
 param(
-    [string]$ApplicationId = "com.example.hello_world_app"
+    [string]$ApplicationId = "com.redpos.service"
 )
 
 $ErrorActionPreference = "Stop"
@@ -46,6 +46,6 @@ Write-Host "Instalando en dispositivo Android..." -ForegroundColor Cyan
 & $adb install -r $apk
 
 Write-Host "Abriendo la app..." -ForegroundColor Cyan
-& $adb shell am start -n "$ApplicationId/.MainActivity"
+& $adb shell am start -n "$ApplicationId/com.example.hello_world_app.MainActivity"
 
 Write-Host "Listo." -ForegroundColor Green

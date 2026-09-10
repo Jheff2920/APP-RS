@@ -57,8 +57,8 @@ class BoletaPrinterDiscoverySession(
         if (infos.isEmpty()) {
             val id = printService.generatePrinterId("no_printers")
             infos.add(
-                PrinterInfo.Builder(id, "Boleta Print — sin impresoras", PrinterInfo.STATUS_UNAVAILABLE)
-                    .setDescription("Abre Boleta Print y vincula una impresora")
+                PrinterInfo.Builder(id, "RedPOS Service — sin impresoras", PrinterInfo.STATUS_UNAVAILABLE)
+                    .setDescription("Abre RedPOS Service y vincula una impresora")
                     .build(),
             )
         }

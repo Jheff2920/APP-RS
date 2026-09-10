@@ -43,6 +43,7 @@ class SavedPrinter {
     this.cashDrawer = CashDrawer.none,
     this.rasterScale = RasterScale.x1,
     this.isDefault = false,
+    this.adsFree = false,
   });
 
   final String id;
@@ -59,6 +60,8 @@ class SavedPrinter {
   final CashDrawer cashDrawer;
   final RasterScale rasterScale;
   final bool isDefault;
+  /// Copia para el PrintService nativo. En Dart se verifica el pase firmado.
+  final bool adsFree;
 
   int get dotsWidth => dpi.dotsFor(paper);
 
@@ -75,6 +78,7 @@ class SavedPrinter {
     CashDrawer? cashDrawer,
     RasterScale? rasterScale,
     bool? isDefault,
+    bool? adsFree,
   }) {
     return SavedPrinter(
       id: id ?? this.id,
@@ -89,6 +93,7 @@ class SavedPrinter {
       cashDrawer: cashDrawer ?? this.cashDrawer,
       rasterScale: rasterScale ?? this.rasterScale,
       isDefault: isDefault ?? this.isDefault,
+      adsFree: adsFree ?? this.adsFree,
     );
   }
 
@@ -105,6 +110,7 @@ class SavedPrinter {
         'cashDrawer': cashDrawer.name,
         'rasterScale': rasterScale.name,
         'isDefault': isDefault,
+        'adsFree': adsFree,
       };
 
   factory SavedPrinter.fromJson(Map<String, dynamic> json) {
@@ -123,6 +129,7 @@ class SavedPrinter {
       cashDrawer: CashDrawer.fromName(json['cashDrawer'] as String? ?? 'none'),
       rasterScale: RasterScale.fromName(json['rasterScale'] as String? ?? 'x1'),
       isDefault: json['isDefault'] as bool? ?? false,
+      adsFree: json['adsFree'] as bool? ?? false,
     );
   }
 

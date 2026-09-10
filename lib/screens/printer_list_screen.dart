@@ -2,18 +2,23 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
+import '../brand.dart';
 import '../models/saved_printer.dart';
 import '../platform_caps.dart';
 import '../services/bluetooth_bond_channel.dart';
 import '../services/print_service.dart';
 import '../services/printer_permissions.dart';
 import '../services/printer_store.dart';
+import '../services/redpos/redpos_license.dart';
 import '../services/transports/printer_transport.dart';
 import '../widgets/boleta_page.dart';
 import '../widgets/print_status_dialog.dart';
+import '../widgets/redpos_ad_banner.dart';
+import 'help_screen.dart';
 import 'print_history_screen.dart';
 import 'printer_form_screen.dart';
 import 'share_print_screen.dart';
+import 'legal_screen.dart';
 
 const _expandedBreakpoint = 840.0;
 
@@ -38,6 +43,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
   String? _busyId;
   bool _detailIsAddForm = false;
   bool _openingForm = false;
+  bool _adsFree = false;
 
   bool get _expanded => MediaQuery.sizeOf(context).width >= _expandedBreakpoint;
 
@@ -81,11 +87,16 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
 
   Future<void> _reload() async {
     if (!mounted) return;
-    setState(() => _loading = true);
+    if (_printers.isEmpty) {
+      setState(() => _loading = true);
+    }
     final all = await widget.store.loadAll();
+    final adsFree =
+        await RedPosLicenseStore.instance.isAdsFree(reloadDisk: false);
     if (!mounted) return;
     setState(() {
       _printers = all;
+      _adsFree = adsFree;
       _loading = false;
     });
   }
@@ -191,7 +202,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Desvincular impresora'),
         content: Text(
-          '¿Quitar "${printer.name}" de Boleta Print?$bluetoothNote',
+          '¿Quitar "${printer.name}" de ${AppBrand.name}?$bluetoothNote',
         ),
         actions: [
           TextButton(
@@ -302,6 +313,20 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
                   _openForm(existing: printer);
                 },
               ),
+              if (!_adsFree)
+                ListTile(
+                  leading: const Icon(Icons.vpn_key_outlined),
+                  title: const Text('Quitar publicidad (código)'),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await showRedPosActivateDialog(
+                      context: context,
+                      store: widget.store,
+                      address: printer.address,
+                      onActivated: _reload,
+                    );
+                  },
+                ),
               if (!printer.isDefault)
                 ListTile(
                   leading: const Icon(Icons.star_outline),
@@ -313,7 +338,8 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
                   },
                 ),
               ListTile(
-                leading: Icon(Icons.link_off, color: Theme.of(ctx).colorScheme.error),
+                leading: Icon(Icons.link_off,
+                    color: Theme.of(ctx).colorScheme.error),
                 title: Text(
                   'Desvincular',
                   style: TextStyle(color: Theme.of(ctx).colorScheme.error),
@@ -333,7 +359,9 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
 
   Widget _listBody() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: RepaintBoundary(child: CircularProgressIndicator()),
+      );
     }
     if (_printers.isEmpty) {
       return _EmptyState(
@@ -342,48 +370,64 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
         onOpenFile: _openSharedFile,
       );
     }
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
-      scrollCacheExtent: const ScrollCacheExtent.pixels(280),
-      itemCount: _printers.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final p = _printers[index];
-        final busy = _busyId == p.id;
-        return Card(
-          child: RepaintBoundary(
-            child: ListTile(
-            leading: CircleAvatar(
-              child: Icon(
-                p.type == PrinterLinkType.bluetooth
-                    ? Icons.bluetooth
-                    : p.type == PrinterLinkType.usb
-                        ? Icons.usb
-                        : Icons.wifi,
-              ),
-            ),
-            title: Text(p.name),
-            subtitle: Text(
-              p.isDefault
-                  ? 'Predeterminada · ${p.type.label} · ${p.paper.label}'
-                  : '${p.type.label} · ${p.paper.label}',
-            ),
-            trailing: busy
-                ? const SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : IconButton(
-                    tooltip: 'Opciones',
-                    icon: const Icon(Icons.more_vert),
-                    onPressed: () => _showPrinterActions(p),
+    return Column(
+      children: [
+        RedPosAdBanner(
+          adsFree: _adsFree,
+          store: widget.store,
+          onActivated: _reload,
+        ),
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+            scrollCacheExtent: const ScrollCacheExtent.pixels(280),
+            itemCount: _printers.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              final p = _printers[index];
+              final busy = _busyId == p.id;
+              return Card(
+                child: RepaintBoundary(
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      child: Icon(
+                        p.type == PrinterLinkType.bluetooth
+                            ? Icons.bluetooth
+                            : p.type == PrinterLinkType.usb
+                                ? Icons.usb
+                                : Icons.wifi,
+                      ),
+                    ),
+                    title: Text(p.name),
+                    subtitle: Text(
+                      [
+                        if (p.isDefault) 'Predeterminada',
+                        p.type.label,
+                        p.paper.label,
+                        if (!_adsFree) 'con publicidad',
+                      ].join(' · '),
+                    ),
+                    trailing: busy
+                        ? const SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: RepaintBoundary(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : IconButton(
+                            tooltip: 'Opciones',
+                            icon: const Icon(Icons.more_vert),
+                            onPressed: () => _showPrinterActions(p),
+                          ),
+                    onTap: () => _showPrinterActions(p),
                   ),
-            onTap: () => _showPrinterActions(p),
-            ),
+                ),
+              );
+            },
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 
@@ -405,7 +449,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Boleta Print'),
+        title: const Text(AppBrand.name),
         actions: [
           IconButton(
             tooltip: 'Abrir archivo',
@@ -421,6 +465,27 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
             tooltip: 'Actualizar',
             onPressed: _loading ? null : _reload,
             icon: const Icon(Icons.refresh),
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Ayuda y legal',
+            onSelected: (value) {
+              final page = switch (value) {
+                'help' => const HelpScreen(),
+                'terms' => const LegalScreen.terms(),
+                'privacy' => const LegalScreen.privacy(),
+                _ => null,
+              };
+              if (page == null) return;
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => page),
+              );
+            },
+            itemBuilder: (ctx) => const [
+              PopupMenuItem(value: 'help', child: Text('Ayuda y soporte')),
+              PopupMenuItem(
+                  value: 'terms', child: Text('Términos y condiciones')),
+              PopupMenuItem(value: 'privacy', child: Text('Privacidad')),
+            ],
           ),
         ],
       ),
@@ -479,44 +544,53 @@ class _EmptyState extends StatelessWidget {
         ? '${PrinterLinkType.bluetooth.label}, ${PrinterLinkType.network.label} o ${PrinterLinkType.usb.label}'
         : '${PrinterLinkType.bluetooth.label} o ${PrinterLinkType.network.label}';
     return BoletaPage(
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.print_disabled,
-                size: 64,
-                color: Theme.of(context).colorScheme.outline,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Sin impresoras vinculadas',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Vincula una impresora térmica ($types). '
-                'El historial de trabajos se ve en el icono de reloj o en las opciones de cada impresora.\n\n'
-                '${showUsb ? 'También puedes compartir un PDF hacia esta app desde otras apps.' : 'En iPhone/iPad imprime por WiFi (TCP 9100). Abre un PDF, XML o ZIP SUNAT con el botón de carpeta.'}',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: onAdd,
-                icon: const Icon(Icons.add_link),
-                label: const Text('Vincular impresora'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: onOpenFile,
-                icon: const Icon(Icons.folder_open),
-                label: const Text('Abrir archivo'),
-              ),
-            ],
-          ),
-        ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final body = Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.print_disabled,
+                  size: 64,
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Sin impresoras vinculadas',
+                  style: Theme.of(context).textTheme.titleLarge,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Vincula una impresora térmica ($types). '
+                  'El historial de trabajos se ve en el icono de reloj o en las opciones de cada impresora.\n\n'
+                  '${showUsb ? 'También puedes compartir un PDF hacia esta app desde otras apps.' : 'En iPhone/iPad imprime por WiFi (TCP 9100). Abre un PDF, XML o ZIP SUNAT con el botón de carpeta.'}',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add_link),
+                  label: const Text('Vincular impresora'),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: onOpenFile,
+                  icon: const Icon(Icons.folder_open),
+                  label: const Text('Abrir archivo'),
+                ),
+              ],
+            ),
+          );
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(child: body),
+            ),
+          );
+        },
       ),
     );
   }

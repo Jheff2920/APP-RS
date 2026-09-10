@@ -17,7 +17,7 @@
     <uses-feature android:name="android.hardware.usb.host" android:required="false"/>
 
     <application
-        android:label="Boleta Print"
+        android:label="RedPOS Service"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -131,11 +131,15 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Tablets POS antiguas (Lenovo YT-X705F, IMIN 2 GB): Impeller tira. -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
 
         <!-- Impresión del sistema (diálogo Imprimir), como RawBT -->
         <service
             android:name=".printservice.BoletaPrintService"
-            android:label="Boleta Print"
+            android:label="RedPOS Service"
             android:exported="true"
             android:permission="android.permission.BIND_PRINT_SERVICE">
             <intent-filter>
@@ -150,6 +154,14 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO"/>
+            <data android:scheme="mailto"/>
         </intent>
     </queries>
 </manifest>

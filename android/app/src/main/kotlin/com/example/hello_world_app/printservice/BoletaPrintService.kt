@@ -126,7 +126,7 @@ class BoletaPrintService : PrintService() {
             jobId = identifiers.second
 
             if (printerLocalId == "no_printers") {
-                failJob(job, "Vincula una impresora en Boleta Print")
+                failJob(job, "Vincula una impresora en RedPOS Service")
                 return
             }
 
@@ -197,10 +197,15 @@ class BoletaPrintService : PrintService() {
                 throw IllegalStateException("Ticket vacio")
             }
 
+            var payload = data
+            if (!row.adsFree) {
+                payload = RedPosAdEscPos.appendBeforeCut(payload, row.paper, row.cut)
+            }
+
             mainHandler.post { overlay.setStatus("Enviando a ${row.name}...") }
 
             val drawer = EscPosTransport.drawerBytes(row.cashDrawer, row.type)
-            val waitMs = EscPosTransport.drawerWaitMs(row.type, data.size)
+            val waitMs = EscPosTransport.drawerWaitMs(row.type, payload.size)
             if (drawer.isNotEmpty()) {
                 mainHandler.post {
                     overlay.setStatus("Ticket a ${row.name}, luego gaveta...")
@@ -211,7 +216,7 @@ class BoletaPrintService : PrintService() {
                     "usb" -> EscPosTransport.sendUsb(
                         applicationContext,
                         row.address,
-                        data,
+                        payload,
                         jobId,
                         drawer,
                         waitMs,
@@ -225,12 +230,12 @@ class BoletaPrintService : PrintService() {
                                 e.cause?.message ?: e.message ?: "No se pudo conectar",
                             )
                         }
-                        EscPosTransport.writeBluetooth(socket, data, jobId, drawer, waitMs)
+                        EscPosTransport.writeBluetooth(socket, payload, jobId, drawer, waitMs)
                     }
                     else -> EscPosTransport.sendNetwork(
                         row.address,
                         row.port,
-                        data,
+                        payload,
                         jobId,
                         drawer,
                         waitMs,
@@ -357,7 +362,7 @@ class BoletaPrintService : PrintService() {
             postPrintNotification(launch)
             Toast.makeText(
                 this,
-                "Activa «Mostrar sobre otras apps» en Boleta Print para imprimir sin salir",
+                "Activa «Mostrar sobre otras apps» en RedPOS Service para imprimir sin salir",
                 Toast.LENGTH_LONG,
             ).show()
             PrintTiming.event(jobToken, "fallback_waiting_for_user")
@@ -435,7 +440,7 @@ class BoletaPrintService : PrintService() {
                     address = o.optString("address", ""),
                     port = o.optInt("port", 9100),
                     paper = o.optString("paper", "mm58"),
-                    bottomMm = margins?.optDouble("bottomMm", 10.0) ?: 10.0,
+                    bottomMm = margins?.optDouble("bottomMm", 15.0) ?: 15.0,
                     cut = o.optString("cut", "fullGsV0"),
                     cashDrawer = o.optString("cashDrawer", "none"),
                     dpi = if (o.optString("dpi", "dpi203") == "dpi300") 300 else 203,
@@ -444,6 +449,8 @@ class BoletaPrintService : PrintService() {
                         "x2" -> 2
                         else -> 1
                     },
+                    adsFree = o.optBoolean("adsFree", false) ||
+                        prefs.getBoolean(PrintersNativePrefsPlugin.ADS_FREE_KEY, false),
                 )
             }
             null
@@ -468,7 +475,7 @@ class BoletaPrintService : PrintService() {
         val pi = PendingIntent.getActivity(this, 1001, launch, flags)
         val notif = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_share)
-            .setContentTitle("Boleta Print")
+            .setContentTitle("RedPOS Service")
             .setContentText("Toca para imprimir (falta permiso de superposición)")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
@@ -489,6 +496,7 @@ class BoletaPrintService : PrintService() {
         val cashDrawer: String,
         val dpi: Int,
         val rasterScale: Int,
+        val adsFree: Boolean,
     )
 
     private data class PendingFallback(

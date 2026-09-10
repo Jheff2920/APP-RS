@@ -60,7 +60,8 @@ class PrinterStore {
       if (a[i].id != b[i].id ||
           a[i].isDefault != b[i].isDefault ||
           a[i].paper != b[i].paper ||
-          a[i].address != b[i].address) {
+          a[i].address != b[i].address ||
+          a[i].adsFree != b[i].adsFree) {
         return false;
       }
     }
@@ -167,6 +168,7 @@ class PrinterStore {
         cashDrawer: p.cashDrawer,
         margins: p.margins,
         name: p.name.isNotEmpty ? p.name : prev.name,
+        adsFree: p.adsFree || prev.adsFree,
       );
     }
     return out;
@@ -182,5 +184,14 @@ class PrinterStore {
     return list
         .map((p) => p.copyWith(isDefault: p.id == preferred.id))
         .toList();
+  }
+
+  /// Copia el pase de la instalación a cada impresora (PrintService nativo).
+  Future<List<SavedPrinter>> applyAdsFree(bool adsFree) async {
+    final all = await loadAll();
+    if (all.every((p) => p.adsFree == adsFree)) return all;
+    final next = all.map((p) => p.copyWith(adsFree: adsFree)).toList();
+    await _saveAll(next);
+    return next;
   }
 }

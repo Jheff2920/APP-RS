@@ -1,3 +1,5 @@
+import 'dart:ui' show FakeViewPadding, Size;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,9 +22,45 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.textContaining('Sin impresoras'), findsOneWidget);
-    expect(find.text('Boleta Print'), findsOneWidget);
+    expect(find.text('RedPOS Service'), findsOneWidget);
     expect(find.textContaining('WiFi / Red'), findsOneWidget);
     expect(find.text('Abrir archivo'), findsOneWidget);
+    await tester.tap(find.byTooltip('Ayuda y legal'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ayuda y soporte'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ayuda y soporte'), findsWidgets);
+    expect(find.text('soporte@redpos.com'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Términos y condiciones'),
+      120,
+    );
+    expect(find.text('Términos y condiciones'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Política de privacidad'),
+      80,
+    );
+    expect(find.text('Política de privacidad'), findsOneWidget);
+  });
+
+  testWidgets('Empty printers state does not overflow with keyboard',
+      (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 360);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+      tester.view.resetViewInsets();
+    });
+    await tester.pumpWidget(
+      BoletaPrintApp(store: PrinterStore(), printService: PrintService()),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.textContaining('Sin impresoras'), findsOneWidget);
+    expect(find.text('Abrir archivo'), findsWidgets);
   });
 
   test('PlatformCaps USB and PrintService are Android-only', () {

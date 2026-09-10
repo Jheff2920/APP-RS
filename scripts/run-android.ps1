@@ -1,5 +1,5 @@
 param(
-    [string]$ApplicationId = "com.example.hello_world_app",
+    [string]$ApplicationId = "com.redpos.service",
     [switch]$UseAdb,
     [string]$PacmanPath = "C:\Program Files\WSA PacMan\WSA-pacman.exe"
 )

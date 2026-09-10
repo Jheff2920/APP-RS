@@ -3,7 +3,7 @@ class PrintMargins {
     this.leftMm = 0,
     this.rightMm = 0,
     /// Avance de papel al final (para poder cortar / despegar).
-    this.bottomMm = 10,
+    this.bottomMm = 15,
   });
 
   final double leftMm;
@@ -33,7 +33,17 @@ class PrintMargins {
     return PrintMargins(
       leftMm: (json['leftMm'] as num?)?.toDouble() ?? 0,
       rightMm: (json['rightMm'] as num?)?.toDouble() ?? 0,
-      bottomMm: bottom ?? 10,
+      bottomMm: bottom ?? 15,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      other is PrintMargins &&
+      leftMm == other.leftMm &&
+      rightMm == other.rightMm &&
+      bottomMm == other.bottomMm;
+
+  @override
+  int get hashCode => Object.hash(leftMm, rightMm, bottomMm);
 }

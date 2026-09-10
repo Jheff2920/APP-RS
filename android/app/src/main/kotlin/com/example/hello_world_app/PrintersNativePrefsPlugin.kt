@@ -44,6 +44,20 @@ class PrintersNativePrefsPlugin : FlutterPlugin, MethodChannel.MethodCallHandler
                 Log.i(TAG, "Synced printers json len=${json.length}")
                 result.success(null)
             }
+            "syncAdsFree" -> {
+                val adsFree = call.arguments as? Boolean ?: false
+                val ctx = appContext
+                if (ctx == null) {
+                    result.error("no_ctx", "Sin contexto", null)
+                    return
+                }
+                ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .putBoolean(ADS_FREE_KEY, adsFree)
+                    .commit()
+                Log.i(TAG, "Synced adsFree=$adsFree")
+                result.success(null)
+            }
             else -> result.notImplemented()
         }
     }
@@ -53,5 +67,6 @@ class PrintersNativePrefsPlugin : FlutterPlugin, MethodChannel.MethodCallHandler
         const val CHANNEL = "boleta_print/printers_prefs"
         const val PREFS = "boleta_print"
         const val KEY = "saved_printers_v1"
+        const val ADS_FREE_KEY = "ads_free"
     }
 }

@@ -5,14 +5,14 @@
 **Última actualización:** 2026-09-09 (v1.7.0)  
 **Carpeta:** `C:\Users\RS-Soporte\Documents\app`  
 **Versión:** `1.7.0+36`  
-**Package ID:** `com.example.hello_world_app`  
-**iOS bundle:** `com.example.helloWorldApp`
+**Package ID:** `com.redpos.service`  
+**iOS bundle:** `com.redpos.service`
 
 ---
 
 ## Objetivo
 
-**Boleta Print** — intermediario Android **e iOS** para impresoras térmicas ESC/POS.
+**RedPOS Service** — intermediario Android **e iOS** para impresoras térmicas ESC/POS.
 
 - Imprime PDF/imagen del POS, o arma ticket desde **XML/ZIP UBL SUNAT** (boleta, factura, NC/ND, guía, retención).
 - Android: Bluetooth Classic, TCP :9100 o USB host (impresora integrada IMIN/Falcon).
@@ -42,6 +42,7 @@
 - [x] Android: emparejar Classic desde la app (`createBond` + PIN del sistema) y olvidar al desvincular (`removeBond`)
 - [x] Formulario BT: emparejados vs Agregar dispositivo; scan pide ubicación en Android 10
 - [x] Shell adaptativo (lista/detalle tablet) + scan BT sin relayout de toda la hoja
+- [ ] Rama `test/redpos-activacion`: código opcional + ads (no está en `main`)
 - [ ] Validar `flutter run` en Mac / iPhone
 - [ ] v2 — jobs del POS (HTTP / cola)
 
@@ -63,7 +64,7 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 
 ### Activación usuario
 1. Vincular impresora en la app (papel 58/80 + márgenes). En Falcon usa **USB**, no Bluetooth. En iPhone/iPad usa **WiFi :9100**.
-2. En Android: permitir **Mostrar sobre otras apps** y activar **Boleta Print** en Ajustes → Impresión.
+2. En Android: permitir **Mostrar sobre otras apps** y activar **RedPOS Service** en Ajustes → Impresión.
 
 ---
 
@@ -154,4 +155,4 @@ flutter run -d <iphone>
 ## Cómo retomar
 
 > **v1.7.0:** Android + iOS. Emparejar/olvidar BT Classic en Android desde la app. iOS imprime por WiFi :9100 y abre XML/PDF/ZIP. USB/PrintService/GPIO siguen en Android.  
-> Compilar iOS requiere un Mac. Siguiente: validar en iPhone, luego **v2** jobs del POS.
+> **Prueba (fuera de main):** `test/redpos-activacion` — código RedPOS opcional, banner y pie de papel. Compilar iOS requiere un Mac.

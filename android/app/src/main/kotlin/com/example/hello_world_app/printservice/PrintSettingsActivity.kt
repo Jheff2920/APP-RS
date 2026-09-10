@@ -45,7 +45,7 @@ class PrintSettingsActivity : Activity() {
         val overlayOk = Build.VERSION.SDK_INT < 29 || Settings.canDrawOverlays(this)
         status.text = if (overlayOk) {
             "Listo: al imprimir desde otra app verás un recuadro flotante " +
-                "(sin saltar a Boleta Print)."
+                "(sin saltar a RedPOS Service)."
         } else {
             "Falta permiso «Mostrar sobre otras apps»: sin él no se puede mostrar " +
                 "el aviso de impresión sobre la app actual."

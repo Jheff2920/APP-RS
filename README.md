@@ -1,13 +1,13 @@
-# Boleta Print
+# RedPOS Service
 
 Controlador **Android e iOS** de impresoras térmicas ESC/POS (58 y 80 mm).  
 Imprime PDF/imagen del POS **o** convierte el **XML/ZIP UBL de SUNAT** (boleta, factura, NC/ND, guía de remisión, retención/percepción) a ticket 58/80 mm.
 
 **Repo:** https://github.com/Jheff2920/APP-RS  
-**Versión:** 1.7.0+36 · Package ID: `com.example.hello_world_app`  
-**Rama estable:** `main` · **Rama de pruebas:** `test/pruebas`
+**Versión:** 1.7.0+36 · Package ID: `com.redpos.service`  
+**Rama estable:** `main` · **Rama de esta prueba:** `test/redpos-activacion` (código RedPOS + ads; no mergear a `main` hasta validar)
 
-> Memoria técnica: [CONTEXTO.md](CONTEXTO.md) · Rendimiento: [docs/PRINT_PERFORMANCE.md](docs/PRINT_PERFORMANCE.md)
+> Memoria técnica: [CONTEXTO.md](CONTEXTO.md) · Rendimiento: [docs/PRINT_PERFORMANCE.md](docs/PRINT_PERFORMANCE.md) · Play/RedPOS: [docs/DISTRIBUCION.md](docs/DISTRIBUCION.md)
 
 ---
 
@@ -22,9 +22,10 @@ Imprime PDF/imagen del POS **o** convierte el **XML/ZIP UBL de SUNAT** (boleta, 
 - **USB tras apagar:** Android olvida el permiso USB (solo USB, no BT/WiFi). La impresora sigue vinculada. Al abrir la app o al imprimir (también desde Chrome) se pide otra vez el aviso; no hay que volver a vincular.
 - En Falcon la gaveta **no va por USB**: se pulsa el GPIO del equipo (`cashbox_en`), como el plugin IMIN. En BT/LAN se sigue usando `ESC p`.
 - **XML/ZIP SUNAT:** Compartir o Abrir el CPE. En Android 10+ se copia a caché (Descargas no es legible). El CDR (`R-...`) no se imprime.
-- **iOS:** misma app. Imprime por **WiFi TCP :9100**. USB, PrintService y GPIO Falcon quedan en Android. Abrir PDF/XML/ZIP desde la app o “Abrir en Boleta Print”.
+- **iOS:** misma app. Imprime por **WiFi TCP :9100**. USB, PrintService y GPIO Falcon quedan en Android. Abrir PDF/XML/ZIP desde la app o “Abrir en RedPOS Service”.
 - **Bluetooth Android:** emparejar desde la app (PIN del sistema). La pestaña lista solo equipos ya vinculados; **Agregar dispositivo** busca cercanos. **Desvincular** también olvida el vínculo del teléfono. En Android 10 el scan Classic pide ubicación encendida.
 - **UI:** lista + detalle en tablet (≥840 dp), Guardar/Probar fijos abajo, scan BT sin tirones al ir apareciendo equipos.
+- **Prueba RedPOS (solo rama `test/redpos-activacion`):** código opcional al vincular; sin código hay banner y pie en el papel. Demo `REDPOS-PRUEBA-1`. Web local: `dart run tool/redpos_admin.dart`. Detalle: [docs/DISTRIBUCION.md](docs/DISTRIBUCION.md).
 
 ---
 
@@ -69,7 +70,7 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 1. Vincular impresoras: **WiFi** (ambas plataformas), **Bluetooth** (Classic en Android; BLE/MFi en iOS) o **USB** (solo Android, Falcon/IMIN).
 2. En Android, emparejar el Bluetooth **dentro de la app** (diálogo PIN del sistema). Desvincular también olvida el equipo del Bluetooth del teléfono.
 3. Configurar antes de guardar: rollo, DPI, nitidez, márgenes, corte, gaveta, predeterminada.
-4. Compartir PDF/imagen → imprimir tal cual (raster). En iOS también **Abrir archivo** o “Abrir en Boleta Print”.
+4. Compartir PDF/imagen → imprimir tal cual (raster). En iOS también **Abrir archivo** o “Abrir en RedPOS Service”.
 5. Compartir / Abrir **XML o ZIP SUNAT** (boleta, factura, NC, guía, etc.) → ticket 58 u 80 mm + QR.
 6. En Android, diálogo **Imprimir** del sistema (PDF) → overlay sin saltar de app.
 
@@ -81,7 +82,7 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 - En el formulario, **Dispositivos emparejados** solo muestra lo ya vinculado en el sistema.
 - **Agregar dispositivo** busca cercanos y llama a `createBond`. El PIN lo pide Android (suele ser `0000` o `1234`).
-- **Desvincular** quita la impresora de Boleta Print **y** del Bluetooth del teléfono (`removeBond`).
+- **Desvincular** quita la impresora de RedPOS Service **y** del Bluetooth del teléfono (`removeBond`).
 - En Android 10 (tablet Lenovo) hace falta permiso de **ubicación** y el interruptor de Ubicación encendido para listar cercanos. No uses `neverForLocation` en `BLUETOOTH_SCAN`.
 
 **iOS:**
@@ -95,7 +96,7 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 Solo Android. Bluetooth y WiFi **no** pierden el vínculo al apagar.
 
-- Al apagar el equipo, Android borra el permiso USB. La impresora **sigue vinculada** en Boleta Print.
+- Al apagar el equipo, Android borra el permiso USB. La impresora **sigue vinculada** en RedPOS Service.
 - Al encender: abrir la app o imprimir (también desde Google). Aparece el aviso de USB; hay que aceptarlo. No hace falta vincular de nuevo.
 - Si niegan el aviso, verán “Sin permiso USB”.
 - Gaveta en Falcon: GPIO `cashbox_en`, no el cable USB.
@@ -117,7 +118,7 @@ flutter run -d <id-del-iphone>
 
 - Camino de impresión fiable: impresora en la **misma WiFi**, IP y puerto **9100**.
 - USB integrado / PrintService / overlay / GPIO `cashbox_en` son **solo Android**.
-- Bundle ID actual: `com.example.helloWorldApp` (cámbialo en Xcode antes de App Store).
+- Bundle ID: `com.redpos.service` (mismo que Android).
 
 ---
 
@@ -156,7 +157,7 @@ Usa **Max** si en Chrome no se ve toda la boleta y no quieres la medida Google. 
 
 ## XML / ZIP SUNAT
 
-Desde **Archivos** o la consulta CPE: **Compartir** o **Abrir con → Boleta Print** el `.xml` o el `.zip`. En iOS también el botón **Abrir archivo** de la lista.
+Desde **Archivos** o la consulta CPE: **Compartir** o **Abrir con → RedPOS Service** el `.xml` o el `.zip`. En iOS también el botón **Abrir archivo** de la lista.
 
 | Código | Comprobante | Raíz UBL |
 |--------|-------------|----------|

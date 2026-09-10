@@ -49,6 +49,7 @@ app.*.map.json
 /apk2-ejemplo/
 *.env
 **/key.properties
+tool/redpos_admin_data.json
 
 # Reference dumps (not part of the app)
 /apk-ejemplo/

@@ -10,8 +10,10 @@ import 'screens/share_print_screen.dart';
 import 'services/incoming_files.dart';
 import 'services/print_service.dart';
 import 'services/printer_store.dart';
+import 'services/redpos/redpos_license.dart';
 import 'services/shared_incoming.dart';
 import 'system_print_main.dart';
+import 'brand.dart';
 import 'theme.dart';
 
 class BoletaPrintApp extends StatefulWidget {
@@ -46,6 +48,9 @@ class _BoletaPrintAppState extends State<BoletaPrintApp> {
     );
     // Re-sincroniza prefs nativas (impresoras ya guardadas antes del PrintService).
     unawaited(widget.store.syncNativePrefs());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(RedPosLicenseStore.instance.hydrate(widget.store));
+    });
     _listenShares();
   }
 
@@ -130,7 +135,7 @@ class _BoletaPrintAppState extends State<BoletaPrintApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: _navKey,
-      title: 'Boleta Print',
+      title: AppBrand.name,
       theme: boletaPrintTheme,
       home: PrinterListScreen(
         store: widget.store,

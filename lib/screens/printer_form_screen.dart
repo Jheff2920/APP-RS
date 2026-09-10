@@ -16,6 +16,8 @@ import '../services/bluetooth_bond_channel.dart';
 import '../services/print_service.dart';
 import '../services/printer_permissions.dart';
 import '../services/printer_store.dart';
+import '../services/redpos/redpos_config.dart';
+import '../services/redpos/redpos_license.dart';
 import '../services/usb_printer_channel.dart';
 import '../services/transports/printer_transport.dart';
 import '../widgets/boleta_page.dart';
@@ -45,6 +47,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   late final TextEditingController _nameCtrl;
   late final TextEditingController _addressCtrl;
   late final TextEditingController _portCtrl;
+  late final TextEditingController _codeCtrl;
 
   /// ID fijo desde el primer frame (evita duplicar al Probar y luego Guardar).
   late final String _id;
@@ -65,6 +68,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   bool _saving = false;
   bool _testing = false;
   bool _firstPrinter = false;
+  bool _adsFree = false;
+  bool _activating = false;
 
   bool get _isEdit => widget.existing != null;
 
@@ -77,6 +82,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     _nameCtrl = TextEditingController(text: e?.name ?? '');
     _addressCtrl = TextEditingController(text: e?.address ?? '');
     _portCtrl = TextEditingController(text: '${e?.port ?? 9100}');
+    _codeCtrl = TextEditingController();
+    _adsFree = e?.adsFree ?? false;
     _type = e?.type ??
         (PlatformCaps.prefersNetworkDefault
             ? PrinterLinkType.network
@@ -99,6 +106,13 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
       _loadUsb();
     }
     _initDefaultFlag();
+    _initLicense();
+  }
+
+  Future<void> _initLicense() async {
+    final free = await RedPosLicenseStore.instance.isAdsFree();
+    if (!mounted) return;
+    setState(() => _adsFree = free || _adsFree);
   }
 
   Future<void> _initDefaultFlag() async {
@@ -118,6 +132,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     _nameCtrl.dispose();
     _addressCtrl.dispose();
     _portCtrl.dispose();
+    _codeCtrl.dispose();
     super.dispose();
   }
 
@@ -320,6 +335,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
       cashDrawer: _cashDrawer,
       rasterScale: _rasterScale,
       isDefault: _isDefault || _firstPrinter,
+      adsFree: _adsFree,
     );
   }
 
@@ -328,21 +344,53 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     await widget.store.upsert(_buildPrinter());
   }
 
-  Future<void> _save({bool pop = true}) async {
+  Future<void> _save({bool pop = true, bool withAds = false}) async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
+      if (!withAds) {
+        final code = _codeCtrl.text.trim();
+        if (code.isNotEmpty && !_adsFree) {
+          setState(() => _activating = true);
+          final result = await RedPosLicenseStore.instance.redeem(
+            code,
+            store: widget.store,
+            address: _addressCtrl.text.trim(),
+          );
+          if (!mounted) return;
+          if (!result.ok) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(result.message ?? 'No se pudo activar')),
+            );
+            return;
+          }
+          _adsFree = true;
+        } else {
+          _adsFree = await RedPosLicenseStore.instance.isAdsFree();
+        }
+      } else {
+        _adsFree = await RedPosLicenseStore.instance.isAdsFree();
+      }
       await widget.store.upsert(_buildPrinter());
       if (!mounted) return;
       if (pop) {
         Navigator.of(context).pop(true);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Impresora guardada')),
-        );
+        return;
       }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _adsFree ? 'Impresora guardada' : 'Guardada. Imprimirá con publicidad.',
+          ),
+        ),
+      );
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _activating = false;
+        });
+      }
     }
   }
 
@@ -393,6 +441,55 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     }
   }
 
+  Widget _activationCard(ThemeData theme) {
+    if (_adsFree) {
+      return Card(
+        child: ListTile(
+          leading: Icon(Icons.verified, color: theme.colorScheme.primary),
+          title: const Text('Esta instalación no muestra publicidad'),
+          subtitle: const Text(
+            'Código RedPOS o suscripción activa. El ticket sale sin pie de anuncio.',
+          ),
+        ),
+      );
+    }
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Código de activación (opcional)', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              'Sin código puedes imprimir; saldrá publicidad en la app y un pie '
+              'en el papel. Código RedPOS o suscripción quitan los avisos. '
+              'Soporte: menú ⋮ → Ayuda.',
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _codeCtrl,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                labelText: 'Código RedPOS',
+                hintText: 'RP-XXXX-XXXX-XXXX',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            if (RedPosConfig.allowTestCodes) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Prueba: ${RedPosConfig.testCode}',
+                style: theme.textTheme.labelSmall,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -407,19 +504,31 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               FilledButton.icon(
-                onPressed: (_saving || _testing) ? null : () => _save(),
-                icon: _saving
+                onPressed: (_saving || _testing || _activating)
+                    ? null
+                    : () => _save(),
+                icon: (_saving || _activating)
                     ? const SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.save),
-                label: const Text('Guardar'),
+                label: Text(_adsFree ? 'Guardar' : 'Guardar / activar'),
               ),
+              if (!_adsFree) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: (_saving || _testing || _activating)
+                      ? null
+                      : () => _save(withAds: true),
+                  icon: const Icon(Icons.campaign_outlined),
+                  label: const Text('Continuar con publicidad'),
+                ),
+              ],
               const SizedBox(height: 8),
               OutlinedButton.icon(
-                onPressed: (_saving || _testing) ? null : _test,
+                onPressed: (_saving || _testing || _activating) ? null : _test,
                 icon: _testing
                     ? const SizedBox(
                         width: 18,
@@ -444,6 +553,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                       'En iPhone/iPad el camino fiable es WiFi (IP y puerto 9100).',
               style: theme.textTheme.bodyMedium,
             ),
+            const SizedBox(height: 16),
+            _activationCard(theme),
             const SizedBox(height: 16),
             TextFormField(
               controller: _nameCtrl,
@@ -705,7 +816,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
             const SizedBox(height: 20),
             MarginFields(
               value: _margins,
-              onChanged: (v) => setState(() => _margins = v),
+              onChanged: (v) => _margins = v,
             ),
             const SizedBox(height: 20),
             Text('Corte automatico', style: theme.textTheme.titleMedium),
