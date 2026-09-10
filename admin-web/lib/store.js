@@ -5,8 +5,16 @@ const filePath =
   process.env.REDPOS_ADMIN_DATA ||
   path.join(__dirname, '..', 'data', 'codes.json');
 
+function kvUrl() {
+  return process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || '';
+}
+
+function kvToken() {
+  return process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || '';
+}
+
 function hasKv() {
-  return Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+  return Boolean(kvUrl() && kvToken());
 }
 
 function loadFile() {
@@ -23,11 +31,11 @@ function saveFile(data) {
 }
 
 async function kv(command) {
-  const url = process.env.KV_REST_API_URL.replace(/\/$/, '');
+  const url = kvUrl().replace(/\/$/, '');
   const res = await fetch(`${url}/pipeline`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}`,
+      Authorization: `Bearer ${kvToken()}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(command),
