@@ -54,6 +54,7 @@ tool/redpos_admin_data.json
 # Reference dumps (not part of the app)
 /apk-ejemplo/
 /apk-imin/
+design-assets/brand-page-*.png
 
 
 # Machine-local / build noise
