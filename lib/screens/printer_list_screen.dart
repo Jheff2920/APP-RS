@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -109,6 +111,9 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
       store: widget.store,
       printService: widget.printService,
       existing: existing,
+      onStoreChanged: () {
+        if (mounted) unawaited(_reload());
+      },
     );
     try {
       if (_expanded) {
@@ -118,17 +123,19 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
           if (mounted) setState(() => _detailIsAddForm = false);
           return;
         }
-        final result = await nav.push<bool>(
+        await nav.push<bool>(
           MaterialPageRoute(builder: (_) => form),
         );
-        if (mounted) setState(() => _detailIsAddForm = false);
-        if (result == true) await _reload();
+        if (mounted) {
+          setState(() => _detailIsAddForm = false);
+          await _reload();
+        }
         return;
       }
       final result = await Navigator.of(context).push<bool>(
         MaterialPageRoute(builder: (_) => form),
       );
-      if (result == true) await _reload();
+      if (mounted && result == true) await _reload();
     } finally {
       _openingForm = false;
     }

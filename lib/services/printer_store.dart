@@ -130,6 +130,29 @@ class PrinterStore {
     return next;
   }
 
+  /// Quita las impresoras guardadas de esa dirección (p. ej. al olvidar BT).
+  Future<List<String>> deleteByAddress(
+    String address, {
+    PrinterLinkType? type,
+  }) async {
+    final key = address.trim().toLowerCase();
+    if (key.isEmpty) return const [];
+    final all = await loadAll();
+    final removed = <String>[];
+    final kept = <SavedPrinter>[];
+    for (final p in all) {
+      final sameType = type == null || p.type == type;
+      if (sameType && p.address.trim().toLowerCase() == key) {
+        removed.add(p.id);
+      } else {
+        kept.add(p);
+      }
+    }
+    if (removed.isEmpty) return const [];
+    await _saveAll(_ensureSingleDefault(kept));
+    return removed;
+  }
+
   Future<List<SavedPrinter>> setDefault(String id) async {
     final next = _ensureSingleDefault(
       (await loadAll()).map((p) => p.copyWith(isDefault: p.id == id)).toList(),

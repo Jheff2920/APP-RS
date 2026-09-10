@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
+import '../brand.dart';
 import '../models/cash_drawer.dart';
 import '../models/cut_mode.dart';
 import '../models/paper_width.dart';
@@ -31,11 +32,13 @@ class PrinterFormScreen extends StatefulWidget {
     required this.store,
     this.printService,
     this.existing,
+    this.onStoreChanged,
   });
 
   final PrinterStore store;
   final PrintService? printService;
   final SavedPrinter? existing;
+  final VoidCallback? onStoreChanged;
 
   @override
   State<PrinterFormScreen> createState() => _PrinterFormScreenState();
@@ -210,9 +213,10 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Olvidar Bluetooth'),
+        title: const Text('Desvincular impresora'),
         content: Text(
-          '¿Olvidar "${device.name}" del Bluetooth del teléfono?',
+          '¿Quitar "${device.name}" de ${AppBrand.name} y del Bluetooth '
+          'del teléfono?',
         ),
         actions: [
           TextButton(
@@ -221,7 +225,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Olvidar'),
+            child: const Text('Desvincular'),
           ),
         ],
       ),
@@ -236,7 +240,20 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
       );
       return;
     }
+    final removedIds = await widget.store.deleteByAddress(
+      device.macAdress,
+      type: PrinterLinkType.bluetooth,
+    );
+    widget.onStoreChanged?.call();
     if (!mounted) return;
+    final editingGone = _isEdit &&
+        (removedIds.contains(widget.existing!.id) ||
+            widget.existing!.address.trim().toLowerCase() ==
+                device.macAdress.trim().toLowerCase());
+    if (editingGone) {
+      Navigator.pop(context, true);
+      return;
+    }
     if (_addressCtrl.text.trim().toUpperCase() ==
         device.macAdress.trim().toUpperCase()) {
       _addressCtrl.clear();
@@ -645,7 +662,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                       d.macAdress.toUpperCase(),
                   trailing: PlatformCaps.isAndroid
                       ? IconButton(
-                          tooltip: 'Olvidar del Bluetooth',
+                          tooltip: 'Desvincular',
                           icon: const Icon(Icons.link_off),
                           onPressed: () => _forgetPaired(d),
                         )
