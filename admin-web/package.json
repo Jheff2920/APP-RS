@@ -1,0 +1,8 @@
+{
+  "name": "redpos-codigos",
+  "private": true,
+  "description": "Web staff de prueba para generar códigos RedPOS Service (Vercel).",
+  "scripts": {
+    "test": "node test/hmac.test.js"
+  }
+}

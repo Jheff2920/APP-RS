@@ -4,8 +4,9 @@ App **pública en Play** (Android). Imprimir **nunca se bloquea**.
 Sin publicidad solo con **código de activación** (equipo RedPOS) o **suscripción** (cuenta).  
 Sin código y sin cuenta: la app funciona igual, con anuncios en pantalla y pie en el papel.
 
-**Implementación de prueba:** rama `test/redpos-activacion` (no está en `main`).  
-El HMAC de esta rama es de demostración; en producción el servidor firma el pase y la clave privada no va en el APK.
+**Implementación de prueba:** códigos en `main` (HMAC en la app).  
+Web staff + API HTTPS (Vercel): rama `test/redpos-vercel-codigos` → carpeta `admin-web/`.  
+El HMAC de prueba no es producción; en Vercel el KV marca cada código como usado.
 
 ---
 
@@ -13,13 +14,10 @@ El HMAC de esta rama es de demostración; en producción el servidor firma el pa
 
 1. App: al **vincular** hay campo opcional de código y **Continuar con publicidad**.
 2. Código de demo: `REDPOS-PRUEBA-1`
-3. Generar más códigos (web interna local):
+3. Generar más códigos:
 
-```powershell
-dart run tool/redpos_admin.dart
-```
-
-Abre http://127.0.0.1:8787 (clave `redpos-prueba`). Formato: `RP-XXXX-XXXX-XXXX`.
+- Local (PC): `dart run tool/redpos_admin.dart` → http://127.0.0.1:8787 (clave `redpos-prueba`).
+- Nube de prueba (HTTPS): rama `test/redpos-vercel-codigos`, ver [admin-web/README.md](../admin-web/README.md).
 
 4. Sin código: banner en la lista / Compartir, y pie en el papel **después** del ticket/QR y **antes** del corte (también PrintService/Chrome).
 5. Un código válido quita la publicidad en **toda la instalación** (no hace falta cuenta).
@@ -66,6 +64,7 @@ Agrega impresora
 - [x] Generar código (rama de prueba: `tool/redpos_admin.dart`)
 - [ ] Login de **empleados** RedPOS (ahora una clave local)
 - [ ] Atar a MAC / modelo al vender
+- [x] Rama de prueba Vercel: `test/redpos-vercel-codigos` (`admin-web/`)
 - [ ] Servidor de producción + HTTPS (no HMAC en el APK)
 - [ ] No exponer esta web en Google
 

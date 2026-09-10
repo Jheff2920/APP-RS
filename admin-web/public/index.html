@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>RedPOS · códigos (prueba)</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 40rem;
+      margin: 2rem auto;
+      padding: 0 1rem 3rem;
+      background: #f4f4f5;
+      color: #111;
+    }
+    h1 { color: #2b0a53; font-size: 1.4rem; }
+    input, button { font-size: 1rem; padding: .55rem .75rem; }
+    input { width: 100%; box-sizing: border-box; margin-top: .35rem; }
+    button {
+      background: #2b0a53;
+      color: #fff;
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .code {
+      font-size: 1.5rem;
+      letter-spacing: .08em;
+      font-family: ui-monospace, monospace;
+      margin: 1rem 0;
+      color: #2b0a53;
+    }
+    .hint, .warn { color: #333; line-height: 1.45; }
+    .warn { background: #fff3cd; padding: .75rem 1rem; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Códigos RedPOS Service</h1>
+  <p class="warn">Solo personal interno. El cliente <strong>no</strong> abre esta
+  página: ustedes generan el código y se lo pasan. Él lo escribe en la app.</p>
+  <label>Clave staff
+    <input id="pw" type="password" autocomplete="current-password"/>
+  </label>
+  <p><button id="go" type="button">Generar código</button></p>
+  <p id="out" class="code"></p>
+  <p class="hint">Formato <code>RP-XXXX-XXXX-XXXX</code>. En Vercel configura
+  <code>REDPOS_STAFF_PASSWORD</code>, <code>REDPOS_HMAC</code> (el mismo de la
+  app de prueba) y un KV para que cada código sirva una sola vez.</p>
+  <script>
+    document.getElementById('go').onclick = async () => {
+      const out = document.getElementById('out');
+      out.textContent = '…';
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ password: document.getElementById('pw').value }),
+      });
+      const data = await res.json();
+      out.textContent = data.code || data.error || 'error';
+    };
+  </script>
+</body>
+</html>
