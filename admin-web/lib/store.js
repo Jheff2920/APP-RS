@@ -51,6 +51,9 @@ async function recordGenerated(code, nonce) {
     ]);
     return;
   }
+  if (process.env.VERCEL) {
+    return;
+  }
   const data = loadFile();
   data.codes.push(row);
   saveFile(data);

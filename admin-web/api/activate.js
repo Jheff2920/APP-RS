@@ -10,7 +10,16 @@ module.exports = async function handler(req, res) {
     res.status(405).json({ ok: false, error: 'method' });
     return;
   }
-  const body = req.body || {};
+  const body =
+    req.body && typeof req.body === 'object'
+      ? req.body
+      : (() => {
+          try {
+            return JSON.parse(req.body || '{}');
+          } catch {
+            return {};
+          }
+        })();
   const checked = verify(body.code || '');
   if (!checked.ok || !checked.nonce) {
     res.status(400).json({ ok: false, error: 'invalid' });
