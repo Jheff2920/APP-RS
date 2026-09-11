@@ -7,18 +7,18 @@ enum RasterScale {
   String get label {
     switch (this) {
       case RasterScale.x1:
-        return 'x1 (rapido)';
+        return 'x1';
       case RasterScale.x2:
-        return 'x2 (nitido)';
+        return 'x2';
       case RasterScale.x3:
-        return 'x3 (maximo)';
+        return 'x3';
     }
   }
 
   String get hint {
     switch (this) {
       case RasterScale.x1:
-        return 'Igual que RawBT; el mas rapido';
+        return 'Más rápido';
       case RasterScale.x2:
         return 'Misma medida que x1; mas nítido. Tarda un poco';
       case RasterScale.x3:

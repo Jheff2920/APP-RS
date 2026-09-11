@@ -58,7 +58,7 @@ function verify(input, secret = defaultSecret()) {
   if (!trimmed) {
     return { ok: false, error: 'empty' };
   }
-  if (normalize(trimmed) === normalize('REDPOS-PRUEBA-1')) {
+  if (normalize(trimmed) === normalize('R100301S')) {
     return { ok: true, nonce: 'TESTALIAS', testAlias: true };
   }
   let body = normalize(trimmed);

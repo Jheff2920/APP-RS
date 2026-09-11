@@ -102,7 +102,7 @@ class RedPosLicenseStore {
     }
 
     final api = RedPosConfig.apiBase.trim();
-    if (api.isNotEmpty) {
+    if (api.isNotEmpty && !verified.testAlias) {
       try {
         final accepted = await _activateOnServer(
           api,

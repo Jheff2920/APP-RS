@@ -36,7 +36,7 @@ enum CutMode {
   String get hint {
     switch (this) {
       case CutMode.none:
-        return 'Portátiles sin cuchilla (HL200B, etc.)';
+        return 'Sin cuchilla';
       case CutMode.fullGsV0:
       case CutMode.fullGsVA:
       case CutMode.fullEscI:
@@ -47,7 +47,7 @@ enum CutMode {
         return 'Deja un punto sin cortar (fácil de arrancar)';
       case CutMode.fullEscD0:
       case CutMode.partialEscD1:
-        return 'Solo avance (algunos perfiles RawBT)';
+        return 'Solo avance';
     }
   }
 

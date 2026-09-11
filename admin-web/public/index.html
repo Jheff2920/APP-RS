@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>RedPOS · códigos (prueba)</title>
+  <title>RedPOS · códigos</title>
   <style>
     :root { color-scheme: light; }
     body {
@@ -31,22 +31,17 @@
       margin: 1rem 0;
       color: #2b0a53;
     }
-    .hint, .warn { color: #333; line-height: 1.45; }
-    .warn { background: #fff3cd; padding: .75rem 1rem; border-radius: 8px; }
+    .hint { color: #555; line-height: 1.45; }
   </style>
 </head>
 <body>
   <h1>Códigos RedPOS Service</h1>
-  <p class="warn">Solo personal interno. El cliente <strong>no</strong> abre esta
-  página: ustedes generan el código y se lo pasan. Él lo escribe en la app.</p>
-  <label>Clave staff
+  <p class="hint">Genera un código para activar la app sin publicidad.</p>
+  <label>Clave
     <input id="pw" type="password" autocomplete="current-password"/>
   </label>
   <p><button id="go" type="button">Generar código</button></p>
   <p id="out" class="code"></p>
-  <p class="hint">Formato <code>RP-XXXX-XXXX-XXXX</code>. En Vercel configura
-  <code>REDPOS_STAFF_PASSWORD</code>, <code>REDPOS_HMAC</code> (el mismo de la
-  app de prueba) y un KV para que cada código sirva una sola vez.</p>
   <script>
     document.getElementById('go').onclick = async () => {
       const out = document.getElementById('out');

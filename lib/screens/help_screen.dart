@@ -87,8 +87,7 @@ class HelpScreen extends StatelessWidget {
                   Text(
                     'Bluetooth, WiFi o USB bien vinculados. En Android, permiso '
                     '«Mostrar sobre otras apps» y ${AppBrand.name} activo en Ajustes → Impresión. '
-                    'En IMIN, tras apagar el equipo vuelve a aceptar el permiso USB; '
-                    'no hace falta volver a vincular.',
+                    'Tras apagar un equipo USB, vuelve a aceptar el permiso.',
                     style: theme.textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 24),

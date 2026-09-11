@@ -12,7 +12,7 @@ enum PrinterDpi {
   String get hint {
     switch (this) {
       case PrinterDpi.dpi203:
-        return 'Estandar (HL200B, HQ300 203, casi todas)';
+        return 'Estándar (casi todas las impresoras)';
       case PrinterDpi.dpi300:
         return 'Cabezal 300 dpi. Si sale partido, vuelve a 203';
     }

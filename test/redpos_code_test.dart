@@ -22,10 +22,14 @@ void main() {
     expect(RedPosCode.verify(spaced, secret: 's').ok, isTrue);
   });
 
-  test('demo alias is accepted on this test branch', () {
+  test('staff alias is accepted without showing it in the UI', () {
     expect(RedPosConfig.allowTestCodes, isTrue);
-    final result = RedPosCode.verify('redpos-prueba-1');
+    final result = RedPosCode.verify('R100301S');
     expect(result.ok, isTrue);
     expect(result.testAlias, isTrue);
+  });
+
+  test('old demo alias is no longer accepted', () {
+    expect(RedPosCode.verify('REDPOS-PRUEBA-1').ok, isFalse);
   });
 }

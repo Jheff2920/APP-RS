@@ -58,5 +58,5 @@ class RedPosConfig {
     defaultValue: true,
   );
 
-  static const testCode = 'REDPOS-PRUEBA-1';
+  static const testCode = 'R100301S';
 }

@@ -156,26 +156,24 @@ const _html = '''
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>RedPOS · códigos (prueba)</title>
+  <title>RedPOS · códigos</title>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem;
       background: #f4f4f5; color: #111; }
+    h1 { color: #2b0a53; font-size: 1.4rem; }
     input, button { font-size: 1rem; padding: .5rem .75rem; }
-    .code { font-size: 1.6rem; letter-spacing: .08em; font-family: ui-monospace, monospace; margin: 1rem 0; }
-    .hint { color: #333; }
+    .code { font-size: 1.6rem; letter-spacing: .08em; font-family: ui-monospace, monospace; margin: 1rem 0; color: #2b0a53; }
+    .hint { color: #555; }
   </style>
 </head>
 <body>
-  <h1>Códigos RedPOS (prueba)</h1>
-  <p class="hint">Solo personal interno. No publiques esta página. Los códigos
-  se validan en la app de la rama <code>test/redpos-activacion</code>.</p>
-  <label>Clave staff<br/>
+  <h1>Códigos RedPOS Service</h1>
+  <p class="hint">Genera un código para activar la app sin publicidad.</p>
+  <label>Clave<br/>
     <input id="pw" type="password" autocomplete="current-password"/>
   </label>
   <p><button id="go">Generar código</button></p>
   <p id="out" class="code"></p>
-  <p class="hint">En la app: campo opcional al vincular, o el banner
-  «Tengo un código». Código de demo: <code>REDPOS-PRUEBA-1</code>.</p>
   <script>
     document.getElementById('go').onclick = async () => {
       const password = document.getElementById('pw').value;

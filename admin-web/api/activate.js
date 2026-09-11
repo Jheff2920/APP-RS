@@ -35,10 +35,7 @@ module.exports = async function handler(req, res) {
     res.status(status).json({
       ok: false,
       error: result.error,
-      hint:
-        result.error === 'no_kv'
-          ? 'En Vercel crea un KV (Upstash) y las variables KV_REST_API_URL / KV_REST_API_TOKEN.'
-          : undefined,
+      hint: undefined,
     });
     return;
   }

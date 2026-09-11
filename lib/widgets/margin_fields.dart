@@ -41,21 +41,16 @@ class _MarginFieldsState extends State<MarginFields> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final theme = Theme.of(context);
+    return ExpansionTile(
+      initiallyExpanded: false,
+      tilePadding: EdgeInsets.zero,
+      childrenPadding: const EdgeInsets.only(bottom: 8),
+      title: Text(
+        'Márgenes (mm)',
+        style: theme.textTheme.titleMedium,
+      ),
       children: [
-        Text(
-          'Margenes de software (mm)',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Estos valores mandan en PDF, imagen y pagina de prueba. '
-          'Izquierdo/derecho: blanco dentro del area imprimible. '
-          'Inferior: avance al terminar; si hay cuchilla, se avanza y luego se corta.',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        const SizedBox(height: 8),
         _MmField(
           label: 'Izquierdo',
           mm: _value.leftMm,

@@ -17,7 +17,6 @@ import '../services/bluetooth_bond_channel.dart';
 import '../services/print_service.dart';
 import '../services/printer_permissions.dart';
 import '../services/printer_store.dart';
-import '../services/redpos/redpos_config.dart';
 import '../services/redpos/redpos_license.dart';
 import '../services/usb_printer_channel.dart';
 import '../services/transports/printer_transport.dart';
@@ -477,30 +476,15 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Código de activación (opcional)', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(
-              'Sin código puedes imprimir; saldrá publicidad en la app y un pie '
-              'en el papel. Código RedPOS o suscripción quitan los avisos. '
-              'Soporte: menú ⋮ → Ayuda.',
-              style: theme.textTheme.bodySmall,
-            ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _codeCtrl,
               textCapitalization: TextCapitalization.characters,
               decoration: const InputDecoration(
                 labelText: 'Código RedPOS',
-                hintText: 'RP-XXXX-XXXX-XXXX',
                 border: OutlineInputBorder(),
               ),
             ),
-            if (RedPosConfig.allowTestCodes) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Prueba: ${RedPosConfig.testCode}',
-                style: theme.textTheme.labelSmall,
-              ),
-            ],
           ],
         ),
       ),
@@ -562,22 +546,12 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
           scrollCacheExtent: const ScrollCacheExtent.pixels(280),
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           children: [
-            Text(
-              PlatformCaps.supportsSystemPrint
-                  ? 'Configura conexión, rollo y márgenes antes de guardar. '
-                      'Así el diálogo Imprimir usará el ancho correcto (58 u 80 mm).'
-                  : 'Configura conexión, rollo y márgenes antes de guardar. '
-                      'En iPhone/iPad el camino fiable es WiFi (IP y puerto 9100).',
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
             _activationCard(theme),
             const SizedBox(height: 16),
             TextFormField(
               controller: _nameCtrl,
               decoration: const InputDecoration(
                 labelText: 'Nombre',
-                hintText: 'Caja 1 / Cocina',
                 border: OutlineInputBorder(),
               ),
               textCapitalization: TextCapitalization.words,
@@ -637,15 +611,6 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                         : const Icon(Icons.refresh),
                   ),
                 ],
-              ),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  PlatformCaps.isIOS
-                      ? 'Aquí solo ves el equipo que ya elegiste. Para buscar una impresora BLE cercana usa Agregar dispositivo.'
-                      : 'Aquí solo salen impresoras ya vinculadas. Para una nueva, usa Agregar dispositivo.',
-                  style: theme.textTheme.bodySmall,
-                ),
               ),
               if (_paired.isEmpty && !_loadingPaired)
                 const Padding(
@@ -711,13 +676,6 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                   ),
                 ],
               ),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 8),
-                child: Text(
-                  'En IMIN/Falcon usa USB (impresora integrada), no Bluetooth. '
-                      'Android pide el permiso USB otra vez después de apagar el equipo.',
-                ),
-              ),
               if (_usbDevices.isEmpty && !_loadingUsb)
                 const Padding(
                   padding: EdgeInsets.only(bottom: 8),
@@ -772,7 +730,6 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                 decoration: const InputDecoration(
                   labelText: 'Puerto TCP',
                   hintText: '9100',
-                  helperText: 'Puerto tipico ESC/POS: 9100',
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.number,
@@ -787,34 +744,13 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
             ],
             const SizedBox(height: 24),
             Text('Ancho del rollo', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(
-              PlatformCaps.supportsSystemPrint
-                  ? 'Elige 58 mm u 80 mm según el papel instalado en esta impresora '
-                      'antes de guardar. Esto define el tamaño en el diálogo Imprimir.'
-                  : 'Elige 58 mm u 80 mm según el papel instalado en esta impresora.',
-              style: theme.textTheme.bodySmall,
-            ),
             const SizedBox(height: 8),
             PaperWidthSelector(
               value: _paper,
               onChanged: (v) => setState(() => _paper = v),
             ),
-            const SizedBox(height: 8),
-            Text(
-              '${_paper.label} · ${_dpi.label} · ${_dpi.dotsFor(_paper)} puntos',
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: theme.colorScheme.primary,
-              ),
-            ),
             const SizedBox(height: 20),
             Text('DPI del cabezal', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(
-              '203 es lo normal. 300 solo si la impresora es 300 dpi; '
-              'si el ticket sale partido, vuelve a 203.',
-              style: theme.textTheme.bodySmall,
-            ),
             const SizedBox(height: 8),
             SegmentedButton<PrinterDpi>(
               segments: [
@@ -836,13 +772,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
               onChanged: (v) => _margins = v,
             ),
             const SizedBox(height: 20),
-            Text('Corte automatico', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(
-              'Con cuchilla: al terminar se aplica el margen inferior y luego el corte. '
-              'Sin cuchilla: elige «Sin corte» (solo avance).',
-              style: theme.textTheme.bodySmall,
-            ),
+            Text('Corte automático', style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             DropdownMenu<CutMode>(
               initialSelection: _cut,
@@ -866,16 +796,6 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
             ],
             const SizedBox(height: 20),
             Text('Gaveta de dinero', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(
-              PlatformCaps.supportsUsb
-                  ? 'Opcional: el pulso se envía cuando el ticket ya salió. '
-                      'En Falcon/USB la gaveta es del equipo (GPIO), no del cable USB. '
-                      'Elige Pin 2 o Pin 5. Si no hay cajón, deja «Sin gaveta».'
-                  : 'Opcional: el pulso ESC/POS se envía cuando el ticket ya salió. '
-                      'Elige Pin 2 o Pin 5. Si no hay cajón, deja «Sin gaveta».',
-              style: theme.textTheme.bodySmall,
-            ),
             const SizedBox(height: 8),
             DropdownMenu<CashDrawer>(
               initialSelection: _cashDrawer,
@@ -899,12 +819,6 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
             ],
             const SizedBox(height: 20),
             Text('Nitidez', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(
-              'x1, x2 y x3 imprimen al mismo tamaño (384/576). '
-              'x2 y x3 solo afinan el dibujo; tardan un poco mas.',
-              style: theme.textTheme.bodySmall,
-            ),
             const SizedBox(height: 8),
             SegmentedButton<RasterScale>(
               segments: [
@@ -933,12 +847,6 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
               onChanged: _firstPrinter
                   ? null
                   : (v) => setState(() => _isDefault = v),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'La vista previa del sistema puede verse angosta en 80 mm si el PDF '
-              'del POS es de 58 mm; la impresión real usa el ancho que elegiste aquí.',
-              style: theme.textTheme.bodySmall,
             ),
           ],
         ),
