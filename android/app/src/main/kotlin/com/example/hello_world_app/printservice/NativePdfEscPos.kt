@@ -18,12 +18,12 @@ import kotlin.math.roundToInt
  * 1) Preview 1:1 y recorte del ticket
  * 2) Geometría fija: 384/576 × alto proporcional (igual en x1/x2/x3)
  * 3) Nitidez: raster del recorte a hi× con Matrix (no escalar la página alta)
- * 4) Umbral promedio → GS v 0 en franjas de 48
+ * 4) Umbral promedio → GS v 0 en franjas altas (carga y luego imprime)
  */
 object NativePdfEscPos {
 
     private const val MAX_PAGES = 8
-    private const val BAND_HEIGHT = 48
+    private const val BAND_HEIGHT = 2048
     private const val NEAR_WHITE_SUM = 720
     /** Aire superior ~4 mm a 203 dpi. */
     private const val TOP_AIR_DOTS = 32

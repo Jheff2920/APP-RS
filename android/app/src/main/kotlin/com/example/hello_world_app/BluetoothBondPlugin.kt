@@ -26,7 +26,7 @@ import io.flutter.plugin.common.MethodChannel
 
 /**
  * Discovery Classic + createBond. El PIN lo muestra Android; la impresión
- * sigue por RFCOMM ([print_bluetooth_thermal] / PrintService).
+ * sigue por RFCOMM ([EscPosTransport] / PrintService).
  */
 class BluetoothBondPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
 

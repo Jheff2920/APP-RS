@@ -16,6 +16,11 @@ object EscPosTransport {
 
     private const val TAG = "EscPosTransport"
     private val SPP: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+    /** La 803B tira los primeros bytes; los ceros no marcan el papel. */
+    private const val BT_LEAD_IN = 128
+    private val heldLock = Any()
+    private var heldSocket: BluetoothSocket? = null
+    private var heldNeedsLeadIn = false
 
     fun drawerBytes(cashDrawer: String, linkType: String = ""): ByteArray {
         val escP = when (cashDrawer) {
@@ -59,6 +64,46 @@ object EscPosTransport {
         adapter.cancelDiscovery()
         socket.connect()
         return socket
+    }
+
+    fun openHeld(mac: String) {
+        synchronized(heldLock) {
+            closeHeldLocked()
+            heldSocket = openBluetooth(mac)
+            heldNeedsLeadIn = true
+        }
+        Thread.sleep(280)
+    }
+
+    fun writeHeld(data: ByteArray) {
+        synchronized(heldLock) {
+            val socket = heldSocket
+                ?: throw IllegalStateException("No hay conexion Bluetooth activa.")
+            val leadIn = heldNeedsLeadIn
+            heldNeedsLeadIn = false
+            writeBluetoothBytes(socket.outputStream, data, leadIn)
+            socket.outputStream.flush()
+        }
+    }
+
+    fun closeHeld() {
+        synchronized(heldLock) {
+            if (heldSocket == null) return
+            try {
+                Thread.sleep(220)
+            } catch (_: InterruptedException) {
+            }
+            closeHeldLocked()
+        }
+    }
+
+    private fun closeHeldLocked() {
+        try {
+            heldSocket?.close()
+        } catch (_: Exception) {
+        }
+        heldSocket = null
+        heldNeedsLeadIn = false
     }
 
     fun writeBluetooth(
@@ -140,23 +185,13 @@ object EscPosTransport {
         val writeStartedAt = PrintTiming.now()
         if (phase == "bluetooth") {
             Thread.sleep(200)
-            val ranges = EscPosChunker.ranges(data)
-            var first = true
-            for (range in ranges) {
-                if (first) {
-                    first = false
-                    val chunk = ByteArray(128 + range.length)
-                    System.arraycopy(data, range.offset, chunk, 128, range.length)
-                    out.write(chunk)
-                } else {
-                    out.write(data, range.offset, range.length)
-                }
-            }
+            // Un solo stream: si se hace flush/trocea, la 803B imprime a tirones.
+            writeBluetoothBytes(out, data, leadIn = true)
             PrintTiming.phase(
                 jobId,
                 "bluetooth_write",
                 writeStartedAt,
-                mapOf("bytes" to data.size, "chunks" to ranges.size),
+                mapOf("bytes" to data.size, "chunks" to 1),
             )
         } else {
             out.write(data)
@@ -179,6 +214,29 @@ object EscPosTransport {
             }
         } else {
             Thread.sleep(220)
+        }
+    }
+
+    private fun writeBluetoothBytes(
+        out: OutputStream,
+        data: ByteArray,
+        leadIn: Boolean,
+    ) {
+        if (leadIn) {
+            val payload = ByteArray(BT_LEAD_IN + data.size)
+            System.arraycopy(data, 0, payload, BT_LEAD_IN, data.size)
+            writeFully(out, payload)
+        } else {
+            writeFully(out, data)
+        }
+    }
+
+    private fun writeFully(out: OutputStream, data: ByteArray) {
+        var offset = 0
+        while (offset < data.size) {
+            val n = minOf(data.size - offset, 262_144)
+            out.write(data, offset, n)
+            offset += n
         }
     }
 }

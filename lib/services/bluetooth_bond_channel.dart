@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import '../platform_caps.dart';
+import 'bluetooth_spp_channel.dart';
 
 class NearbyBtDevice {
   const NearbyBtDevice({
@@ -184,6 +185,9 @@ class BluetoothBondChannel {
   static Future<void> forget(String address) async {
     try {
       await PrintBluetoothThermal.disconnect;
+    } catch (_) {}
+    try {
+      await BluetoothSppChannel.close();
     } catch (_) {}
     await removeBond(address);
   }

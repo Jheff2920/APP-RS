@@ -2,6 +2,7 @@ import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import '../../models/saved_printer.dart';
 import '../../platform_caps.dart';
+import '../bluetooth_spp_channel.dart';
 import 'printer_transport.dart';
 
 class BluetoothTransport implements PrinterTransport {
@@ -11,6 +12,7 @@ class BluetoothTransport implements PrinterTransport {
 
   bool _connected = false;
   bool _needsWake = false;
+  bool _nativeSpp = false;
 
   @override
   Future<void> connect(SavedPrinter printer) async {
@@ -24,6 +26,24 @@ class BluetoothTransport implements PrinterTransport {
     try {
       await PrintBluetoothThermal.disconnect;
     } catch (_) {}
+    try {
+      await BluetoothSppChannel.close();
+    } catch (_) {}
+
+    if (BluetoothSppChannel.isSupported) {
+      try {
+        await BluetoothSppChannel.connect(printer.address.trim());
+      } catch (e) {
+        throw PrinterTransportException(
+          'No se pudo conectar por Bluetooth a ${printer.address}. '
+          'Empareja la impresora en Ajustes de Android primero. ($e)',
+        );
+      }
+      _nativeSpp = true;
+      _connected = true;
+      _needsWake = true;
+      return;
+    }
 
     final ok = await PrintBluetoothThermal.connect(
       macPrinterAddress: printer.address.trim(),
@@ -34,6 +54,7 @@ class BluetoothTransport implements PrinterTransport {
         '${PlatformCaps.isIOS ? 'En iPhone/iPad el Bluetooth Classic de impresoras genéricas no está disponible. Usa WiFi (IP y puerto 9100) o una impresora BLE/MFi.' : 'Empareja la impresora en Ajustes de Android primero.'}',
       );
     }
+    _nativeSpp = false;
     _connected = true;
     _needsWake = true;
     await Future<void>.delayed(const Duration(milliseconds: 280));
@@ -45,77 +66,46 @@ class BluetoothTransport implements PrinterTransport {
       throw PrinterTransportException('No hay conexion Bluetooth activa.');
     }
 
+    if (_nativeSpp) {
+      try {
+        await BluetoothSppChannel.write(bytes);
+      } catch (e) {
+        throw PrinterTransportException(
+          'Fallo al enviar datos a la impresora Bluetooth. ($e)',
+        );
+      }
+      _needsWake = false;
+      return;
+    }
+
     var payload = bytes;
     if (_needsWake) {
       _needsWake = false;
       payload = <int>[..._leadIn, ...bytes];
     }
 
-    // Intento en bloque único → la impresora recibe el job de corrido.
-    if (payload.length <= 49152) {
-      final ok = await PrintBluetoothThermal.writeBytes(payload);
-      if (ok) return;
+    final ok = await PrintBluetoothThermal.writeBytes(payload);
+    if (!ok) {
+      throw PrinterTransportException(
+        'Fallo al enviar datos a la impresora Bluetooth.',
+      );
     }
-
-    var i = 0;
-    while (i < payload.length) {
-      final end = _nextWriteEnd(payload, i);
-      final ok = await PrintBluetoothThermal.writeBytes(payload.sublist(i, end));
-      if (!ok) {
-        throw PrinterTransportException(
-          'Fallo al enviar datos a la impresora Bluetooth (offset $i).',
-        );
-      }
-      i = end;
-    }
-  }
-
-  static int _nextWriteEnd(List<int> bytes, int start) {
-    const maxBytes = 24576;
-    if (start + 7 < bytes.length &&
-        bytes[start] == 0x1d &&
-        bytes[start + 1] == 0x76 &&
-        bytes[start + 2] == 0x30) {
-      final widthBytes = bytes[start + 4] + (bytes[start + 5] << 8);
-      final height = bytes[start + 6] + (bytes[start + 7] << 8);
-      final total = 8 + widthBytes * height;
-      var end = start + total;
-      if (total <= 0 || end > bytes.length) {
-        return (start + maxBytes).clamp(start + 1, bytes.length);
-      }
-      while (end + 7 < bytes.length && end - start < maxBytes) {
-        if (bytes[end] != 0x1d ||
-            bytes[end + 1] != 0x76 ||
-            bytes[end + 2] != 0x30) {
-          break;
-        }
-        final wb = bytes[end + 4] + (bytes[end + 5] << 8);
-        final h = bytes[end + 6] + (bytes[end + 7] << 8);
-        final t = 8 + wb * h;
-        if (t <= 0 || end + t > bytes.length) break;
-        if ((end + t) - start > maxBytes) break;
-        end += t;
-      }
-      return end;
-    }
-
-    final limit =
-        (start + maxBytes < bytes.length) ? start + maxBytes : bytes.length;
-    for (var j = start + 1; j < limit - 7; j++) {
-      if (bytes[j] == 0x1d && bytes[j + 1] == 0x76 && bytes[j + 2] == 0x30) {
-        return j;
-      }
-    }
-    return limit;
   }
 
   @override
   Future<void> disconnect() async {
-    if (_connected) {
-      await Future<void>.delayed(const Duration(milliseconds: 220));
-      await PrintBluetoothThermal.disconnect;
+    if (!_connected) return;
+    try {
+      if (_nativeSpp) {
+        await BluetoothSppChannel.close();
+      } else {
+        await Future<void>.delayed(const Duration(milliseconds: 220));
+        await PrintBluetoothThermal.disconnect;
+      }
+    } finally {
       _connected = false;
       _needsWake = false;
+      _nativeSpp = false;
     }
   }
 

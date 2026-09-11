@@ -69,8 +69,8 @@ void main() {
       expect(fused, previous);
     });
 
-    test('preserves 512-row band boundaries', () {
-      final image = img.Image(width: 8, height: 513, numChannels: 3);
+    test('keeps a typical ticket in one GS v 0 band', () {
+      final image = img.Image(width: 8, height: 1800, numChannels: 3);
       img.fill(image, color: img.ColorRgb8(0, 0, 0));
 
       final bytes = EscPosGsV0.encodeLuminance(
@@ -79,8 +79,22 @@ void main() {
         outputWidth: 8,
       );
 
-      expect(bytes.sublist(0, 8), [0x1d, 0x76, 0x30, 0, 1, 0, 0, 2]);
-      final secondHeader = 8 + 512;
+      expect(bytes.sublist(0, 8), [0x1d, 0x76, 0x30, 0, 1, 0, 8, 7]);
+      expect(bytes.length, 8 + 1800);
+    });
+
+    test('splits only when taller than 2048 rows', () {
+      final image = img.Image(width: 8, height: 2049, numChannels: 3);
+      img.fill(image, color: img.ColorRgb8(0, 0, 0));
+
+      final bytes = EscPosGsV0.encodeLuminance(
+        image,
+        threshold: 128,
+        outputWidth: 8,
+      );
+
+      expect(bytes.sublist(0, 8), [0x1d, 0x76, 0x30, 0, 1, 0, 0, 8]);
+      final secondHeader = 8 + 2048;
       expect(
         bytes.sublist(secondHeader, secondHeader + 8),
         [0x1d, 0x76, 0x30, 0, 1, 0, 1, 0],

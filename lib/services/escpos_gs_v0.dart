@@ -6,8 +6,9 @@ import 'package:image/image.dart' as img;
 ///
 /// Franjas altas → pocos comandos → el BT envía casi de corrido.
 class EscPosGsV0 {
-  /// Una sola franja si el ticket cabe; si no, bloques grandes.
-  static const int bandHeight = 512;
+  /// Una sola franja si el ticket cabe: la impresora carga y luego imprime
+  /// de corrido. 2048 filas ≈ 25 cm a 203 dpi; una boleta típica entra en una.
+  static const int bandHeight = 2048;
 
   /// [image] debe ser blanco/negro (oscuro = tinta) y ancho múltiplo de 8.
   static List<int> encode(img.Image image) {
