@@ -5,7 +5,12 @@ import '../../platform_caps.dart';
 import 'printer_transport.dart';
 
 class BluetoothTransport implements PrinterTransport {
+  /// La 803B tira los primeros bytes del write. Si ahí va ESC @, imprime "@".
+  /// Los ceros se pierden sin marcar el papel; el ticket sigue pegado.
+  static final _leadIn = List<int>.filled(128, 0x00);
+
   bool _connected = false;
+  bool _needsWake = false;
 
   @override
   Future<void> connect(SavedPrinter printer) async {
@@ -30,6 +35,8 @@ class BluetoothTransport implements PrinterTransport {
       );
     }
     _connected = true;
+    _needsWake = true;
+    await Future<void>.delayed(const Duration(milliseconds: 280));
   }
 
   @override
@@ -38,17 +45,22 @@ class BluetoothTransport implements PrinterTransport {
       throw PrinterTransportException('No hay conexion Bluetooth activa.');
     }
 
+    var payload = bytes;
+    if (_needsWake) {
+      _needsWake = false;
+      payload = <int>[..._leadIn, ...bytes];
+    }
+
     // Intento en bloque único → la impresora recibe el job de corrido.
-    if (bytes.length <= 49152) {
-      final ok = await PrintBluetoothThermal.writeBytes(bytes);
+    if (payload.length <= 49152) {
+      final ok = await PrintBluetoothThermal.writeBytes(payload);
       if (ok) return;
-      // Si el plugin rechaza el bloque, caer a chunks.
     }
 
     var i = 0;
-    while (i < bytes.length) {
-      final end = _nextWriteEnd(bytes, i);
-      final ok = await PrintBluetoothThermal.writeBytes(bytes.sublist(i, end));
+    while (i < payload.length) {
+      final end = _nextWriteEnd(payload, i);
+      final ok = await PrintBluetoothThermal.writeBytes(payload.sublist(i, end));
       if (!ok) {
         throw PrinterTransportException(
           'Fallo al enviar datos a la impresora Bluetooth (offset $i).',
@@ -100,9 +112,10 @@ class BluetoothTransport implements PrinterTransport {
   @override
   Future<void> disconnect() async {
     if (_connected) {
-      await Future<void>.delayed(const Duration(milliseconds: 80));
+      await Future<void>.delayed(const Duration(milliseconds: 220));
       await PrintBluetoothThermal.disconnect;
       _connected = false;
+      _needsWake = false;
     }
   }
 

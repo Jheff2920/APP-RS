@@ -45,8 +45,8 @@ object NativePdfEscPos {
         val tallChrome = true
         val out = ByteArrayOutputStream()
         out.write(byteArrayOf(0x1b, 0x40))
-        // Retroceso ~8–10 mm (ESC j). Si el firmware lo ignora, no pasa nada.
-        out.write(byteArrayOf(0x1b, 0x6a, 0x40))
+        // Retroceso ~4 mm (ESC j). No usar 0x40: si se pierde ESC, imprime "@".
+        out.write(byteArrayOf(0x1b, 0x6a, 0x20))
 
         ParcelFileDescriptor.open(pdf, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
             PdfRenderer(pfd).use { renderer ->

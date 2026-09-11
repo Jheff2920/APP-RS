@@ -139,9 +139,18 @@ object EscPosTransport {
     ) {
         val writeStartedAt = PrintTiming.now()
         if (phase == "bluetooth") {
+            Thread.sleep(200)
             val ranges = EscPosChunker.ranges(data)
+            var first = true
             for (range in ranges) {
-                out.write(data, range.offset, range.length)
+                if (first) {
+                    first = false
+                    val chunk = ByteArray(128 + range.length)
+                    System.arraycopy(data, range.offset, chunk, 128, range.length)
+                    out.write(chunk)
+                } else {
+                    out.write(data, range.offset, range.length)
+                }
             }
             PrintTiming.phase(
                 jobId,
@@ -169,7 +178,7 @@ object EscPosTransport {
                 Log.w(TAG, "Gaveta ESC/POS falló; el ticket ya salió", e)
             }
         } else {
-            Thread.sleep(80)
+            Thread.sleep(220)
         }
     }
 }
