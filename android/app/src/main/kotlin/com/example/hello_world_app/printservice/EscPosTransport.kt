@@ -42,7 +42,8 @@ object EscPosTransport {
     fun drawerWaitMs(linkType: String, ticketBytes: Int): Long {
         if (linkType == "network") return 300L
         if (linkType == "usb") return 800L
-        return (ticketBytes / 3L).coerceIn(2500L, 8000L)
+        // El write BT ya bloquea hasta que salió el papel.
+        return 400L
     }
 
     fun openBluetooth(mac: String): BluetoothSocket {

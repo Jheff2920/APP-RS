@@ -163,6 +163,10 @@ class PrintService {
 
       phase(PrintPhase.sending);
       await paint();
+      // En Bluetooth el write dura lo que tarda el papel: no dejar
+      // el diálogo en "Enviando" todo ese rato.
+      phase(PrintPhase.printing);
+      await paint();
       await timing.measure(
         'write',
         () => transport.writeBytes(payload),

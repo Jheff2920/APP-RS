@@ -18,12 +18,13 @@ import kotlin.math.roundToInt
  * 1) Preview 1:1 y recorte del ticket
  * 2) Geometría fija: 384/576 × alto proporcional (igual en x1/x2/x3)
  * 3) Nitidez: raster del recorte a hi× con Matrix (no escalar la página alta)
- * 4) Umbral promedio → GS v 0 en franjas altas (carga y luego imprime)
+ * 4) Umbral promedio → GS v 0 en franjas de 512 (365B / Chrome)
  */
 object NativePdfEscPos {
 
     private const val MAX_PAGES = 8
-    private const val BAND_HEIGHT = 2048
+    /** Como el raster Dart original. 2048 en Chrome lo tira a texto la 365B. */
+    private const val BAND_HEIGHT = 512
     private const val NEAR_WHITE_SUM = 720
     /** Aire superior ~4 mm a 203 dpi. */
     private const val TOP_AIR_DOTS = 32
@@ -45,8 +46,6 @@ object NativePdfEscPos {
         val tallChrome = true
         val out = ByteArrayOutputStream()
         out.write(byteArrayOf(0x1b, 0x40))
-        // Retroceso ~4 mm (ESC j). No usar 0x40: si se pierde ESC, imprime "@".
-        out.write(byteArrayOf(0x1b, 0x6a, 0x20))
 
         ParcelFileDescriptor.open(pdf, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
             PdfRenderer(pfd).use { renderer ->

@@ -9,8 +9,9 @@ class DrawerWait {
       case PrinterLinkType.usb:
         return const Duration(milliseconds: 800);
       case PrinterLinkType.bluetooth:
-        final ms = (ticketBytes / 3).round().clamp(2500, 8000);
-        return Duration(milliseconds: ms);
+        // El write BT ya espera a que el RFCOMM trague el ticket (el papel
+        // ya salió). 2.5–8 s extra dejaban la gaveta y el círculo colgados.
+        return const Duration(milliseconds: 400);
     }
   }
 }

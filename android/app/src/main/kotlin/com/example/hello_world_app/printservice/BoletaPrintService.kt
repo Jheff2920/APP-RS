@@ -24,12 +24,9 @@ import com.example.hello_world_app.PrintersNativePrefsPlugin
 import org.json.JSONArray
 import java.io.File
 import java.io.FileOutputStream
-import android.bluetooth.BluetoothSocket
 import java.util.concurrent.Executors
-import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicReference
 
 /**
  * PrintService: imprime sin traer Boleta Print al frente.
@@ -39,7 +36,6 @@ class BoletaPrintService : PrintService() {
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executor = Executors.newSingleThreadExecutor()
-    private val connectPool = Executors.newSingleThreadExecutor()
     private val pendingFallbacks = ConcurrentHashMap<String, PendingFallback>()
     private val printResultReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -71,7 +67,6 @@ class BoletaPrintService : PrintService() {
         } catch (_: Exception) {
         }
         executor.shutdownNow()
-        connectPool.shutdownNow()
         super.onDestroy()
     }
 
@@ -115,8 +110,6 @@ class BoletaPrintService : PrintService() {
         var jobId = "unknown"
         var pdfFile: File? = null
         var succeeded = false
-        val pendingSocket = AtomicReference<BluetoothSocket?>(null)
-        var connectFuture: Future<BluetoothSocket>? = null
         try {
             val identifiers = mainHandler.runSync {
                 Pair(job.info.printerId?.localId, job.info.id.toString())
@@ -151,18 +144,6 @@ class BoletaPrintService : PrintService() {
             val mediaSizeId = media?.id
             val mediaWidthMils = media?.widthMils
             Log.i(TAG, "mediaSize id=$mediaSizeId widthMils=$mediaWidthMils")
-
-            connectFuture = if (row.type == "bluetooth") {
-                connectPool.submit<BluetoothSocket> {
-                    val started = PrintTiming.now()
-                    val socket = EscPosTransport.openBluetooth(row.address)
-                    pendingSocket.set(socket)
-                    PrintTiming.phase(jobId, "bluetooth_connect", started)
-                    socket
-                }
-            } else {
-                null
-            }
 
             val rasterStartedAt = PrintTiming.now()
             val data = try {
@@ -221,17 +202,13 @@ class BoletaPrintService : PrintService() {
                         drawer,
                         waitMs,
                     )
-                    "bluetooth" -> {
-                        val socket = try {
-                            connectFuture?.get(45, TimeUnit.SECONDS)
-                                ?: throw IllegalStateException("Sin conexion Bluetooth")
-                        } catch (e: Exception) {
-                            throw IllegalStateException(
-                                e.cause?.message ?: e.message ?: "No se pudo conectar",
-                            )
-                        }
-                        EscPosTransport.writeBluetooth(socket, payload, jobId, drawer, waitMs)
-                    }
+                    "bluetooth" -> EscPosTransport.sendBluetooth(
+                        row.address,
+                        payload,
+                        jobId,
+                        drawer,
+                        waitMs,
+                    )
                     else -> EscPosTransport.sendNetwork(
                         row.address,
                         row.port,
@@ -259,11 +236,6 @@ class BoletaPrintService : PrintService() {
             }
             Log.i(TAG, "Inline print OK")
         } catch (e: Exception) {
-            connectFuture?.cancel(true)
-            try {
-                pendingSocket.getAndSet(null)?.close()
-            } catch (_: Exception) {
-            }
             Log.e(TAG, "Inline print failed", e)
             mainHandler.post {
                 overlay.setStatus(e.message ?: "Error", spinning = false)
