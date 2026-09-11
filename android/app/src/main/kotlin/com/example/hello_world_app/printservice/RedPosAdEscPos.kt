@@ -16,7 +16,7 @@ object RedPosAdEscPos {
         ticket: ByteArray,
         paper: String,
         cut: String,
-        siteUrl: String = "www.redpos.com",
+        siteUrl: String = "www.redsoluciones.com.pe",
     ): ByteArray {
         val footer = footerBytes(paper, siteUrl)
         val cutBytes = cutBytes(cut)

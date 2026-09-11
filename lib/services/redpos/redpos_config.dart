@@ -10,17 +10,17 @@ class RedPosConfig {
 
   static const siteUrl = String.fromEnvironment(
     'REDPOS_SITE',
-    defaultValue: 'www.redpos.com',
+    defaultValue: 'www.redsoluciones.com.pe',
   );
 
   static const contactUrl = String.fromEnvironment(
     'REDPOS_CONTACT',
-    defaultValue: 'https://www.redpos.com',
+    defaultValue: 'https://www.redsoluciones.com.pe',
   );
 
   static const supportEmail = String.fromEnvironment(
     'REDPOS_SUPPORT_EMAIL',
-    defaultValue: 'soporte@redpos.com',
+    defaultValue: 'jcefe.2920@gmail.com',
   );
 
   /// Solo dígitos con código de país, ej. 51987654321. Vacío = no hay WhatsApp.

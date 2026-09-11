@@ -50,9 +50,10 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   late final TextEditingController _addressCtrl;
   late final TextEditingController _portCtrl;
   late final TextEditingController _codeCtrl;
+  late final Map<PrinterLinkType, _LinkDraft> _drafts;
 
-  /// ID fijo desde el primer frame (evita duplicar al Probar y luego Guardar).
-  late final String _id;
+  /// Mismo ID al Probar y Guardar; cambia si eliges otra impresora de la lista.
+  late String _id;
 
   late PrinterLinkType _type;
   late PaperWidth _paper;
@@ -62,52 +63,64 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   late CashDrawer _cashDrawer;
   late RasterScale _rasterScale;
   late bool _isDefault;
+  var _showAddress = false;
 
+  List<SavedPrinter> _saved = [];
   List<BluetoothInfo> _paired = [];
   List<UsbDeviceInfo> _usbDevices = [];
   bool _loadingPaired = false;
   bool _loadingUsb = false;
+  bool _loadingSaved = false;
   bool _saving = false;
   bool _testing = false;
   bool _firstPrinter = false;
   bool _adsFree = false;
   bool _activating = false;
 
-  bool get _isEdit => widget.existing != null;
+  bool get _isEdit =>
+      _saved.any((p) => p.id == _id) || widget.existing?.id == _id;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _drafts = {
+      for (final t in PrinterLinkType.values)
+        t: _LinkDraft(id: widget.store.newId()),
+    };
     final e = widget.existing;
-    _id = e?.id ?? widget.store.newId();
-    _nameCtrl = TextEditingController(text: e?.name ?? '');
-    _addressCtrl = TextEditingController(text: e?.address ?? '');
-    _portCtrl = TextEditingController(text: '${e?.port ?? 9100}');
-    _codeCtrl = TextEditingController();
-    _adsFree = e?.adsFree ?? false;
+    if (e != null) {
+      _drafts[e.type] = _LinkDraft.fromPrinter(e);
+    }
     _type = e?.type ??
         (PlatformCaps.prefersNetworkDefault
             ? PrinterLinkType.network
             : PrinterLinkType.bluetooth);
-    _paper = e?.paper ?? PaperWidth.mm58;
-    _dpi = e?.dpi ?? PrinterDpi.dpi203;
-    _margins = e?.margins ?? const PrintMargins();
-    _cut = e?.cut ?? CutMode.fullGsV0;
-    _cashDrawer = e?.cashDrawer ?? CashDrawer.none;
-    _rasterScale = e?.rasterScale ?? RasterScale.x1;
-    _isDefault = e?.isDefault ?? false;
     if (!PlatformCaps.supportsUsb && _type == PrinterLinkType.usb) {
       _type = PrinterLinkType.network;
-      _addressCtrl.text = '';
     }
+    final draft = _drafts[_type]!;
+    _id = draft.id;
+    _nameCtrl = TextEditingController(text: draft.name);
+    _addressCtrl = TextEditingController(text: draft.address);
+    _portCtrl = TextEditingController(text: draft.port);
+    _codeCtrl = TextEditingController();
+    _showAddress = draft.showAddress;
+    _adsFree = e?.adsFree ?? false;
+    _paper = draft.paper;
+    _dpi = draft.dpi;
+    _margins = draft.margins;
+    _cut = draft.cut;
+    _cashDrawer = draft.cashDrawer;
+    _rasterScale = draft.rasterScale;
+    _isDefault = draft.isDefault;
 
     if (_type == PrinterLinkType.bluetooth) {
       _loadPaired();
     } else if (_type == PrinterLinkType.usb) {
       _loadUsb();
     }
-    _initDefaultFlag();
+    unawaited(_loadSaved());
     _initLicense();
   }
 
@@ -117,14 +130,218 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     setState(() => _adsFree = free || _adsFree);
   }
 
-  Future<void> _initDefaultFlag() async {
-    if (_isEdit) return;
-    final all = await widget.store.loadAll();
+  Future<void> _loadSaved() async {
     if (!mounted) return;
+    setState(() => _loadingSaved = true);
+    try {
+      final all = await widget.store.loadAll();
+      if (!mounted) return;
+      setState(() {
+        _saved = all;
+        if (!_isEdit) {
+          _firstPrinter = all.isEmpty;
+          if (_firstPrinter) _isDefault = true;
+        }
+      });
+    } finally {
+      if (mounted) setState(() => _loadingSaved = false);
+    }
+  }
+
+  List<SavedPrinter> _savedOf(PrinterLinkType type) {
+    return _saved.where((p) => p.type == type).toList();
+  }
+
+  SavedPrinter? _savedMatch(PrinterLinkType type, String address) {
+    final key = address.trim().toLowerCase();
+    if (key.isEmpty) return null;
+    for (final p in _savedOf(type)) {
+      if (p.address.trim().toLowerCase() == key) return p;
+    }
+    return null;
+  }
+
+  void _captureDraft(PrinterLinkType type) {
+    final d = _drafts[type]!;
+    d.id = _id;
+    d.name = _nameCtrl.text;
+    d.address = _addressCtrl.text;
+    d.port = _portCtrl.text;
+    d.showAddress = _showAddress;
+    d.paper = _paper;
+    d.dpi = _dpi;
+    d.margins = _margins;
+    d.cut = _cut;
+    d.cashDrawer = _cashDrawer;
+    d.rasterScale = _rasterScale;
+    d.isDefault = _isDefault;
+  }
+
+  void _restoreDraft(PrinterLinkType type) {
+    final d = _drafts[type]!;
+    _id = d.id;
+    _nameCtrl.text = d.name;
+    _addressCtrl.text = d.address;
+    _portCtrl.text = d.port;
+    _showAddress = d.showAddress;
+    _paper = d.paper;
+    _dpi = d.dpi;
+    _margins = d.margins;
+    _cut = d.cut;
+    _cashDrawer = d.cashDrawer;
+    _rasterScale = d.rasterScale;
+    _isDefault = d.isDefault;
+  }
+
+  void _onTypeChanged(PrinterLinkType next) {
+    if (next == _type) return;
+    _captureDraft(_type);
     setState(() {
-      _firstPrinter = all.isEmpty;
-      if (_firstPrinter) _isDefault = true;
+      _type = next;
+      _restoreDraft(next);
     });
+    if (next == PrinterLinkType.bluetooth) {
+      unawaited(_loadPaired());
+    } else if (next == PrinterLinkType.usb) {
+      unawaited(BluetoothBondChannel.stopScan());
+      unawaited(_loadUsb());
+    } else {
+      unawaited(BluetoothBondChannel.stopScan());
+      unawaited(_loadSaved());
+    }
+  }
+
+  void _fillNameIfEmpty(String candidate) {
+    final next = candidate.trim();
+    if (next.isEmpty || _nameCtrl.text.trim().isNotEmpty) return;
+    _nameCtrl.text = next;
+  }
+
+  String _fallbackName(PrinterLinkType type, String address) {
+    if (address.trim().isEmpty) return '';
+    switch (type) {
+      case PrinterLinkType.bluetooth:
+        return address.trim();
+      case PrinterLinkType.network:
+        return 'WiFi ${address.trim()}';
+      case PrinterLinkType.usb:
+        return 'USB ${address.trim()}';
+    }
+  }
+
+  String _usbFallbackName(UsbDeviceInfo d) {
+    final n = d.name.trim();
+    if (n.isEmpty || n.toLowerCase() == 'usb') {
+      return 'USB ${d.address}';
+    }
+    return n;
+  }
+
+  void _ensureName() {
+    if (_nameCtrl.text.trim().isNotEmpty) return;
+    _nameCtrl.text = _fallbackName(_type, _addressCtrl.text);
+  }
+
+  void _syncAutoName(PrinterLinkType type, String address) {
+    final current = _nameCtrl.text.trim();
+    final prefix = switch (type) {
+      PrinterLinkType.network => 'WiFi',
+      PrinterLinkType.usb => 'USB',
+      PrinterLinkType.bluetooth => '',
+    };
+    if (prefix.isEmpty) return;
+    final auto = current.isEmpty ||
+        current == prefix ||
+        current.startsWith('$prefix ');
+    if (!auto) return;
+    _nameCtrl.text = _fallbackName(type, address);
+  }
+
+  String get _connectionMissingMessage {
+    switch (_type) {
+      case PrinterLinkType.bluetooth:
+        return 'Agrega o elige un dispositivo Bluetooth';
+      case PrinterLinkType.network:
+        return 'Escribe la IP de la impresora';
+      case PrinterLinkType.usb:
+        return 'Elige o agrega una impresora USB';
+    }
+  }
+
+  bool _requireConnection() {
+    if (_addressCtrl.text.trim().isNotEmpty) return true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(_connectionMissingMessage)),
+    );
+    return false;
+  }
+
+  void _applyPrinter(SavedPrinter printer) {
+    _captureDraft(_type);
+    setState(() {
+      _type = printer.type;
+      _drafts[printer.type] = _LinkDraft.fromPrinter(printer);
+      _restoreDraft(printer.type);
+      _adsFree = printer.adsFree || _adsFree;
+      _firstPrinter = false;
+    });
+    if (printer.type == PrinterLinkType.bluetooth) {
+      unawaited(_loadPaired());
+    } else if (printer.type == PrinterLinkType.usb) {
+      unawaited(_loadUsb());
+    }
+  }
+
+  void _startNew(PrinterLinkType type, {bool showAddress = false}) {
+    _captureDraft(_type);
+    setState(() {
+      _type = type;
+      _firstPrinter = _saved.isEmpty;
+      _drafts[type] = _LinkDraft(
+        id: widget.store.newId(),
+        showAddress: showAddress,
+        isDefault: _firstPrinter,
+      );
+      _restoreDraft(type);
+    });
+    if (type == PrinterLinkType.bluetooth) {
+      unawaited(_loadPaired());
+    } else if (type == PrinterLinkType.usb) {
+      unawaited(_loadUsb());
+    }
+  }
+
+  Future<void> _unlinkSaved(SavedPrinter printer) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Desvincular impresora'),
+        content: Text('¿Quitar "${printer.name}" de ${AppBrand.name}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Desvincular'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await widget.store.delete(printer.id);
+    widget.onStoreChanged?.call();
+    if (!mounted) return;
+    final openedThis = widget.existing?.id == printer.id;
+    await _loadSaved();
+    if (!mounted) return;
+    if (_id != printer.id) return;
+    if (openedThis) {
+      Navigator.pop(context, true);
+      return;
+    }
+    _startNew(_type);
   }
 
   @override
@@ -200,11 +417,17 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   }
 
   Future<void> _pickPaired(BluetoothInfo device) async {
+    final existing = _savedMatch(PrinterLinkType.bluetooth, device.macAdress);
+    if (existing != null) {
+      _applyPrinter(existing);
+      return;
+    }
     setState(() {
       _addressCtrl.text = device.macAdress;
-      if (_nameCtrl.text.trim().isEmpty) {
-        _nameCtrl.text = device.name;
-      }
+      _showAddress = true;
+      _fillNameIfEmpty(
+        device.name.trim().isEmpty ? device.macAdress : device.name,
+      );
     });
   }
 
@@ -245,18 +468,22 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     );
     widget.onStoreChanged?.call();
     if (!mounted) return;
-    final editingGone = _isEdit &&
-        (removedIds.contains(widget.existing!.id) ||
-            widget.existing!.address.trim().toLowerCase() ==
-                device.macAdress.trim().toLowerCase());
-    if (editingGone) {
+    final gone = removedIds.contains(_id) ||
+        removedIds.contains(widget.existing?.id);
+    if (gone && widget.existing != null) {
       Navigator.pop(context, true);
       return;
     }
-    if (_addressCtrl.text.trim().toUpperCase() ==
+    if (gone) {
+      _startNew(PrinterLinkType.bluetooth);
+    } else if (_addressCtrl.text.trim().toUpperCase() ==
         device.macAdress.trim().toUpperCase()) {
-      _addressCtrl.clear();
+      setState(() {
+        _addressCtrl.clear();
+        _showAddress = false;
+      });
     }
+    await _loadSaved();
     await _loadPaired();
   }
 
@@ -285,10 +512,18 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
           BluetoothInfo(name: added.name, macAdress: added.address),
         ];
       }
+    });
+    final existing = _savedMatch(PrinterLinkType.bluetooth, added.address);
+    if (existing != null) {
+      _applyPrinter(existing);
+      return;
+    }
+    setState(() {
       _addressCtrl.text = added.address;
-      if (_nameCtrl.text.trim().isEmpty) {
-        _nameCtrl.text = added.name;
-      }
+      _showAddress = true;
+      _fillNameIfEmpty(
+        added.name.trim().isEmpty ? added.address : added.name,
+      );
     });
   }
 
@@ -321,11 +556,15 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
         return;
       }
       if (!mounted) return;
+      final existing = _savedMatch(PrinterLinkType.usb, d.address);
+      if (existing != null) {
+        _applyPrinter(existing);
+        return;
+      }
       setState(() {
         _addressCtrl.text = d.address;
-        if (_nameCtrl.text.trim().isEmpty) {
-          _nameCtrl.text = d.name;
-        }
+        _showAddress = true;
+        _fillNameIfEmpty(_usbFallbackName(d));
       });
     } catch (e) {
       if (mounted) {
@@ -361,6 +600,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   }
 
   Future<void> _save({bool pop = true, bool withAds = false}) async {
+    if (!_requireConnection()) return;
+    _ensureName();
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
@@ -389,6 +630,9 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
       }
       await widget.store.upsert(_buildPrinter());
       if (!mounted) return;
+      await _loadSaved();
+      widget.onStoreChanged?.call();
+      if (!mounted) return;
       if (pop) {
         Navigator.of(context).pop(true);
         return;
@@ -411,6 +655,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   }
 
   Future<void> _test() async {
+    if (!_requireConnection()) return;
+    _ensureName();
     if (!_formKey.currentState!.validate()) return;
     setState(() => _testing = true);
     final messenger = ScaffoldMessenger.of(context);
@@ -418,6 +664,9 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
       // Mismo ID siempre → Probar no crea una segunda impresora.
       final printer = _buildPrinter();
       await widget.store.upsert(printer);
+      if (!mounted) return;
+      await _loadSaved();
+      widget.onStoreChanged?.call();
       if (!mounted) return;
       await runWithPrintStatusDialog(
         context: context,
@@ -455,6 +704,49 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
       case PrinterLinkType.usb:
         return Icons.usb;
     }
+  }
+
+  List<UsbDeviceInfo> get _usbNotSaved {
+    final saved = {
+      for (final p in _savedOf(PrinterLinkType.usb))
+        p.address.trim().toLowerCase(),
+    };
+    return [
+      for (final d in _usbDevices)
+        if (!saved.contains(d.address.trim().toLowerCase())) d,
+    ];
+  }
+
+  Widget _savedPrinterTiles(ThemeData theme, PrinterLinkType type) {
+    final list = _savedOf(type);
+    if (list.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          type == PrinterLinkType.network
+              ? 'Impresoras WiFi'
+              : 'Impresoras USB',
+          style: theme.textTheme.titleSmall,
+        ),
+        const SizedBox(height: 4),
+        for (final p in list)
+          ListTile(
+            dense: true,
+            leading: Icon(_iconFor(type)),
+            title: Text(p.name),
+            subtitle: Text(p.connectionSummary),
+            selected: p.id == _id,
+            trailing: IconButton(
+              tooltip: 'Desvincular',
+              icon: const Icon(Icons.link_off),
+              onPressed: () => _unlinkSaved(p),
+            ),
+            onTap: () => _applyPrinter(p),
+          ),
+        const SizedBox(height: 8),
+      ],
+    );
   }
 
   Widget _activationCard(ThemeData theme) {
@@ -576,19 +868,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                   ),
               ],
               selected: {_type},
-              onSelectionChanged: (set) {
-                setState(() {
-                  _type = set.first;
-                  if (_type == PrinterLinkType.bluetooth) {
-                    _loadPaired();
-                  } else if (_type == PrinterLinkType.usb) {
-                    unawaited(BluetoothBondChannel.stopScan());
-                    _loadUsb();
-                  } else {
-                    unawaited(BluetoothBondChannel.stopScan());
-                  }
-                });
-              },
+              onSelectionChanged: (set) => _onTypeChanged(set.first),
             ),
             const SizedBox(height: 16),
             if (_type == PrinterLinkType.bluetooth) ...[
@@ -612,11 +892,6 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                   ),
                 ],
               ),
-              if (_paired.isEmpty && !_loadingPaired)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 8),
-                  child: Text('No hay dispositivos emparejados.'),
-                ),
               ..._paired.map(
                 (d) => ListTile(
                   dense: true,
@@ -641,30 +916,34 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                 icon: const Icon(Icons.add),
                 label: const Text('Agregar dispositivo'),
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _addressCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Direccion MAC',
-                  hintText: 'AA:BB:CC:DD:EE:FF',
-                  border: OutlineInputBorder(),
+              if (_showAddress) ...[
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _addressCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Direccion MAC',
+                    hintText: 'AA:BB:CC:DD:EE:FF',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Selecciona o escribe la MAC';
+                    }
+                    return null;
+                  },
                 ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return 'Selecciona o escribe la MAC';
-                  }
-                  return null;
-                },
-              ),
+              ],
             ] else if (_type == PrinterLinkType.usb) ...[
+              _savedPrinterTiles(theme, PrinterLinkType.usb),
               Row(
                 children: [
                   Text(
-                    'Elegir impresora USB',
+                    'Dispositivos USB',
                     style: theme.textTheme.titleSmall,
                   ),
                   const Spacer(),
                   IconButton(
+                    tooltip: 'Actualizar USB',
                     onPressed: _loadingUsb ? null : _loadUsb,
                     icon: _loadingUsb
                         ? const SizedBox(
@@ -676,12 +955,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                   ),
                 ],
               ),
-              if (_usbDevices.isEmpty && !_loadingUsb)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 8),
-                  child: Text('No hay dispositivos USB con salida de impresora.'),
-                ),
-              ..._usbDevices.map(
+              ..._usbNotSaved.map(
                 (d) => ListTile(
                   dense: true,
                   leading: const Icon(Icons.usb),
@@ -694,53 +968,109 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                 ),
               ),
               const SizedBox(height: 8),
-              TextFormField(
-                controller: _addressCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'USB vid:pid',
-                  hintText: '1137:85',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return 'Selecciona un dispositivo USB';
-                  }
-                  return null;
-                },
+              OutlinedButton.icon(
+                onPressed: () =>
+                    _startNew(PrinterLinkType.usb, showAddress: true),
+                icon: const Icon(Icons.add),
+                label: const Text('Agregar impresora'),
               ),
+              if (_showAddress) ...[
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _addressCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'USB vid:pid',
+                    hintText: '1137:85',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (v) => _syncAutoName(PrinterLinkType.usb, v),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Selecciona un dispositivo USB';
+                    }
+                    return null;
+                  },
+                ),
+              ],
             ] else ...[
-              TextFormField(
-                controller: _addressCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'IP de la impresora',
-                  hintText: '192.168.1.50',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.url,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return 'Escribe la IP';
-                  }
-                  return null;
-                },
+              Row(
+                children: [
+                  Text(
+                    'Dispositivos WiFi / Red',
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'Actualizar',
+                    onPressed: _loadingSaved ? null : _loadSaved,
+                    icon: _loadingSaved
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _portCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Puerto TCP',
-                  hintText: '9100',
-                  border: OutlineInputBorder(),
+              ..._savedOf(PrinterLinkType.network).map(
+                (p) => ListTile(
+                  dense: true,
+                  leading: Icon(_iconFor(PrinterLinkType.network)),
+                  title: Text(p.name),
+                  subtitle: Text(p.connectionSummary),
+                  selected: p.id == _id,
+                  trailing: IconButton(
+                    tooltip: 'Desvincular',
+                    icon: const Icon(Icons.link_off),
+                    onPressed: () => _unlinkSaved(p),
+                  ),
+                  onTap: () => _applyPrinter(p),
                 ),
-                keyboardType: TextInputType.number,
-                validator: (v) {
-                  final n = int.tryParse(v?.trim() ?? '');
-                  if (n == null || n < 1 || n > 65535) {
-                    return 'Puerto invalido';
-                  }
-                  return null;
-                },
               ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () =>
+                    _startNew(PrinterLinkType.network, showAddress: true),
+                icon: const Icon(Icons.add),
+                label: const Text('Agregar impresora'),
+              ),
+              if (_showAddress) ...[
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _addressCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'IP de la impresora',
+                    hintText: '192.168.1.50',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.url,
+                  onChanged: (v) => _syncAutoName(PrinterLinkType.network, v),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Escribe la IP';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _portCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Puerto TCP',
+                    hintText: '9100',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (v) {
+                    final n = int.tryParse(v?.trim() ?? '');
+                    if (n == null || n < 1 || n > 65535) {
+                      return 'Puerto invalido';
+                    }
+                    return null;
+                  },
+                ),
+              ],
             ],
             const SizedBox(height: 24),
             Text('Ancho del rollo', style: theme.textTheme.titleMedium),
@@ -768,6 +1098,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
             Text(_dpi.hint, style: theme.textTheme.labelMedium),
             const SizedBox(height: 20),
             MarginFields(
+              key: ValueKey('margins-$_id'),
               value: _margins,
               onChanged: (v) => _margins = v,
             ),
@@ -775,6 +1106,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
             Text('Corte automático', style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             DropdownMenu<CutMode>(
+              key: ValueKey('cut-$_id'),
               initialSelection: _cut,
               expandedInsets: EdgeInsets.zero,
               label: const Text('Comando de corte'),
@@ -798,6 +1130,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
             Text('Gaveta de dinero', style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             DropdownMenu<CashDrawer>(
+              key: ValueKey('drawer-$_id'),
               initialSelection: _cashDrawer,
               expandedInsets: EdgeInsets.zero,
               label: const Text('Comando de gaveta'),
@@ -854,6 +1187,53 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
       ),
     );
   }
+}
+
+class _LinkDraft {
+  _LinkDraft({
+    required this.id,
+    this.name = '',
+    this.address = '',
+    this.port = '9100',
+    this.showAddress = false,
+    this.paper = PaperWidth.mm58,
+    this.dpi = PrinterDpi.dpi203,
+    this.margins = const PrintMargins(),
+    this.cut = CutMode.fullGsV0,
+    this.cashDrawer = CashDrawer.none,
+    this.rasterScale = RasterScale.x1,
+    this.isDefault = false,
+  });
+
+  factory _LinkDraft.fromPrinter(SavedPrinter printer) {
+    return _LinkDraft(
+      id: printer.id,
+      name: printer.name,
+      address: printer.address,
+      port: '${printer.port}',
+      showAddress: true,
+      paper: printer.paper,
+      dpi: printer.dpi,
+      margins: printer.margins,
+      cut: printer.cut,
+      cashDrawer: printer.cashDrawer,
+      rasterScale: printer.rasterScale,
+      isDefault: printer.isDefault,
+    );
+  }
+
+  String id;
+  String name;
+  String address;
+  String port;
+  bool showAddress;
+  PaperWidth paper;
+  PrinterDpi dpi;
+  PrintMargins margins;
+  CutMode cut;
+  CashDrawer cashDrawer;
+  RasterScale rasterScale;
+  bool isDefault;
 }
 
 class _BtChoice {

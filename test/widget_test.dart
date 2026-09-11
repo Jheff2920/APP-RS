@@ -30,7 +30,7 @@ void main() {
     await tester.tap(find.text('Ayuda y soporte'));
     await tester.pumpAndSettle();
     expect(find.text('Ayuda y soporte'), findsWidgets);
-    expect(find.text('soporte@redpos.com'), findsOneWidget);
+    expect(find.text('jcefe.2920@gmail.com'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('Términos y condiciones'),
       120,

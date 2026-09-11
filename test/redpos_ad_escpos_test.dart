@@ -51,11 +51,11 @@ void main() {
   test('footer includes site url and is ASCII', () {
     final bytes = RedPosAdEscPos.footerBytes(
       paper: PaperWidth.mm58,
-      siteUrl: 'www.redpos.com',
+      siteUrl: 'www.redsoluciones.com.pe',
     );
     final text = String.fromCharCodes(bytes.where((b) => b >= 32 && b < 127));
     expect(text.contains('App de uso gratuito'), isTrue);
-    expect(text.contains('www.redpos.com'), isTrue);
+    expect(text.contains('www.redsoluciones.com.pe'), isTrue);
     expect(bytes.contains(0x1d), isFalse);
   });
 }
