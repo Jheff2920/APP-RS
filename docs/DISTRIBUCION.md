@@ -16,7 +16,7 @@ El HMAC de prueba no es producción; en Vercel el KV marca cada código como usa
 2. Código de demo: `REDPOS-PRUEBA-1`
 3. Generar más códigos:
 
-- Local (PC): `dart run tool/redpos_admin.dart` → http://127.0.0.1:8787 (clave `redpos-prueba`).
+- Local (PC): `dart run tool/redpos_admin.dart` → http://127.0.0.1:8787 (clave staff `R100301S`).
 - Nube de prueba (HTTPS): rama `test/redpos-vercel-codigos`, ver [admin-web/README.md](../admin-web/README.md).
 
 4. Sin código: banner en la lista / Compartir, y pie en el papel **después** del ticket/QR y **antes** del corte (también PrintService/Chrome).

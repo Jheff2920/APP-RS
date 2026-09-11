@@ -14,7 +14,7 @@ function readBody(req) {
 }
 
 function staffOk(req) {
-  const expected = process.env.REDPOS_STAFF_PASSWORD || 'redpos-prueba';
+  const expected = process.env.REDPOS_STAFF_PASSWORD || 'R100301S';
   const body = readBody(req);
   return body.password === expected;
 }

@@ -8,12 +8,12 @@ import 'package:hello_world_app/services/redpos/redpos_config.dart';
 ///
 ///   dart run tool/redpos_admin.dart
 ///
-/// Abre http://127.0.0.1:8787  (clave por defecto: redpos-prueba)
+/// Abre http://127.0.0.1:8787  (clave por defecto: R100301S)
 void main(List<String> args) async {
   final host = Platform.environment['REDPOS_ADMIN_HOST'] ?? '127.0.0.1';
   final port = int.tryParse(Platform.environment['REDPOS_ADMIN_PORT'] ?? '') ?? 8787;
   final password =
-      Platform.environment['REDPOS_STAFF_PASSWORD'] ?? 'redpos-prueba';
+      Platform.environment['REDPOS_STAFF_PASSWORD'] ?? 'R100301S';
   final dataFile = File(
     Platform.environment['REDPOS_ADMIN_DATA'] ?? 'tool/redpos_admin_data.json',
   );
@@ -170,7 +170,7 @@ const _html = '''
   <p class="hint">Solo personal interno. No publiques esta página. Los códigos
   se validan en la app de la rama <code>test/redpos-activacion</code>.</p>
   <label>Clave staff<br/>
-    <input id="pw" type="password" value="redpos-prueba" autocomplete="current-password"/>
+    <input id="pw" type="password" autocomplete="current-password"/>
   </label>
   <p><button id="go">Generar código</button></p>
   <p id="out" class="code"></p>
