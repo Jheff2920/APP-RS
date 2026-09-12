@@ -40,6 +40,20 @@ void main() {
     expect(out.sublist(out.length - 3), CutMode.fullGsV0.escPosBytes);
   });
 
+  test('puts ads before ESC d and GS V 0x00 so they stay on the ticket', () {
+    final feedAndCut = <int>[0x1b, 0x64, 8, 0x1d, 0x56, 0x00];
+    final ticket = <int>[9, 8, 7, ...feedAndCut];
+    final footer = RedPosAdEscPos.footerBytes(paper: PaperWidth.mm58);
+    final out = RedPosAdEscPos.insertBeforeFeedAndCut(
+      ticket,
+      footer,
+      CutMode.fullGsV0.escPosBytes,
+    );
+    expect(out.sublist(0, 3), [9, 8, 7]);
+    expect(out.sublist(3, 3 + footer.length), footer);
+    expect(out.sublist(out.length - feedAndCut.length), feedAndCut);
+  });
+
   test('appends footer when there is no cut', () {
     final ticket = <int>[9, 8, 7];
     final footer = RedPosAdEscPos.footerBytes(paper: PaperWidth.mm80);

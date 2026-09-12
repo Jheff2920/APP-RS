@@ -1,3 +1,4 @@
+import '../../models/cut_mode.dart';
 import '../../models/paper_width.dart';
 import '../../models/saved_printer.dart';
 import 'redpos_config.dart';
@@ -47,7 +48,10 @@ class RedPosAdEscPos {
     return insertBeforeFeedAndCut(
       ticket,
       footerBytes(paper: printer.paper),
-      printer.cut.escPosBytes,
+      printer.type == PrinterLinkType.network &&
+              printer.cut == CutMode.fullGsV0
+          ? const [0x1d, 0x56, 0x00]
+          : printer.cut.escPosBytes,
     );
   }
 
@@ -60,8 +64,10 @@ class RedPosAdEscPos {
     var end = ticket.length;
     if (cut.isNotEmpty && _endsWith(ticket, cut)) {
       end -= cut.length;
+    } else {
+      end -= _trailingCutLength(ticket, end);
     }
-    final insertAt = _trailingBlankRasterStart(ticket, end);
+    final insertAt = _trailingFeedStart(ticket, end);
     var ad = footer;
     if (insertAt >= end) {
       // Sin margen de fábrica: avance para que la cuchilla no coma el texto.
@@ -89,6 +95,35 @@ class RedPosAdEscPos {
       if (hay[off + i] != needle[i]) return false;
     }
     return true;
+  }
+
+  static int _trailingCutLength(List<int> ticket, int end) {
+    if (end >= 4 &&
+        ticket[end - 4] == 0x1d &&
+        ticket[end - 3] == 0x56 &&
+        (ticket[end - 2] == 0x41 || ticket[end - 2] == 0x42)) {
+      return 4;
+    }
+    if (end >= 3 && ticket[end - 3] == 0x1d && ticket[end - 2] == 0x56) {
+      return 3;
+    }
+    if (end >= 2 &&
+        ticket[end - 2] == 0x1b &&
+        (ticket[end - 1] == 0x69 || ticket[end - 1] == 0x6d)) {
+      return 2;
+    }
+    return 0;
+  }
+
+  /// Margen inferior: `ESC J` / `ESC d` y GS v 0 en blanco.
+  static int _trailingFeedStart(List<int> ticket, int end) {
+    var i = _trailingBlankRasterStart(ticket, end);
+    while (i >= 3 &&
+        ticket[i - 3] == 0x1b &&
+        (ticket[i - 2] == 0x4a || ticket[i - 2] == 0x64)) {
+      i -= 3;
+    }
+    return i;
   }
 
   /// Inicio de las franjas GS v 0 en blanco al final (margen inferior).

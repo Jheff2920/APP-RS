@@ -23,8 +23,10 @@ object RedPosAdEscPos {
         var end = ticket.size
         if (cutBytes.isNotEmpty() && endsWith(ticket, cutBytes)) {
             end -= cutBytes.size
+        } else {
+            end -= trailingCutLength(ticket, end)
         }
-        val insertAt = trailingBlankRasterStart(ticket, end)
+        val insertAt = trailingFeedStart(ticket, end)
         val ad = if (insertAt >= end) {
             footer + byteArrayOf(0x1b, 0x64, 0x05)
         } else {
@@ -62,6 +64,40 @@ object RedPosAdEscPos {
             if (hay[off + i] != needle[i]) return false
         }
         return true
+    }
+
+    private fun trailingCutLength(ticket: ByteArray, end: Int): Int {
+        if (end >= 4 &&
+            ticket[end - 4] == 0x1d.toByte() &&
+            ticket[end - 3] == 0x56.toByte() &&
+            (ticket[end - 2] == 0x41.toByte() || ticket[end - 2] == 0x42.toByte())
+        ) {
+            return 4
+        }
+        if (end >= 3 &&
+            ticket[end - 3] == 0x1d.toByte() &&
+            ticket[end - 2] == 0x56.toByte()
+        ) {
+            return 3
+        }
+        if (end >= 2 &&
+            ticket[end - 2] == 0x1b.toByte() &&
+            (ticket[end - 1] == 0x69.toByte() || ticket[end - 1] == 0x6d.toByte())
+        ) {
+            return 2
+        }
+        return 0
+    }
+
+    private fun trailingFeedStart(ticket: ByteArray, end: Int): Int {
+        var i = trailingBlankRasterStart(ticket, end)
+        while (i >= 3 &&
+            ticket[i - 3] == 0x1b.toByte() &&
+            (ticket[i - 2] == 0x4a.toByte() || ticket[i - 2] == 0x64.toByte())
+        ) {
+            i -= 3
+        }
+        return i
     }
 
     private fun trailingBlankRasterStart(ticket: ByteArray, end: Int): Int {

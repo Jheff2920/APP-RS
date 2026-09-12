@@ -21,6 +21,9 @@ object EscPosTransport {
     private val heldLock = Any()
     private var heldSocket: BluetoothSocket? = null
     private var heldNeedsLeadIn = false
+    private val netLock = Any()
+    private var heldNet: Socket? = null
+    private var heldNetKey: String? = null
 
     fun drawerBytes(cashDrawer: String, linkType: String = ""): ByteArray {
         val escP = when (cashDrawer) {
@@ -147,20 +150,35 @@ object EscPosTransport {
         drawer: ByteArray = byteArrayOf(),
         drawerWaitMs: Long = 0,
     ) {
-        Socket().use { socket ->
-            val connectStartedAt = PrintTiming.now()
-            socket.connect(InetSocketAddress(host.trim(), port), 8_000)
-            PrintTiming.phase(jobId, "network_connect", connectStartedAt)
-            socket.soTimeout = 30_000
-            writeTicketThenDrawer(
-                socket.getOutputStream(),
-                data,
-                drawer,
-                drawerWaitMs,
-                jobId,
-                "network",
-            )
+        val key = "${host.trim()}:$port"
+        val socket = synchronized(netLock) {
+            val existing = heldNet
+            if (existing != null && !existing.isClosed && heldNetKey == key) {
+                existing
+            } else {
+                try {
+                    existing?.close()
+                } catch (_: Exception) {
+                }
+                val next = Socket()
+                next.tcpNoDelay = true
+                val connectStartedAt = PrintTiming.now()
+                next.connect(InetSocketAddress(host.trim(), port), 8_000)
+                PrintTiming.phase(jobId, "network_connect", connectStartedAt)
+                next.soTimeout = 30_000
+                heldNet = next
+                heldNetKey = key
+                next
+            }
         }
+        writeTicketThenDrawer(
+            socket.getOutputStream(),
+            data,
+            drawer,
+            drawerWaitMs,
+            jobId,
+            "network",
+        )
         Log.i(TAG, "Sent ${data.size} bytes TCP")
     }
 

@@ -1,5 +1,6 @@
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 
+import '../models/cut_mode.dart';
 import '../models/paper_width.dart';
 import '../models/saved_printer.dart';
 import 'escpos_capability_profile.dart';
@@ -90,13 +91,24 @@ class EscPosTestPage {
     leftLine(
         'Inf=${margins.bottomMm.toStringAsFixed(0)}mm = avance para cortar.');
 
-    // Margen inferior + corte (gaveta se envia despues).
-    bytes += EscPosFeed.finishJob(
-      bottomMm: margins.bottomMm,
-      paperDotsWidth: paperDots,
-      cut: printer.cut,
-      dotsPerMm: printer.dpi.dotsPerMm,
-    );
+    // LAN 803L: sin franjas GS v 0 al final (el módulo Ethernet se cuelga).
+    if (printer.type == PrinterLinkType.network) {
+      final lines = (margins.bottomMm / 3.5).round().clamp(3, 12);
+      bytes += [0x1b, 0x64, lines];
+      if (printer.cut != CutMode.none) {
+        // 803L corta con GS V 0x00; el '0' ASCII no lo ejecuta.
+        bytes += printer.cut == CutMode.fullGsV0
+            ? const [0x1d, 0x56, 0x00]
+            : printer.cut.escPosBytes;
+      }
+    } else {
+      bytes += EscPosFeed.finishJob(
+        bottomMm: margins.bottomMm,
+        paperDotsWidth: paperDots,
+        cut: printer.cut,
+        dotsPerMm: printer.dpi.dotsPerMm,
+      );
+    }
     return bytes;
   }
 
