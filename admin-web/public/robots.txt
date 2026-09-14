@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /terminos.html
+Allow: /privacidad.html
+Allow: /legal.css
+Disallow: /api/

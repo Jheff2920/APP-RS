@@ -39,6 +39,8 @@ Sin Vercel CLI, la página staff no corre sola: son funciones serverless.
 
 ## Endpoints
 
-- `GET /` — formulario staff
+- `GET /` — formulario staff (`noindex`)
+- `GET /terminos.html` — términos (URL de Play)
+- `GET /privacidad.html` — política de privacidad (URL de Play)
 - `POST /api/generate` — `{ "password": "…" }` → `{ "code": "RP-…" }`
 - `POST /api/activate` — `{ "code": "RP-…" }` → `{ "ok": true }` o 409 si ya se usó
