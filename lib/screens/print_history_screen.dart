@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
+import '../l10n/app_lang.dart';
 import '../models/print_job_record.dart';
 import '../models/saved_printer.dart';
 import '../services/print_history_store.dart';
@@ -44,24 +45,33 @@ class _PrintHistoryScreenState extends State<PrintHistoryScreen> {
   Future<void> _clear() async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Borrar historial'),
-        content: Text(
-          widget.printer == null
-              ? '¿Borrar todo el historial de impresión?'
-              : '¿Borrar el historial de "${widget.printer!.name}"?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+      builder: (ctx) {
+        final loc = L.of(ctx);
+        return AlertDialog(
+          title: Text(loc('Borrar historial', 'Clear history')),
+          content: Text(
+            widget.printer == null
+                ? loc(
+                    '¿Borrar todo el historial de impresión?',
+                    'Clear all print history?',
+                  )
+                : loc(
+                    '¿Borrar el historial de "${widget.printer!.name}"?',
+                    'Clear history for "${widget.printer!.name}"?',
+                  ),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Borrar'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(loc('Cancelar', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(loc('Borrar', 'Clear')),
+            ),
+          ],
+        );
+      },
     );
     if (ok != true) return;
     await widget.history.clear(printerId: widget.printer?.id);
@@ -70,16 +80,20 @@ class _PrintHistoryScreenState extends State<PrintHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final title = widget.printer == null
-        ? 'Historial de impresión'
-        : 'Historial · ${widget.printer!.name}';
+        ? l('Historial de impresión', 'Print history')
+        : l(
+            'Historial · ${widget.printer!.name}',
+            'History · ${widget.printer!.name}',
+          );
 
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
         actions: [
           IconButton(
-            tooltip: 'Borrar historial',
+            tooltip: l('Borrar historial', 'Clear history'),
             onPressed: _jobs.isEmpty ? null : _clear,
             icon: const Icon(Icons.delete_outline),
           ),
@@ -89,8 +103,13 @@ class _PrintHistoryScreenState extends State<PrintHistoryScreen> {
           ? const Center(child: CircularProgressIndicator())
           : BoletaPage(
               child: _jobs.isEmpty
-                  ? const Center(
-                      child: Text('Sin trabajos de impresión todavía.'),
+                  ? Center(
+                      child: Text(
+                        l(
+                          'Sin trabajos de impresión todavía.',
+                          'No print jobs yet.',
+                        ),
+                      ),
                     )
                   : ListView.separated(
                       padding: const EdgeInsets.all(16),

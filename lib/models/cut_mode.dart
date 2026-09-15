@@ -1,3 +1,5 @@
+import '../l10n/app_lang.dart';
+
 /// Comando de corte ESC/POS (misma tabla que RawBT `cutTypes`).
 enum CutMode {
   none,
@@ -13,41 +15,44 @@ enum CutMode {
   String get label {
     switch (this) {
       case CutMode.none:
-        return 'Sin corte';
+        return tr('Sin corte', 'No cut');
       case CutMode.fullGsV0:
-        return 'Corte total (GS V 0)';
+        return tr('Corte total (GS V 0)', 'Full cut (GS V 0)');
       case CutMode.fullGsVA:
-        return 'Corte total + avance (GS V A)';
+        return tr('Corte total + avance (GS V A)', 'Full cut + feed (GS V A)');
       case CutMode.fullEscI:
-        return 'Corte total (ESC i)';
+        return tr('Corte total (ESC i)', 'Full cut (ESC i)');
       case CutMode.fullEscD0:
-        return 'Avance ESC d 0';
+        return tr('Avance ESC d 0', 'Feed ESC d 0');
       case CutMode.partialGsV1:
-        return 'Corte parcial (GS V 1)';
+        return tr('Corte parcial (GS V 1)', 'Partial cut (GS V 1)');
       case CutMode.partialGsVB:
-        return 'Corte parcial + avance (GS V B)';
+        return tr('Corte parcial + avance (GS V B)', 'Partial cut + feed (GS V B)');
       case CutMode.partialEscM:
-        return 'Corte parcial (ESC m)';
+        return tr('Corte parcial (ESC m)', 'Partial cut (ESC m)');
       case CutMode.partialEscD1:
-        return 'Avance ESC d 1';
+        return tr('Avance ESC d 1', 'Feed ESC d 1');
     }
   }
 
   String get hint {
     switch (this) {
       case CutMode.none:
-        return 'Sin cuchilla';
+        return tr('Sin cuchilla', 'No cutter');
       case CutMode.fullGsV0:
       case CutMode.fullGsVA:
       case CutMode.fullEscI:
-        return 'Corta el papel por completo';
+        return tr('Corta el papel por completo', 'Cuts the paper fully');
       case CutMode.partialGsV1:
       case CutMode.partialGsVB:
       case CutMode.partialEscM:
-        return 'Deja un punto sin cortar (fácil de arrancar)';
+        return tr(
+          'Deja un punto sin cortar (fácil de arrancar)',
+          'Leaves a tab so the ticket tears off easily',
+        );
       case CutMode.fullEscD0:
       case CutMode.partialEscD1:
-        return 'Solo avance';
+        return tr('Solo avance', 'Feed only');
     }
   }
 
@@ -75,10 +80,22 @@ enum CutMode {
     }
   }
 
+  static const uiOrder = [
+    fullGsV0,
+    fullGsVA,
+    fullEscI,
+    partialGsV1,
+    partialGsVB,
+    partialEscM,
+    fullEscD0,
+    partialEscD1,
+    none,
+  ];
+
   static CutMode fromName(String name) {
     return CutMode.values.firstWhere(
       (e) => e.name == name,
-      orElse: () => CutMode.none,
+      orElse: () => CutMode.fullGsV0,
     );
   }
 }

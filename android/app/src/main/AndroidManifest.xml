@@ -12,6 +12,7 @@
     <!-- Android 10+: abrir UI desde PrintService (igual que apps tipo Playdin) -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="com.android.vending.BILLING"/>
 
     <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
     <uses-feature android:name="android.hardware.usb.host" android:required="false"/>
@@ -163,5 +164,7 @@
             <action android:name="android.intent.action.SENDTO"/>
             <data android:scheme="mailto"/>
         </intent>
+        <package android:name="com.google.android.gms"/>
+        <package android:name="com.android.vending"/>
     </queries>
 </manifest>

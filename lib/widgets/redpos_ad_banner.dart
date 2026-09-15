@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../screens/help_screen.dart';
+import '../l10n/app_lang.dart';
 import '../services/printer_store.dart';
 import '../services/redpos/redpos_license.dart';
+import '../widgets/redpos_unlock_actions.dart';
 
 class RedPosAdBanner extends StatelessWidget {
   const RedPosAdBanner({
@@ -19,6 +20,7 @@ class RedPosAdBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (adsFree) return const SizedBox.shrink();
+    final l = L.of(context);
     final scheme = Theme.of(context).colorScheme;
     return ColoredBox(
       color: scheme.secondaryContainer,
@@ -28,8 +30,12 @@ class RedPosAdBanner extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'App de uso gratuito. Sin código RedPOS o suscripción '
-              'verás este aviso y un pie en el papel.',
+              l(
+                'App de uso gratuito. Sin código RedPOS, suscripción o licencia '
+                'de por vida verás este aviso y un pie en el papel.',
+                'Free to use. Without a RedPOS code, subscription, or lifetime '
+                'license you will see this notice and a footer on the ticket.',
+              ),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: scheme.onSecondaryContainer,
                   ),
@@ -44,17 +50,18 @@ class RedPosAdBanner extends StatelessWidget {
                     store: store,
                     onActivated: onActivated,
                   ),
-                  child: const Text('Tengo un código'),
+                  child: Text(l('Tengo un código', 'I have a code')),
                 ),
                 TextButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const HelpScreen(),
-                      ),
-                    );
+                  onPressed: () async {
+                    final ok = await openMonthlySubscription(context, store);
+                    if (ok) onActivated?.call();
                   },
-                  child: const Text('Quiero suscripción'),
+                  child: Text(l('Suscripción mensual', 'Monthly subscription')),
+                ),
+                TextButton(
+                  onPressed: () => openLifetimeLicenseMail(context),
+                  child: Text(l('Licencia de por vida', 'Lifetime license')),
                 ),
               ],
             ),
@@ -79,8 +86,13 @@ Future<bool> showRedPosActivateDialog({
     onActivated?.call();
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Publicidad desactivada en esta instalación'),
+        SnackBar(
+          content: Text(
+            L.of(context)(
+              'Publicidad desactivada en esta instalación',
+              'Ads turned off on this install',
+            ),
+          ),
         ),
       );
     }
@@ -133,14 +145,19 @@ class _ActivateCodeDialogState extends State<_ActivateCodeDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     return AlertDialog(
-      title: const Text('Código de activación'),
+      title: Text(l('Código de activación', 'Activation code')),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            'El código lo entrega RedPOS con el equipo o al pagar. '
-            'Sin código puedes seguir imprimiendo con publicidad.',
+          Text(
+            l(
+              'El código lo entrega RedPOS con el equipo o al pagar una licencia '
+              'de por vida. Sin código puedes seguir imprimiendo con publicidad.',
+              'RedPOS provides the code with the hardware or after a lifetime '
+              'license. Without a code you can keep printing with ads.',
+            ),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -148,7 +165,7 @@ class _ActivateCodeDialogState extends State<_ActivateCodeDialog> {
             textCapitalization: TextCapitalization.characters,
             enabled: !_busy,
             decoration: InputDecoration(
-              labelText: 'Código',
+              labelText: l('Código', 'Code'),
               hintText: 'RP-XXXX-XXXX-XXXX',
               errorText: _error,
               border: const OutlineInputBorder(),
@@ -159,7 +176,7 @@ class _ActivateCodeDialogState extends State<_ActivateCodeDialog> {
       actions: [
         TextButton(
           onPressed: _busy ? null : () => Navigator.pop(context, false),
-          child: const Text('Cancelar'),
+          child: Text(l('Cancelar', 'Cancel')),
         ),
         FilledButton(
           onPressed: _busy ? null : _submit,
@@ -169,7 +186,7 @@ class _ActivateCodeDialogState extends State<_ActivateCodeDialog> {
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Activar'),
+              : Text(l('Activar', 'Activate')),
         ),
       ],
     );

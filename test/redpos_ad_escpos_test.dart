@@ -68,7 +68,10 @@ void main() {
       siteUrl: 'www.redsoluciones.com.pe',
     );
     final text = String.fromCharCodes(bytes.where((b) => b >= 32 && b < 127));
-    expect(text.contains('App de uso gratuito'), isTrue);
+    expect(
+      text.contains('App de uso gratuito') || text.contains('Free to use.'),
+      isTrue,
+    );
     expect(text.contains('www.redsoluciones.com.pe'), isTrue);
     expect(bytes.contains(0x1d), isFalse);
   });

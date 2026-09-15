@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import '../brand.dart';
+import '../l10n/app_lang.dart';
 import '../models/print_job_record.dart';
 import '../models/saved_printer.dart';
 import '../widgets/print_status_dialog.dart';
@@ -83,7 +84,10 @@ class PrintService {
           return _buildSunatTicket(printer, filePath);
         }
         throw PrinterTransportException(
-          'Formato no soportado. Usa PDF, imagen (PNG/JPG) o XML SUNAT.',
+          tr(
+            'Formato no soportado. Usa PDF, imagen (PNG/JPG) o XML SUNAT.',
+            'Unsupported format. Use PDF, an image (PNG/JPG), or SUNAT XML.',
+          ),
         );
       },
     );
@@ -117,14 +121,20 @@ class PrintService {
         final ok = await PrinterPermissions.ensureBluetooth();
         if (!ok) {
           throw PrinterTransportException(
-            'Faltan permisos de Bluetooth. Concedelos en Ajustes de la app.',
+            tr(
+              'Faltan permisos de Bluetooth. Concedelos en Ajustes de la app.',
+              'Bluetooth permission is missing. Allow it in app Settings.',
+            ),
           );
         }
       }
 
       if (printer.address.trim().isEmpty) {
         throw PrinterTransportException(
-          'La direccion de la impresora esta vacia.',
+          tr(
+            'La direccion de la impresora esta vacia.',
+            'The printer address is empty.',
+          ),
         );
       }
 
@@ -135,7 +145,10 @@ class PrintService {
         () => buildBytes(timing).timeout(
           const Duration(seconds: 90),
           onTimeout: () => throw PrinterTransportException(
-            'Tiempo agotado preparando el ticket (PDF).',
+            tr(
+              'Tiempo agotado preparando el ticket (PDF).',
+              'Timed out preparing the ticket (PDF).',
+            ),
           ),
         ),
       );
@@ -144,7 +157,10 @@ class PrintService {
         () => transport.connect(printer).timeout(
               const Duration(seconds: 45),
               onTimeout: () => throw PrinterTransportException(
-                'No se pudo conectar con la impresora (tiempo agotado).',
+                tr(
+                  'No se pudo conectar con la impresora (tiempo agotado).',
+                  'Could not connect to the printer (timed out).',
+                ),
               ),
             ),
       );
@@ -257,11 +273,20 @@ class PrintService {
       throw PrinterTransportException(e.message);
     } on FileSystemException {
       throw PrinterTransportException(
-        'No se pudo leer el XML. En Android 10+ comparte el archivo '
-        'o usa Abrir con ${AppBrand.name} (no la ruta de Descargas).',
+        tr(
+          'No se pudo leer el XML. En Android 10+ comparte el archivo '
+          'o usa Abrir con ${AppBrand.name} (no la ruta de Descargas).',
+          'Could not read the XML. On Android 10+ share the file '
+          'or use Open with ${AppBrand.name} (not the Downloads path).',
+        ),
       );
     } catch (e) {
-      throw PrinterTransportException('No se pudo armar el ticket SUNAT: $e');
+      throw PrinterTransportException(
+        tr(
+          'No se pudo armar el ticket SUNAT: $e',
+          'Could not build the SUNAT ticket: $e',
+        ),
+      );
     }
   }
 

@@ -5,6 +5,7 @@ import 'dart:ui' show DartPluginRegistrant;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'l10n/app_lang.dart';
 import 'models/saved_printer.dart';
 import 'services/escpos_pdf_print.dart';
 import 'services/print_service.dart';
@@ -39,7 +40,10 @@ void systemPrintMain() {
             ? mediaWidthRaw.toInt()
             : null;
     if (filePath.isEmpty) {
-      throw PlatformException(code: 'bad_args', message: 'filePath vacio');
+      throw PlatformException(
+        code: 'bad_args',
+        message: tr('filePath vacio', 'filePath is empty'),
+      );
     }
 
     final prefsWatch = Stopwatch()..start();
@@ -51,7 +55,10 @@ void systemPrintMain() {
     if (printer == null) {
       throw PlatformException(
         code: 'no_printer',
-        message: 'No hay impresoras vinculadas',
+        message: tr(
+          'No hay impresoras vinculadas',
+          'No printers are paired',
+        ),
       );
     }
 
@@ -152,12 +159,14 @@ class SystemPrintUiHandler {
 
     try {
       if (rawPath.isEmpty) {
-        throw PrinterTransportException('Archivo vacio');
+        throw PrinterTransportException(
+          tr('Archivo vacio', 'Empty file'),
+        );
       }
       final store = _store;
       final printService = _printService;
       if (store == null || printService == null) {
-        throw PrinterTransportException('App no lista');
+        throw PrinterTransportException(tr('App no lista', 'App is not ready'));
       }
 
       final printer = PrinterStore.findByIdOrDefault(
@@ -165,19 +174,28 @@ class SystemPrintUiHandler {
         printerId,
       );
       if (printer == null) {
-        throw PrinterTransportException('No hay impresoras vinculadas');
+        throw PrinterTransportException(
+          tr('No hay impresoras vinculadas', 'No printers are paired'),
+        );
       }
 
       final src = File(rawPath);
       if (!await src.exists()) {
-        throw PrinterTransportException('No se encontro el PDF');
+        throw PrinterTransportException(
+          tr('No se encontro el PDF', 'PDF not found'),
+        );
       }
       final filePath = src.path;
 
       if (printer.type == PrinterLinkType.bluetooth) {
         final ok = await PrinterPermissions.ensureBluetooth();
         if (!ok) {
-          throw PrinterTransportException('Faltan permisos de Bluetooth');
+          throw PrinterTransportException(
+            tr(
+              'Faltan permisos de Bluetooth',
+              'Bluetooth permission is missing',
+            ),
+          );
         }
       }
 

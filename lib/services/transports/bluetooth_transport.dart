@@ -1,5 +1,6 @@
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
+import '../../l10n/app_lang.dart';
 import '../../models/saved_printer.dart';
 import '../../platform_caps.dart';
 import '../bluetooth_spp_channel.dart';
@@ -19,7 +20,10 @@ class BluetoothTransport implements PrinterTransport {
     final enabled = await PrintBluetoothThermal.bluetoothEnabled;
     if (!enabled) {
       throw PrinterTransportException(
-        'Bluetooth esta apagado. Activalo e intenta de nuevo.',
+        tr(
+          'Bluetooth esta apagado. Activalo e intenta de nuevo.',
+          'Bluetooth is off. Turn it on and try again.',
+        ),
       );
     }
 
@@ -35,8 +39,10 @@ class BluetoothTransport implements PrinterTransport {
         await BluetoothSppChannel.connect(printer.address.trim());
       } catch (e) {
         throw PrinterTransportException(
-          'No se pudo conectar por Bluetooth a ${printer.address}. '
-          'Empareja la impresora en Ajustes de Android primero. ($e)',
+          tr(
+            'No se pudo conectar a la impresora. Enciéndela, acércate y vuelve a intentar.',
+            'Could not connect to the printer. Turn it on, move closer, and try again.',
+          ),
         );
       }
       _nativeSpp = true;
@@ -50,8 +56,14 @@ class BluetoothTransport implements PrinterTransport {
     );
     if (!ok) {
       throw PrinterTransportException(
-        'No se pudo conectar por Bluetooth a ${printer.address}. '
-        '${PlatformCaps.isIOS ? 'En iPhone/iPad el Bluetooth Classic de impresoras genéricas no está disponible. Usa WiFi (IP y puerto 9100) o una impresora BLE/MFi.' : 'Empareja la impresora en Ajustes de Android primero.'}',
+        tr(
+          PlatformCaps.isIOS
+              ? 'En iPhone/iPad usa WiFi (IP y puerto 9100) o una impresora BLE.'
+              : 'No se pudo conectar a la impresora. Enciéndela, acércate y vuelve a intentar.',
+          PlatformCaps.isIOS
+              ? 'On iPhone/iPad use WiFi (IP and port 9100) or a BLE printer.'
+              : 'Could not connect to the printer. Turn it on, move closer, and try again.',
+        ),
       );
     }
     _nativeSpp = false;
@@ -63,7 +75,12 @@ class BluetoothTransport implements PrinterTransport {
   @override
   Future<void> writeBytes(List<int> bytes) async {
     if (!_connected) {
-      throw PrinterTransportException('No hay conexion Bluetooth activa.');
+      throw PrinterTransportException(
+        tr(
+          'No hay conexion Bluetooth activa.',
+          'There is no active Bluetooth connection.',
+        ),
+      );
     }
 
     if (_nativeSpp) {
@@ -71,7 +88,10 @@ class BluetoothTransport implements PrinterTransport {
         await BluetoothSppChannel.write(bytes);
       } catch (e) {
         throw PrinterTransportException(
-          'Fallo al enviar datos a la impresora Bluetooth. ($e)',
+          tr(
+            'No se pudo enviar la impresión. Enciende la impresora y vuelve a intentar.',
+            'Could not send the print job. Turn the printer on and try again.',
+          ),
         );
       }
       _needsWake = false;
@@ -87,7 +107,10 @@ class BluetoothTransport implements PrinterTransport {
     final ok = await PrintBluetoothThermal.writeBytes(payload);
     if (!ok) {
       throw PrinterTransportException(
-        'Fallo al enviar datos a la impresora Bluetooth.',
+        tr(
+          'Fallo al enviar datos a la impresora Bluetooth.',
+          'Failed to send data to the Bluetooth printer.',
+        ),
       );
     }
   }

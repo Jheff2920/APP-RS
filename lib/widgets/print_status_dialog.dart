@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
+import '../l10n/app_lang.dart';
+
 /// Fases visibles mientras se imprime.
 enum PrintPhase {
   preparing,
@@ -11,33 +13,36 @@ enum PrintPhase {
 }
 
 extension PrintPhaseLabel on PrintPhase {
-  String get title {
+  String title(L l) {
     switch (this) {
       case PrintPhase.preparing:
-        return 'Preparando';
+        return l('Preparando', 'Preparing');
       case PrintPhase.connecting:
-        return 'Conectando';
+        return l('Conectando', 'Connecting');
       case PrintPhase.sending:
-        return 'Enviando datos';
+        return l('Enviando datos', 'Sending data');
       case PrintPhase.printing:
-        return 'Imprimiendo';
+        return l('Imprimiendo', 'Printing');
       case PrintPhase.done:
-        return 'Listo';
+        return l('Listo', 'Done');
     }
   }
 
-  String get message {
+  String message(L l) {
     switch (this) {
       case PrintPhase.preparing:
-        return 'Preparando el ticket...';
+        return l('Preparando el ticket...', 'Preparing the ticket...');
       case PrintPhase.connecting:
-        return 'Conectando con la impresora...';
+        return l('Conectando con la impresora...', 'Connecting to the printer...');
       case PrintPhase.sending:
-        return 'Enviando datos a la impresora...';
+        return l(
+          'Enviando datos a la impresora...',
+          'Sending data to the printer...',
+        );
       case PrintPhase.printing:
-        return 'Imprimiendo...';
+        return l('Imprimiendo...', 'Printing...');
       case PrintPhase.done:
-        return 'Impresión enviada';
+        return l('Impresión enviada', 'Print job sent');
     }
   }
 
@@ -88,7 +93,7 @@ class PrintStatusDialog extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           Text(
-            phase.title,
+            phase.title(L.of(context)),
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
             ),
@@ -96,7 +101,7 @@ class PrintStatusDialog extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            phase.message,
+            phase.message(L.of(context)),
             style: theme.textTheme.bodyMedium,
             textAlign: TextAlign.center,
           ),

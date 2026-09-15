@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../printer_store.dart';
+import '../../l10n/app_lang.dart';
 import 'redpos_code.dart';
 import 'redpos_config.dart';
 
@@ -22,11 +23,11 @@ class RedPosRedeemResult {
   final String? message;
   final bool offlinePending;
 
-  static const invalid = RedPosRedeemResult(
-    ok: false,
-    adsFree: false,
-    message: 'Código no válido',
-  );
+  static RedPosRedeemResult get invalid => RedPosRedeemResult(
+        ok: false,
+        adsFree: false,
+        message: tr('Código no válido', 'Invalid code'),
+      );
 }
 
 /// Licencia de la instalación (no de una impresora). Imprimir nunca se bloquea.
@@ -35,6 +36,8 @@ class RedPosLicenseStore {
 
   static const _key = 'redpos_license_v1';
   static const _usedKey = 'redpos_used_nonces_v1';
+  static const playEntitlementKey = 'redpos_play_sub_v1';
+  static const googleEmailKey = 'redpos_google_email_v1';
   static const _nativeChannel = MethodChannel('boleta_print/printers_prefs');
 
   static final RedPosLicenseStore instance = RedPosLicenseStore();
@@ -46,8 +49,35 @@ class RedPosLicenseStore {
   }
 
   Future<bool> isAdsFree({bool reloadDisk = true}) async {
-    final token = await _loadToken(reloadDisk: reloadDisk);
-    return token != null;
+    if (await _loadToken(reloadDisk: reloadDisk) != null) return true;
+    final prefs = await _ensurePrefs();
+    if (reloadDisk) await prefs.reload();
+    return prefs.getBool(playEntitlementKey) == true;
+  }
+
+  Future<void> setPlayEntitlement(bool active) async {
+    final prefs = await _ensurePrefs();
+    await prefs.setBool(playEntitlementKey, active);
+  }
+
+  Future<void> setGoogleEmail(String email) async {
+    final trimmed = email.trim();
+    if (trimmed.isEmpty) return;
+    final prefs = await _ensurePrefs();
+    await prefs.setString(googleEmailKey, trimmed);
+  }
+
+  Future<String?> googleEmail() async {
+    final prefs = await _ensurePrefs();
+    final value = prefs.getString(googleEmailKey)?.trim();
+    if (value == null || value.isEmpty) return null;
+    return value;
+  }
+
+  Future<void> applyToPrinters(PrinterStore store) async {
+    final adsFree = await isAdsFree();
+    await store.applyAdsFree(adsFree);
+    await _syncNative(adsFree);
   }
 
   Future<RedPosLicenseToken?> _loadToken({bool reloadDisk = true}) async {
@@ -79,12 +109,10 @@ class RedPosLicenseStore {
     }
   }
 
-  /// Relee el pase y lo copia a las impresoras (PrintService nativo).
+  /// Relee el pase (código o suscripción Play) y lo copia al PrintService.
   Future<bool> hydrate(PrinterStore store) async {
-    final adsFree = await isAdsFree();
-    await store.applyAdsFree(adsFree);
-    await _syncNative(adsFree);
-    return adsFree;
+    await applyToPrinters(store);
+    return isAdsFree();
   }
 
   Future<RedPosRedeemResult> redeem(
@@ -97,7 +125,7 @@ class RedPosLicenseStore {
       return RedPosRedeemResult(
         ok: false,
         adsFree: false,
-        message: verified.message ?? 'Código no válido',
+        message: verified.message ?? tr('Código no válido', 'Invalid code'),
       );
     }
 
@@ -110,30 +138,38 @@ class RedPosLicenseStore {
           address: address ?? '',
         );
         if (!accepted) {
-          return const RedPosRedeemResult(
+          return RedPosRedeemResult(
             ok: false,
             adsFree: false,
-            message: 'Este código ya fue usado o el servidor lo rechazó',
+            message: tr(
+              'Este código ya fue usado o el servidor lo rechazó',
+              'This code was already used or the server rejected it',
+            ),
           );
         }
       } catch (e) {
         debugPrint('redpos activate: $e');
-        return const RedPosRedeemResult(
+        return RedPosRedeemResult(
           ok: false,
           adsFree: false,
           offlinePending: true,
-          message:
-              'Sin red para validar el código. Puedes imprimir con publicidad y reintentar luego.',
+          message: tr(
+            'Sin red para validar el código. Puedes imprimir con publicidad y reintentar luego.',
+            'No network to validate the code. You can print with ads and try again later.',
+          ),
         );
       }
     } else {
       final prefs = await _ensurePrefs();
       final used = prefs.getStringList(_usedKey) ?? [];
       if (!verified.testAlias && used.contains(verified.nonce)) {
-        return const RedPosRedeemResult(
+        return RedPosRedeemResult(
           ok: false,
           adsFree: false,
-          message: 'Este código ya se usó en este teléfono',
+          message: tr(
+            'Este código ya se usó en este teléfono',
+            'This code was already used on this phone',
+          ),
         );
       }
       if (!verified.testAlias) {
@@ -148,10 +184,13 @@ class RedPosLicenseStore {
       ),
     );
     await store.applyAdsFree(true);
-    return const RedPosRedeemResult(
+    return RedPosRedeemResult(
       ok: true,
       adsFree: true,
-      message: 'Activación correcta. Esta instalación no muestra publicidad.',
+      message: tr(
+        'Activación correcta. Esta instalación no muestra publicidad.',
+        'Activated. This install will not show ads.',
+      ),
     );
   }
 

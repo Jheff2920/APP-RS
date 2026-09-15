@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
+import '../l10n/app_lang.dart';
 import '../platform_caps.dart';
 import 'bluetooth_spp_channel.dart';
 
@@ -18,6 +19,20 @@ class NearbyBtDevice {
   final bool bonded;
 
   String get key => address.toUpperCase();
+
+  /// Classic discovery lists unnamed radios as the MAC. Hide those.
+  bool get hasVisibleName {
+    final n = name.trim();
+    if (n.isEmpty) return false;
+    final mac = address.trim().toUpperCase();
+    if (n.toUpperCase() == mac) return false;
+    final compact = n.toUpperCase().replaceAll(RegExp(r'[^0-9A-F]'), '');
+    final macCompact = mac.replaceAll(RegExp(r'[^0-9A-F]'), '');
+    if (compact.length >= 12 && compact == macCompact) return false;
+    return !RegExp(
+      r'^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$',
+    ).hasMatch(n);
+  }
 }
 
 class BluetoothBondException implements Exception {
@@ -27,7 +42,49 @@ class BluetoothBondException implements Exception {
   final String message;
 
   @override
-  String toString() => message;
+  String toString() => localizedMessage;
+
+  String get localizedMessage {
+    switch (code) {
+      case 'permission':
+        return tr(
+          'Faltan permisos de Bluetooth',
+          'Bluetooth permission is required',
+        );
+      case 'need_location':
+        return tr(
+          'Para buscar impresoras cercanas hay que permitir ubicación (Android la usa en el Bluetooth Classic).',
+          'Allow location to scan nearby printers (Android uses it for Classic Bluetooth).',
+        );
+      case 'location_off':
+        return tr(
+          'Activa la ubicación del teléfono (no el GPS de mapas: el interruptor de Ubicación). Sin eso Android no lista Bluetooth cercanos.',
+          'Turn on Location on the phone (the Location switch, not Maps GPS). Android will not list nearby Classic Bluetooth without it.',
+        );
+      case 'rejected':
+      case 'timeout':
+      case 'bond_failed':
+        return tr(
+          'No se emparejó. Si pide PIN, prueba 0000 o 1234.',
+          'Pairing failed. If it asks for a PIN, try 0000 or 1234.',
+        );
+      case 'off':
+        return tr(
+          'Bluetooth está apagado. Actívalo e inténtalo de nuevo.',
+          'Bluetooth is off. Turn it on and try again.',
+        );
+      case 'busy':
+        return tr(
+          'Ya hay un emparejado en curso. Espera un momento.',
+          'Pairing is already in progress. Wait a moment.',
+        );
+      default:
+        return tr(
+          'No se pudo emparejar. Enciende la impresora e inténtalo de nuevo.',
+          'Could not pair. Turn the printer on and try again.',
+        );
+    }
+  }
 }
 
 /// Discovery Classic + emparejado del sistema. Solo Android.
@@ -120,7 +177,10 @@ class BluetoothBondChannel {
     if (!isSupported) {
       throw BluetoothBondException(
         'unsupported',
-        'El emparejado desde la app solo está en Android.',
+        tr(
+          'El emparejado desde la app solo está en Android.',
+          'Pairing from the app is Android only.',
+        ),
       );
     }
     try {
@@ -128,15 +188,46 @@ class BluetoothBondChannel {
         'address': address,
       });
       if (ok != true) {
-        throw BluetoothBondException('bond_failed', 'No se pudo emparejar');
+        throw BluetoothBondException(
+          'bond_failed',
+          tr('No se pudo emparejar', 'Could not pair'),
+        );
+      }
+      if (!await isBonded(address)) {
+        throw BluetoothBondException(
+          'rejected',
+          tr(
+            'No se emparejó. Si pide PIN, prueba 0000 o 1234.',
+            'Pairing failed. If it asks for a PIN, try 0000 or 1234.',
+          ),
+        );
       }
     } on MissingPluginException {
       throw BluetoothBondException(
         'unsupported',
-        'El emparejado Bluetooth no está disponible.',
+        tr(
+          'El emparejado Bluetooth no está disponible.',
+          'Bluetooth pairing is not available.',
+        ),
       );
     } on PlatformException catch (e) {
       throw BluetoothBondException(e.code, e.message ?? e.code);
+    }
+  }
+
+  static Future<bool> isBonded(String address) async {
+    final mac = address.trim();
+    if (mac.isEmpty || !isSupported) return false;
+    try {
+      final ok = await _ch.invokeMethod<bool>('isFullyBonded', {
+        'address': mac,
+      });
+      return ok == true;
+    } on MissingPluginException {
+      final bonded = await listBonded();
+      return bonded.any((d) => d.address.trim().toUpperCase() == mac.toUpperCase());
+    } on PlatformException {
+      return false;
     }
   }
 
@@ -171,7 +262,10 @@ class BluetoothBondChannel {
       if (ok != true) {
         throw BluetoothBondException(
           'unbond_failed',
-          'No se pudo desvincular del Bluetooth',
+          tr(
+            'No se pudo desvincular del Bluetooth',
+            'Could not unpair from Bluetooth',
+          ),
         );
       }
     } on MissingPluginException {

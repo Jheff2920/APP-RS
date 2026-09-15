@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../brand.dart';
+import '../l10n/app_lang.dart';
 import '../models/saved_printer.dart';
 import '../platform_caps.dart';
 import '../services/bluetooth_bond_channel.dart';
@@ -63,24 +64,31 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
     if (ok || !mounted) return;
     final go = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Impresión del sistema'),
-        content: const Text(
-          'Para imprimir desde el diálogo Imprimir sin salir de la otra app, '
-          'hay que permitir «Mostrar sobre otras apps». Verás un recuadro '
-          'flotante de progreso encima.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Después'),
+      builder: (ctx) {
+        final l = L.of(ctx);
+        return AlertDialog(
+          title: Text(l('Impresión del sistema', 'System printing')),
+          content: Text(
+            l(
+              'Para imprimir desde el diálogo Imprimir sin salir de la otra app, '
+              'hay que permitir «Mostrar sobre otras apps». Verás un recuadro '
+              'flotante de progreso encima.',
+              'To print from the system Print dialog without leaving the other app, '
+              'allow “Display over other apps”. You will see a floating progress box.',
+            ),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Permitir'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l('Después', 'Later')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l('Permitir', 'Allow')),
+            ),
+          ],
+        );
+      },
     );
     if (go == true) {
       await PrinterPermissions.ensureSystemOverlay();
@@ -161,7 +169,11 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo abrir el archivo: $e')),
+        SnackBar(
+          content: Text(
+            L.of(context)('No se pudo abrir el archivo: $e', 'Could not open the file: $e'),
+          ),
+        ),
       );
     }
   }
@@ -175,7 +187,9 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
         printer.id,
       );
       if (fresh == null) {
-        throw PrinterTransportException('Impresora no encontrada');
+        throw PrinterTransportException(
+          tr('Impresora no encontrada', 'Printer not found'),
+        );
       }
       if (!mounted) return;
       await runWithPrintStatusDialog(
@@ -187,38 +201,64 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
         ),
       );
       messenger.showSnackBar(
-        SnackBar(content: Text('Prueba enviada a ${printer.name}')),
+        SnackBar(
+          content: Text(
+            L.of(context)(
+              'Prueba enviada a ${printer.name}',
+              'Test page sent to ${printer.name}',
+            ),
+          ),
+        ),
       );
     } on PrinterTransportException catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            L.of(context)(
+              'No se pudo completar la prueba. Enciende la impresora e inténtalo de nuevo.',
+              'Could not finish the test. Turn the printer on and try again.',
+            ),
+          ),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _busyId = null);
     }
   }
 
   Future<void> _unlink(SavedPrinter printer) async {
+    final l = L.of(context);
     final bluetoothNote = printer.type != PrinterLinkType.bluetooth
         ? ''
         : PlatformCaps.isAndroid
-            ? '\nTambién se olvidará del Bluetooth del teléfono.'
-            : '\nEn iPhone/iPad hay que olvidarla en Ajustes > Bluetooth.';
+            ? l(
+                '\nTambién se olvidará del Bluetooth del teléfono.',
+                '\nIt will also be forgotten from the phone Bluetooth.',
+              )
+            : l(
+                '\nEn iPhone/iPad hay que olvidarla en Ajustes > Bluetooth.',
+                '\nOn iPhone/iPad, forget it in Settings > Bluetooth.',
+              );
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Desvincular impresora'),
+        title: Text(l('Desvincular impresora', 'Unlink printer')),
         content: Text(
-          '¿Quitar "${printer.name}" de ${AppBrand.name}?$bluetoothNote',
+          l(
+            '¿Quitar "${printer.name}" de ${AppBrand.name}?$bluetoothNote',
+            'Remove "${printer.name}" from ${AppBrand.name}?$bluetoothNote',
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+            child: Text(l('Cancelar', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Desvincular'),
+            child: Text(l('Desvincular', 'Unlink')),
           ),
         ],
       ),
@@ -230,8 +270,10 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
         if (PlatformCaps.isAndroid) {
           final permitted = await PrinterPermissions.ensureBluetooth();
           if (!permitted) {
-            bluetoothError =
-                'Se quitó de la app, pero faltan permisos para olvidarla del Bluetooth.';
+            bluetoothError = tr(
+              'Se quitó de la app, pero faltan permisos para olvidarla del Bluetooth.',
+              'Removed from the app, but Bluetooth permission is needed to forget it.',
+            );
           } else {
             await BluetoothBondChannel.forget(printer.address);
           }
@@ -239,8 +281,10 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
           await BluetoothBondChannel.forget(printer.address);
         }
       } catch (e) {
-        bluetoothError =
-            'Se quitó de la app, pero no se pudo olvidar del Bluetooth: $e';
+        bluetoothError = tr(
+          'Se quitó de la app, pero no se pudo olvidar del Bluetooth: $e',
+          'Removed from the app, but it could not be forgotten from Bluetooth: $e',
+        );
       }
     }
     await widget.store.delete(printer.id);
@@ -298,7 +342,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
               const Divider(height: 1),
               ListTile(
                 leading: const Icon(Icons.print),
-                title: const Text('Probar impresión'),
+                title: Text(L.of(ctx)('Probar impresión', 'Test print')),
                 onTap: () {
                   Navigator.pop(ctx);
                   _testPrint(printer);
@@ -306,7 +350,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.history),
-                title: const Text('Ver historial'),
+                title: Text(L.of(ctx)('Ver historial', 'View history')),
                 onTap: () {
                   Navigator.pop(ctx);
                   _openHistory(printer: printer);
@@ -314,7 +358,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.edit),
-                title: const Text('Configurar'),
+                title: Text(L.of(ctx)('Configurar', 'Settings')),
                 onTap: () {
                   Navigator.pop(ctx);
                   _openForm(existing: printer);
@@ -323,7 +367,9 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
               if (!_adsFree)
                 ListTile(
                   leading: const Icon(Icons.vpn_key_outlined),
-                  title: const Text('Quitar publicidad (código)'),
+                  title: Text(
+                    L.of(ctx)('Quitar publicidad (código)', 'Remove ads (code)'),
+                  ),
                   onTap: () async {
                     Navigator.pop(ctx);
                     await showRedPosActivateDialog(
@@ -337,7 +383,9 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
               if (!printer.isDefault)
                 ListTile(
                   leading: const Icon(Icons.star_outline),
-                  title: const Text('Marcar predeterminada'),
+                  title: Text(
+                    L.of(ctx)('Marcar predeterminada', 'Set as default'),
+                  ),
                   onTap: () async {
                     Navigator.pop(ctx);
                     await widget.store.setDefault(printer.id);
@@ -348,7 +396,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
                 leading: Icon(Icons.link_off,
                     color: Theme.of(ctx).colorScheme.error),
                 title: Text(
-                  'Desvincular',
+                  L.of(ctx)('Desvincular', 'Unlink'),
                   style: TextStyle(color: Theme.of(ctx).colorScheme.error),
                 ),
                 onTap: () {
@@ -408,10 +456,10 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
                     title: Text(p.name),
                     subtitle: Text(
                       [
-                        if (p.isDefault) 'Predeterminada',
+                        if (p.isDefault) L.of(context)('Predeterminada', 'Default'),
                         p.type.label,
                         p.paper.label,
-                        if (!_adsFree) 'con publicidad',
+                        if (!_adsFree) L.of(context)('con publicidad', 'with ads'),
                       ].join(' · '),
                     ),
                     trailing: busy
@@ -423,7 +471,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
                             ),
                           )
                         : IconButton(
-                            tooltip: 'Opciones',
+                            tooltip: L.of(context)('Opciones', 'Options'),
                             icon: const Icon(Icons.more_vert),
                             onPressed: () => _showPrinterActions(p),
                           ),
@@ -453,31 +501,32 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
   Widget build(BuildContext context) {
     final expanded = _expanded;
     final hideFab = expanded && _detailIsAddForm;
+    final l = L.of(context);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text(AppBrand.name),
         actions: [
           IconButton(
-            tooltip: 'Abrir archivo',
+            tooltip: l('Abrir archivo', 'Open file'),
             onPressed: _openSharedFile,
             icon: const Icon(Icons.folder_open),
           ),
           IconButton(
-            tooltip: 'Historial',
+            tooltip: l('Historial', 'History'),
             onPressed: () => _openHistory(),
             icon: const Icon(Icons.history),
           ),
           IconButton(
-            tooltip: 'Actualizar',
+            tooltip: l('Actualizar', 'Refresh'),
             onPressed: _loading ? null : _reload,
             icon: const Icon(Icons.refresh),
           ),
           PopupMenuButton<String>(
-            tooltip: 'Ayuda y legal',
+            tooltip: l('Ayuda y legal', 'Help and legal'),
             onSelected: (value) {
               final page = switch (value) {
-                'help' => const HelpScreen(),
+                'help' => HelpScreen(store: widget.store),
                 'terms' => const LegalScreen.terms(),
                 'privacy' => const LegalScreen.privacy(),
                 _ => null,
@@ -487,12 +536,23 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
                 MaterialPageRoute<void>(builder: (_) => page),
               );
             },
-            itemBuilder: (ctx) => const [
-              PopupMenuItem(value: 'help', child: Text('Ayuda y soporte')),
-              PopupMenuItem(
-                  value: 'terms', child: Text('Términos y condiciones')),
-              PopupMenuItem(value: 'privacy', child: Text('Privacidad')),
-            ],
+            itemBuilder: (ctx) {
+              final loc = L.of(ctx);
+              return [
+                PopupMenuItem(
+                  value: 'help',
+                  child: Text(loc('Ayuda y soporte', 'Help & support')),
+                ),
+                PopupMenuItem(
+                  value: 'terms',
+                  child: Text(loc('Términos y condiciones', 'Terms and conditions')),
+                ),
+                PopupMenuItem(
+                  value: 'privacy',
+                  child: Text(loc('Privacidad', 'Privacy')),
+                ),
+              ];
+            },
           ),
         ],
       ),
@@ -501,7 +561,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
           : FloatingActionButton.extended(
               onPressed: _openingForm ? null : () => _openForm(),
               icon: const Icon(Icons.add),
-              label: const Text('Vincular'),
+              label: Text(l('Vincular', 'Pair')),
             ),
       body: expanded
           ? Row(
@@ -547,9 +607,11 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = L.of(context);
     final types = showUsb
         ? '${PrinterLinkType.bluetooth.label}, ${PrinterLinkType.network.label} o ${PrinterLinkType.usb.label}'
-        : '${PrinterLinkType.bluetooth.label} o ${PrinterLinkType.network.label}';
+            .replaceFirst(' o ', l(' o ', ' or '))
+        : '${PrinterLinkType.bluetooth.label} ${l('o', 'or')} ${PrinterLinkType.network.label}';
     return BoletaPage(
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -565,28 +627,33 @@ class _EmptyState extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Sin impresoras vinculadas',
+                  l('Sin impresoras vinculadas', 'No printers paired'),
                   style: Theme.of(context).textTheme.titleLarge,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Vincula una impresora térmica ($types). '
-                  'El historial de trabajos se ve en el icono de reloj o en las opciones de cada impresora.\n\n'
-                  '${showUsb ? 'También puedes compartir un PDF hacia esta app desde otras apps.' : 'En iPhone/iPad imprime por WiFi (TCP 9100). Abre un PDF, XML o ZIP SUNAT con el botón de carpeta.'}',
+                  l(
+                    'Vincula una impresora térmica ($types). '
+                    'El historial de trabajos se ve en el icono de reloj o en las opciones de cada impresora.\n\n'
+                    '${showUsb ? 'También puedes compartir un PDF hacia esta app desde otras apps.' : 'En iPhone/iPad imprime por WiFi (TCP 9100). Abre un PDF, XML o ZIP SUNAT con el botón de carpeta.'}',
+                    'Pair a thermal printer ($types). '
+                    'Job history is in the clock icon or each printer’s options.\n\n'
+                    '${showUsb ? 'You can also share a PDF to this app from other apps.' : 'On iPhone/iPad print over WiFi (TCP 9100). Open a PDF, XML, or SUNAT ZIP with the folder button.'}',
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: onAdd,
                   icon: const Icon(Icons.add_link),
-                  label: const Text('Vincular impresora'),
+                  label: Text(l('Vincular impresora', 'Pair printer')),
                 ),
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: onOpenFile,
                   icon: const Icon(Icons.folder_open),
-                  label: const Text('Abrir archivo'),
+                  label: Text(l('Abrir archivo', 'Open file')),
                 ),
               ],
             ),

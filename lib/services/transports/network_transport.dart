@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import '../../l10n/app_lang.dart';
 import '../../models/saved_printer.dart';
 import 'printer_transport.dart';
 
@@ -23,7 +24,12 @@ class NetworkTransport implements PrinterTransport {
     final printer = _printer;
     final key = _key;
     if (printer == null || key == null) {
-      throw PrinterTransportException('No hay conexion WiFi/TCP activa.');
+      throw PrinterTransportException(
+        tr(
+          'No hay conexion WiFi/TCP activa.',
+          'There is no active WiFi/TCP connection.',
+        ),
+      );
     }
     final existing = _pool[key];
     if (existing != null) {
@@ -45,10 +51,18 @@ class NetworkTransport implements PrinterTransport {
       return socket;
     } on SocketException catch (e) {
       throw PrinterTransportException(
-        'No se pudo conectar a ${printer.address}:${printer.port}. ${e.message}',
+        tr(
+          'No se pudo conectar por WiFi. Revisa que la impresora esté encendida y la IP sea correcta.',
+          'Could not connect over WiFi. Check that the printer is on and the IP is correct.',
+        ),
       );
-    } on Exception catch (e) {
-      throw PrinterTransportException('Error de red: $e');
+    } on Exception catch (_) {
+      throw PrinterTransportException(
+        tr(
+          'No se pudo conectar por WiFi. Revisa la red e inténtalo de nuevo.',
+          'Could not connect over WiFi. Check the network and try again.',
+        ),
+      );
     }
   }
 
@@ -58,14 +72,22 @@ class NetworkTransport implements PrinterTransport {
     try {
       socket.add(Uint8List.fromList(bytes));
       await socket.flush();
-    } on SocketException catch (e) {
+    } on SocketException catch (_) {
       await _drop();
       throw PrinterTransportException(
-        'Se cortó la conexión WiFi/TCP. ${e.message}',
+        tr(
+          'Se cortó la conexión WiFi. Enciende la impresora y vuelve a intentar.',
+          'The WiFi connection dropped. Turn the printer on and try again.',
+        ),
       );
-    } on Exception catch (e) {
+    } on Exception catch (_) {
       await _drop();
-      throw PrinterTransportException('Error de red al enviar: $e');
+      throw PrinterTransportException(
+        tr(
+          'No se pudo enviar la impresión por WiFi. Inténtalo de nuevo.',
+          'Could not send the print job over WiFi. Try again.',
+        ),
+      );
     }
   }
 

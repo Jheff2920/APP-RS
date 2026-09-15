@@ -4,6 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>RedPOS · códigos</title>
+  <meta name="robots" content="noindex, nofollow"/>
   <style>
     :root { color-scheme: light; }
     body {
@@ -42,6 +43,13 @@
   </label>
   <p><button id="go" type="button">Generar código</button></p>
   <p id="out" class="code"></p>
+  <p class="hint">
+    <a href="/terminos.html">Términos</a>
+    ·
+    <a href="/privacidad.html">Privacidad</a>
+    ·
+    <a href="/eliminar-cuenta.html">Eliminar cuenta</a>
+  </p>
   <script>
     document.getElementById('go').onclick = async () => {
       const out = document.getElementById('out');

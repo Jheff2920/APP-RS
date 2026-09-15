@@ -1,3 +1,4 @@
+import '../l10n/app_lang.dart';
 import 'paper_width.dart';
 
 /// Densidad del cabezal. 203 es lo habitual; 300 solo si el manual lo indica.
@@ -12,9 +13,15 @@ enum PrinterDpi {
   String get hint {
     switch (this) {
       case PrinterDpi.dpi203:
-        return 'Estándar (casi todas las impresoras)';
+        return tr(
+          'Estándar (casi todas las impresoras)',
+          'Standard (almost all printers)',
+        );
       case PrinterDpi.dpi300:
-        return 'Cabezal 300 dpi. Si sale partido, vuelve a 203';
+        return tr(
+          'Cabezal 300 dpi. Si sale partido, vuelve a 203',
+          '300 dpi head. If it prints split, switch back to 203',
+        );
     }
   }
 

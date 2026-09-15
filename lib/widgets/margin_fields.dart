@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../l10n/app_lang.dart';
 import '../models/print_margins.dart';
 
 class MarginFields extends StatefulWidget {
@@ -47,24 +48,24 @@ class _MarginFieldsState extends State<MarginFields> {
       tilePadding: EdgeInsets.zero,
       childrenPadding: const EdgeInsets.only(bottom: 8),
       title: Text(
-        'Márgenes (mm)',
+        L.of(context)('Márgenes (mm)', 'Margins (mm)'),
         style: theme.textTheme.titleMedium,
       ),
       children: [
         _MmField(
-          label: 'Izquierdo',
+          label: L.of(context)('Izquierdo', 'Left'),
           mm: _value.leftMm,
           max: 20,
           onChanged: (v) => _set(_value.copyWith(leftMm: v)),
         ),
         _MmField(
-          label: 'Derecho',
+          label: L.of(context)('Derecho', 'Right'),
           mm: _value.rightMm,
           max: 20,
           onChanged: (v) => _set(_value.copyWith(rightMm: v)),
         ),
         _MmField(
-          label: 'Inferior',
+          label: L.of(context)('Inferior', 'Bottom'),
           mm: _value.bottomMm,
           max: 60,
           onChanged: (v) => _set(_value.copyWith(bottomMm: v)),

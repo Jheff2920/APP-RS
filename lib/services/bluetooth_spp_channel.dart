@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 
+import '../l10n/app_lang.dart';
 import '../platform_caps.dart';
 
 /// RFCOMM nativo: un solo volcado del ticket, sin flush cada 16 KB.
@@ -33,7 +34,10 @@ class BluetoothSppChannel {
     if (!isSupported) {
       throw PlatformException(
         code: 'unsupported',
-        message: 'Bluetooth SPP nativo solo esta en Android.',
+        message: tr(
+          'Bluetooth SPP nativo solo esta en Android.',
+          'Native Bluetooth SPP is Android only.',
+        ),
       );
     }
   }

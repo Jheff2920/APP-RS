@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /terminos.html
+Allow: /privacidad.html
+Allow: /eliminar-cuenta.html
+Allow: /legal.css
+Disallow: /api/

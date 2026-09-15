@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 import '../brand.dart';
+import '../l10n/app_lang.dart';
 import '../models/cash_drawer.dart';
 import '../models/cut_mode.dart';
 import '../models/paper_width.dart';
@@ -24,6 +25,8 @@ import '../widgets/boleta_page.dart';
 import '../widgets/margin_fields.dart';
 import '../widgets/paper_width_selector.dart';
 import '../widgets/print_status_dialog.dart';
+import '../widgets/raster_scale_fields.dart';
+import '../widgets/redpos_unlock_actions.dart';
 
 class PrinterFormScreen extends StatefulWidget {
   const PrinterFormScreen({
@@ -76,6 +79,11 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   bool _firstPrinter = false;
   bool _adsFree = false;
   bool _activating = false;
+  /// Impresora que ya estaba guardada al abrir o al elegir una de la lista.
+  var _protectFromRollback = false;
+  final Set<String> _bondedThisSession = {};
+  /// MAC que falló el PIN: no mostrarlas en emparejados ni rellenar el formulario.
+  final Set<String> _hidePaired = {};
 
   bool get _isEdit =>
       _saved.any((p) => p.id == _id) || widget.existing?.id == _id;
@@ -107,6 +115,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     _codeCtrl = TextEditingController();
     _showAddress = draft.showAddress;
     _adsFree = e?.adsFree ?? false;
+    _protectFromRollback = e != null;
     _paper = draft.paper;
     _dpi = draft.dpi;
     _margins = draft.margins;
@@ -260,11 +269,20 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   String get _connectionMissingMessage {
     switch (_type) {
       case PrinterLinkType.bluetooth:
-        return 'Agrega o elige un dispositivo Bluetooth';
+        return tr(
+          'Agrega o elige un dispositivo Bluetooth',
+          'Add or choose a Bluetooth device',
+        );
       case PrinterLinkType.network:
-        return 'Escribe la IP de la impresora';
+        return tr(
+          'Escribe la IP de la impresora',
+          'Enter the printer IP address',
+        );
       case PrinterLinkType.usb:
-        return 'Elige o agrega una impresora USB';
+        return tr(
+          'Elige o agrega una impresora USB',
+          'Choose or add a USB printer',
+        );
     }
   }
 
@@ -279,6 +297,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   void _applyPrinter(SavedPrinter printer) {
     _captureDraft(_type);
     setState(() {
+      _protectFromRollback = true;
       _type = printer.type;
       _drafts[printer.type] = _LinkDraft.fromPrinter(printer);
       _restoreDraft(printer.type);
@@ -295,6 +314,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   void _startNew(PrinterLinkType type, {bool showAddress = false}) {
     _captureDraft(_type);
     setState(() {
+      _protectFromRollback = false;
       _type = type;
       _firstPrinter = _saved.isEmpty;
       _drafts[type] = _LinkDraft(
@@ -314,20 +334,28 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   Future<void> _unlinkSaved(SavedPrinter printer) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Desvincular impresora'),
-        content: Text('¿Quitar "${printer.name}" de ${AppBrand.name}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+      builder: (ctx) {
+        final loc = L.of(ctx);
+        return AlertDialog(
+          title: Text(loc('Desvincular impresora', 'Unlink printer')),
+          content: Text(
+            loc(
+              '¿Quitar "${printer.name}" de ${AppBrand.name}?',
+              'Remove "${printer.name}" from ${AppBrand.name}?',
+            ),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Desvincular'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(loc('Cancelar', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(loc('Desvincular', 'Unlink')),
+            ),
+          ],
+        );
+      },
     );
     if (ok != true || !mounted) return;
     await widget.store.delete(printer.id);
@@ -371,9 +399,12 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
       if (!mounted) return;
       if (!ok) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Concede permisos de Bluetooth para ver dispositivos emparejados.',
+              tr(
+                'Concede permisos de Bluetooth para ver dispositivos emparejados.',
+                'Grant Bluetooth permission to see paired devices.',
+              ),
             ),
           ),
         );
@@ -399,16 +430,24 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
       setState(() {
         _paired = [
           for (final d in bonded)
-            BluetoothInfo(
-              name: d.name.isEmpty ? d.address : d.name,
-              macAdress: d.address,
-            ),
+            if (!_hidePaired.contains(d.address.trim().toUpperCase()))
+              BluetoothInfo(
+                name: d.name.isEmpty ? d.address : d.name,
+                macAdress: d.address,
+              ),
         ];
       });
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudieron listar BT: $e')),
+          SnackBar(
+            content: Text(
+              tr(
+                'No se pudieron cargar los dispositivos Bluetooth. Activa Bluetooth e inténtalo de nuevo.',
+                'Could not load Bluetooth devices. Turn Bluetooth on and try again.',
+              ),
+            ),
+          ),
         );
       }
     } finally {
@@ -434,23 +473,30 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   Future<void> _forgetPaired(BluetoothInfo device) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Desvincular impresora'),
-        content: Text(
-          '¿Quitar "${device.name}" de ${AppBrand.name} y del Bluetooth '
-          'del teléfono?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
+      builder: (ctx) {
+        final loc = L.of(ctx);
+        return AlertDialog(
+          title: Text(loc('Desvincular impresora', 'Unlink printer')),
+          content: Text(
+            loc(
+              '¿Quitar "${device.name}" de ${AppBrand.name} y del Bluetooth '
+              'del teléfono?',
+              'Remove "${device.name}" from ${AppBrand.name} and from this '
+              'phone’s Bluetooth?',
+            ),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Desvincular'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(loc('Cancelar', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(loc('Desvincular', 'Unlink')),
+            ),
+          ],
+        );
+      },
     );
     if (ok != true || !mounted) return;
     try {
@@ -458,7 +504,14 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo olvidar del Bluetooth: $e')),
+        SnackBar(
+          content: Text(
+            tr(
+              'No se pudo olvidar del Bluetooth: $e',
+              'Could not forget Bluetooth device: $e',
+            ),
+          ),
+        ),
       );
       return;
     }
@@ -487,6 +540,26 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     await _loadPaired();
   }
 
+  Future<void> _blankBluetoothAddForm({String? failedMac}) async {
+    final mac = failedMac?.trim() ?? '';
+    if (mac.isNotEmpty && PlatformCaps.isAndroid) {
+      _hidePaired.add(mac.toUpperCase());
+      _bondedThisSession.remove(mac.toUpperCase());
+      try {
+        await BluetoothBondChannel.forget(mac);
+      } catch (_) {}
+      for (var i = 0; i < 12; i++) {
+        if (!await BluetoothBondChannel.isBonded(mac)) break;
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      }
+    }
+    if (!mounted) return;
+    _codeCtrl.clear();
+    _startNew(PrinterLinkType.bluetooth);
+    if (!mounted) return;
+    await _loadPaired();
+  }
+
   Future<void> _addNewBtDevice() async {
     final exclude = {
       for (final d in _paired) d.macAdress.trim().toUpperCase(),
@@ -497,22 +570,47 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
       showDragHandle: true,
       builder: (ctx) => _AddBtDeviceSheet(excludeAddresses: exclude),
     );
-    if (!mounted || added == null) return;
+    if (!mounted) return;
+    if (added != null && !added.bonded) {
+      await _blankBluetoothAddForm(failedMac: added.address);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            tr(
+              'PIN incorrecto. Vuelve a agregar el dispositivo.',
+              'Wrong PIN. Add the device again.',
+            ),
+          ),
+        ),
+      );
+      return;
+    }
     if (PlatformCaps.isAndroid) {
       await _loadPaired();
     }
     if (!mounted) return;
-    setState(() {
-      final exists = _paired.any(
-        (p) => p.macAdress.trim().toUpperCase() == added.address.toUpperCase(),
+    if (added == null) return;
+    final fullyBonded = !PlatformCaps.isAndroid ||
+        await BluetoothBondChannel.isBonded(added.address);
+    if (!fullyBonded) {
+      await _blankBluetoothAddForm(failedMac: added.address);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            tr(
+              'PIN incorrecto. Vuelve a agregar el dispositivo.',
+              'Wrong PIN. Add the device again.',
+            ),
+          ),
+        ),
       );
-      if (!exists) {
-        _paired = [
-          ..._paired,
-          BluetoothInfo(name: added.name, macAdress: added.address),
-        ];
-      }
-    });
+      return;
+    }
+    _hidePaired.remove(added.address.trim().toUpperCase());
+    _bondedThisSession.add(added.address.trim().toUpperCase());
+    if (!mounted) return;
     final existing = _savedMatch(PrinterLinkType.bluetooth, added.address);
     if (existing != null) {
       _applyPrinter(existing);
@@ -525,6 +623,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
         added.name.trim().isEmpty ? added.address : added.name,
       );
     });
+    await _loadPaired();
   }
 
   Future<void> _loadUsb() async {
@@ -536,7 +635,14 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudieron listar USB: $e')),
+          SnackBar(
+            content: Text(
+              tr(
+                'No se pudieron listar las impresoras USB. Reconecta el cable e inténtalo de nuevo.',
+                'Could not list USB printers. Reconnect the cable and try again.',
+              ),
+            ),
+          ),
         );
       }
     } finally {
@@ -550,7 +656,9 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
       if (!ok) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Permiso USB denegado')),
+            SnackBar(
+              content: Text(tr('Permiso USB denegado', 'USB permission denied')),
+            ),
           );
         }
         return;
@@ -569,7 +677,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('USB: $e')),
+          SnackBar(content: Text(tr('USB: $e', 'USB: $e'))),
         );
       }
     }
@@ -599,10 +707,71 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     await widget.store.upsert(_buildPrinter());
   }
 
+  Future<void> _rollbackUncommitted({required bool unpair}) async {
+    if (_protectFromRollback) return;
+    final address = _addressCtrl.text.trim();
+    if (address.isNotEmpty) {
+      await widget.store.deleteByAddress(address, type: _type);
+    }
+    await widget.store.delete(_id);
+    final mac = address.toUpperCase();
+    if (unpair &&
+        _type == PrinterLinkType.bluetooth &&
+        PlatformCaps.isAndroid &&
+        mac.isNotEmpty) {
+      try {
+        await BluetoothBondChannel.forget(address);
+      } catch (_) {}
+      _bondedThisSession.remove(mac);
+      for (var i = 0; i < 10; i++) {
+        if (!await BluetoothBondChannel.isBonded(address)) break;
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      }
+    }
+    if (!mounted) return;
+    await _loadSaved();
+    if (_type == PrinterLinkType.bluetooth) {
+      await _loadPaired();
+    }
+    widget.onStoreChanged?.call();
+    if (!mounted) return;
+    if (unpair && _type == PrinterLinkType.bluetooth) {
+      setState(() {
+        _addressCtrl.clear();
+        _showAddress = false;
+      });
+    }
+  }
+
+  Future<bool> _ensureBluetoothBonded() async {
+    if (_type != PrinterLinkType.bluetooth || !PlatformCaps.isAndroid) {
+      return true;
+    }
+    final address = _addressCtrl.text.trim();
+    if (address.isEmpty) return true;
+    final bonded = await BluetoothBondChannel.isBonded(address);
+    if (bonded) return true;
+    if (!mounted) return false;
+    await _blankBluetoothAddForm(failedMac: address);
+    if (!mounted) return false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          tr(
+            'PIN incorrecto. Vuelve a agregar el dispositivo.',
+            'Wrong PIN. Add the device again.',
+          ),
+        ),
+      ),
+    );
+    return false;
+  }
+
   Future<void> _save({bool pop = true, bool withAds = false}) async {
     if (!_requireConnection()) return;
     _ensureName();
     if (!_formKey.currentState!.validate()) return;
+    if (!await _ensureBluetoothBonded()) return;
     setState(() => _saving = true);
     try {
       if (!withAds) {
@@ -616,8 +785,18 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
           );
           if (!mounted) return;
           if (!result.ok) {
+            await _rollbackUncommitted(unpair: true);
+            if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(result.message ?? 'No se pudo activar')),
+              SnackBar(
+                content: Text(
+                  result.message ??
+                      tr(
+                        'No se pudo activar. Revisa el código e inténtalo de nuevo.',
+                        'Could not activate. Check the code and try again.',
+                      ),
+                ),
+              ),
             );
             return;
           }
@@ -640,7 +819,12 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            _adsFree ? 'Impresora guardada' : 'Guardada. Imprimirá con publicidad.',
+            _adsFree
+                ? tr('Impresora guardada', 'Printer saved')
+                : tr(
+                    'Guardada. Imprimirá con publicidad.',
+                    'Saved. It will print with ads.',
+                  ),
           ),
         ),
       );
@@ -658,16 +842,19 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     if (!_requireConnection()) return;
     _ensureName();
     if (!_formKey.currentState!.validate()) return;
+    if (!await _ensureBluetoothBonded()) return;
     setState(() => _testing = true);
     final messenger = ScaffoldMessenger.of(context);
+    final existed = _protectFromRollback || _isEdit;
     try {
-      // Mismo ID siempre → Probar no crea una segunda impresora.
       final printer = _buildPrinter();
-      await widget.store.upsert(printer);
-      if (!mounted) return;
-      await _loadSaved();
-      widget.onStoreChanged?.call();
-      if (!mounted) return;
+      if (existed) {
+        await widget.store.upsert(printer);
+        if (!mounted) return;
+        await _loadSaved();
+        widget.onStoreChanged?.call();
+        if (!mounted) return;
+      }
       await runWithPrintStatusDialog(
         context: context,
         printerName: printer.name,
@@ -676,13 +863,36 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
           onPhase: setPhase,
         ),
       );
+      if (!existed) {
+        await widget.store.upsert(printer);
+        if (!mounted) return;
+        await _loadSaved();
+        widget.onStoreChanged?.call();
+      }
       messenger.showSnackBar(
-        const SnackBar(content: Text('Página de prueba enviada')),
+        SnackBar(
+          content: Text(tr('Página de prueba enviada', 'Test page sent')),
+        ),
       );
     } on PrinterTransportException catch (e) {
+      if (!existed) {
+        await _rollbackUncommitted(unpair: _type == PrinterLinkType.bluetooth);
+      }
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
-    } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+    } catch (_) {
+      if (!existed) {
+        await _rollbackUncommitted(unpair: _type == PrinterLinkType.bluetooth);
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            tr(
+              'No se pudo completar la prueba. Enciende la impresora e inténtalo de nuevo.',
+              'Could not finish the test. Turn the printer on and try again.',
+            ),
+          ),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _testing = false);
     }
@@ -725,8 +935,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
       children: [
         Text(
           type == PrinterLinkType.network
-              ? 'Impresoras WiFi'
-              : 'Impresoras USB',
+              ? tr('Impresoras WiFi', 'WiFi printers')
+              : tr('Impresoras USB', 'USB printers'),
           style: theme.textTheme.titleSmall,
         ),
         const SizedBox(height: 4),
@@ -738,7 +948,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
             subtitle: Text(p.connectionSummary),
             selected: p.id == _id,
             trailing: IconButton(
-              tooltip: 'Desvincular',
+              tooltip: tr('Desvincular', 'Unlink'),
               icon: const Icon(Icons.link_off),
               onPressed: () => _unlinkSaved(p),
             ),
@@ -750,13 +960,24 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   }
 
   Widget _activationCard(ThemeData theme) {
+    final l = L.of(context);
     if (_adsFree) {
       return Card(
         child: ListTile(
           leading: Icon(Icons.verified, color: theme.colorScheme.primary),
-          title: const Text('Esta instalación no muestra publicidad'),
-          subtitle: const Text(
-            'Código RedPOS o suscripción activa. El ticket sale sin pie de anuncio.',
+          title: Text(
+            l(
+              'Esta instalación no muestra publicidad',
+              'This install does not show ads',
+            ),
+          ),
+          subtitle: Text(
+            l(
+              'Código RedPOS, suscripción de Play o licencia de por vida. '
+              'El ticket sale sin pie de anuncio.',
+              'RedPOS code, Play subscription, or lifetime license. '
+              'The ticket prints without an ad footer.',
+            ),
           ),
         ),
       );
@@ -767,15 +988,40 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Código de activación (opcional)', style: theme.textTheme.titleMedium),
+            Text(
+              l(
+                'Código de activación (opcional)',
+                'Activation code (optional)',
+              ),
+              style: theme.textTheme.titleMedium,
+            ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _codeCtrl,
               textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                labelText: 'Código RedPOS',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l('Código RedPOS', 'RedPOS code'),
+                border: const OutlineInputBorder(),
               ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                TextButton(
+                  onPressed: () async {
+                    final ok =
+                        await openMonthlySubscription(context, widget.store);
+                    if (!mounted) return;
+                    if (ok) setState(() => _adsFree = true);
+                  },
+                  child: Text(l('Suscripción mensual', 'Monthly subscription')),
+                ),
+                TextButton(
+                  onPressed: () => openLifetimeLicenseMail(context),
+                  child: Text(l('Licencia de por vida', 'Lifetime license')),
+                ),
+              ],
             ),
           ],
         ),
@@ -786,9 +1032,14 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = L.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEdit ? 'Editar impresora' : 'Agregar impresora'),
+        title: Text(
+          _isEdit
+              ? l('Editar impresora', 'Edit printer')
+              : l('Agregar impresora', 'Add printer'),
+        ),
       ),
       body: Form(
         key: _formKey,
@@ -807,7 +1058,11 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.save),
-                label: Text(_adsFree ? 'Guardar' : 'Guardar / activar'),
+                label: Text(
+                  _adsFree
+                      ? l('Guardar', 'Save')
+                      : l('Guardar / activar', 'Save / activate'),
+                ),
               ),
               if (!_adsFree) ...[
                 const SizedBox(height: 8),
@@ -816,7 +1071,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                       ? null
                       : () => _save(withAds: true),
                   icon: const Icon(Icons.campaign_outlined),
-                  label: const Text('Continuar con publicidad'),
+                  label: Text(l('Continuar con publicidad', 'Continue with ads')),
                 ),
               ],
               const SizedBox(height: 8),
@@ -829,7 +1084,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.print),
-                label: const Text('Probar impresión'),
+                label: Text(l('Probar impresión', 'Test print')),
               ),
             ],
           ),
@@ -842,20 +1097,20 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
             const SizedBox(height: 16),
             TextFormField(
               controller: _nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Nombre',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l('Nombre', 'Name'),
+                border: const OutlineInputBorder(),
               ),
               textCapitalization: TextCapitalization.words,
               validator: (v) {
                 if (v == null || v.trim().isEmpty) {
-                  return 'Escribe un nombre';
+                  return l('Escribe un nombre', 'Enter a name');
                 }
                 return null;
               },
             ),
             const SizedBox(height: 16),
-            Text('Conexión', style: theme.textTheme.titleMedium),
+            Text(l('Conexión', 'Connection'), style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             SegmentedButton<PrinterLinkType>(
               showSelectedIcon: false,
@@ -875,12 +1130,12 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
               Row(
                 children: [
                   Text(
-                    'Dispositivos emparejados',
+                    l('Dispositivos emparejados', 'Paired devices'),
                     style: theme.textTheme.titleSmall,
                   ),
                   const Spacer(),
                   IconButton(
-                    tooltip: 'Actualizar emparejados',
+                    tooltip: l('Actualizar emparejados', 'Refresh paired'),
                     onPressed: _loadingPaired ? null : _loadPaired,
                     icon: _loadingPaired
                         ? const SizedBox(
@@ -902,7 +1157,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                       d.macAdress.toUpperCase(),
                   trailing: PlatformCaps.isAndroid
                       ? IconButton(
-                          tooltip: 'Desvincular',
+                          tooltip: tr('Desvincular', 'Unlink'),
                           icon: const Icon(Icons.link_off),
                           onPressed: () => _forgetPaired(d),
                         )
@@ -914,20 +1169,23 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
               OutlinedButton.icon(
                 onPressed: _loadingPaired ? null : _addNewBtDevice,
                 icon: const Icon(Icons.add),
-                label: const Text('Agregar dispositivo'),
+                label: Text(l('Agregar dispositivo', 'Add device')),
               ),
               if (_showAddress) ...[
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _addressCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Direccion MAC',
+                  decoration: InputDecoration(
+                    labelText: l('Direccion MAC', 'MAC address'),
                     hintText: 'AA:BB:CC:DD:EE:FF',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {
-                      return 'Selecciona o escribe la MAC';
+                      return l(
+                        'Selecciona o escribe la MAC',
+                        'Select or enter the MAC',
+                      );
                     }
                     return null;
                   },
@@ -938,12 +1196,12 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
               Row(
                 children: [
                   Text(
-                    'Dispositivos USB',
+                    l('Dispositivos USB', 'USB devices'),
                     style: theme.textTheme.titleSmall,
                   ),
                   const Spacer(),
                   IconButton(
-                    tooltip: 'Actualizar USB',
+                    tooltip: l('Actualizar USB', 'Refresh USB'),
                     onPressed: _loadingUsb ? null : _loadUsb,
                     icon: _loadingUsb
                         ? const SizedBox(
@@ -961,7 +1219,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                   leading: const Icon(Icons.usb),
                   title: Text(d.name),
                   subtitle: Text(
-                    '${d.address}${d.hasPermission ? '' : ' · sin permiso'}',
+                    '${d.address}${d.hasPermission ? '' : l(' · sin permiso', ' · no permission')}',
                   ),
                   selected: _addressCtrl.text == d.address,
                   onTap: () => _pickUsb(d),
@@ -972,7 +1230,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                 onPressed: () =>
                     _startNew(PrinterLinkType.usb, showAddress: true),
                 icon: const Icon(Icons.add),
-                label: const Text('Agregar impresora'),
+                label: Text(l('Agregar impresora', 'Add printer')),
               ),
               if (_showAddress) ...[
                 const SizedBox(height: 12),
@@ -981,12 +1239,15 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                   decoration: const InputDecoration(
                     labelText: 'USB vid:pid',
                     hintText: '1137:85',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                   onChanged: (v) => _syncAutoName(PrinterLinkType.usb, v),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {
-                      return 'Selecciona un dispositivo USB';
+                      return l(
+                        'Selecciona un dispositivo USB',
+                        'Select a USB device',
+                      );
                     }
                     return null;
                   },
@@ -996,12 +1257,12 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
               Row(
                 children: [
                   Text(
-                    'Dispositivos WiFi / Red',
+                    l('Dispositivos WiFi / Red', 'WiFi / Network devices'),
                     style: theme.textTheme.titleSmall,
                   ),
                   const Spacer(),
                   IconButton(
-                    tooltip: 'Actualizar',
+                    tooltip: l('Actualizar', 'Refresh'),
                     onPressed: _loadingSaved ? null : _loadSaved,
                     icon: _loadingSaved
                         ? const SizedBox(
@@ -1021,7 +1282,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                   subtitle: Text(p.connectionSummary),
                   selected: p.id == _id,
                   trailing: IconButton(
-                    tooltip: 'Desvincular',
+                    tooltip: tr('Desvincular', 'Unlink'),
                     icon: const Icon(Icons.link_off),
                     onPressed: () => _unlinkSaved(p),
                   ),
@@ -1033,22 +1294,22 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                 onPressed: () =>
                     _startNew(PrinterLinkType.network, showAddress: true),
                 icon: const Icon(Icons.add),
-                label: const Text('Agregar impresora'),
+                label: Text(l('Agregar impresora', 'Add printer')),
               ),
               if (_showAddress) ...[
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _addressCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'IP de la impresora',
+                  decoration: InputDecoration(
+                    labelText: l('IP de la impresora', 'Printer IP'),
                     hintText: '192.168.1.50',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.url,
                   onChanged: (v) => _syncAutoName(PrinterLinkType.network, v),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) {
-                      return 'Escribe la IP';
+                      return l('Escribe la IP', 'Enter the IP');
                     }
                     return null;
                   },
@@ -1056,16 +1317,16 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _portCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Puerto TCP',
+                  decoration: InputDecoration(
+                    labelText: l('Puerto TCP', 'TCP port'),
                     hintText: '9100',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.number,
                   validator: (v) {
                     final n = int.tryParse(v?.trim() ?? '');
                     if (n == null || n < 1 || n > 65535) {
-                      return 'Puerto invalido';
+                      return l('Puerto invalido', 'Invalid port');
                     }
                     return null;
                   },
@@ -1073,14 +1334,14 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
               ],
             ],
             const SizedBox(height: 24),
-            Text('Ancho del rollo', style: theme.textTheme.titleMedium),
+            Text(l('Ancho del rollo', 'Paper width'), style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             PaperWidthSelector(
               value: _paper,
               onChanged: (v) => setState(() => _paper = v),
             ),
             const SizedBox(height: 20),
-            Text('DPI del cabezal', style: theme.textTheme.titleMedium),
+            Text(l('DPI del cabezal', 'Print head DPI'), style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             SegmentedButton<PrinterDpi>(
               segments: [
@@ -1103,37 +1364,33 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
               onChanged: (v) => _margins = v,
             ),
             const SizedBox(height: 20),
-            Text('Corte automático', style: theme.textTheme.titleMedium),
+            Text(l('Corte automático', 'Auto cut'), style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             DropdownMenu<CutMode>(
               key: ValueKey('cut-$_id'),
               initialSelection: _cut,
               expandedInsets: EdgeInsets.zero,
-              label: const Text('Comando de corte'),
-              dropdownMenuEntries: CutMode.values
-                  .map(
-                    (m) => DropdownMenuEntry(
-                      value: m,
-                      label: m.label,
-                    ),
-                  )
-                  .toList(),
+              label: Text(l('Comando de corte', 'Cut command')),
+              dropdownMenuEntries: [
+                for (final m in CutMode.uiOrder)
+                  DropdownMenuEntry(value: m, label: m.label),
+              ],
               onSelected: (v) {
-                if (v != null) setState(() => _cut = v);
+                if (v == null) return;
+                setState(() => _cut = v);
+                _persistSettings();
               },
             ),
-            if (_cut != CutMode.none) ...[
-              const SizedBox(height: 6),
-              Text(_cut.hint, style: theme.textTheme.labelMedium),
-            ],
+            const SizedBox(height: 6),
+            Text(_cut.hint, style: theme.textTheme.labelMedium),
             const SizedBox(height: 20),
-            Text('Gaveta de dinero', style: theme.textTheme.titleMedium),
+            Text(l('Gaveta de dinero', 'Cash drawer'), style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
             DropdownMenu<CashDrawer>(
               key: ValueKey('drawer-$_id'),
               initialSelection: _cashDrawer,
               expandedInsets: EdgeInsets.zero,
-              label: const Text('Comando de gaveta'),
+              label: Text(l('Comando de gaveta', 'Drawer command')),
               dropdownMenuEntries: CashDrawer.values
                   .map(
                     (m) => DropdownMenuEntry(
@@ -1151,30 +1408,28 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
               Text(_cashDrawer.hint, style: theme.textTheme.labelMedium),
             ],
             const SizedBox(height: 20),
-            Text('Nitidez', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            SegmentedButton<RasterScale>(
-              segments: [
-                for (final s in RasterScale.values)
-                  ButtonSegment(value: s, label: Text(s.label)),
-              ],
-              selected: {_rasterScale},
-              onSelectionChanged: (set) {
-                if (set.isEmpty) return;
-                setState(() => _rasterScale = set.first);
+            RasterScaleFields(
+              key: ValueKey('raster-$_id'),
+              value: _rasterScale,
+              onChanged: (v) {
+                setState(() => _rasterScale = v);
                 _persistSettings();
               },
             ),
-            const SizedBox(height: 6),
-            Text(_rasterScale.hint, style: theme.textTheme.labelMedium),
             const SizedBox(height: 8),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Usar como predeterminada'),
+              title: Text(l('Usar como predeterminada', 'Use as default')),
               subtitle: Text(
                 _firstPrinter
-                    ? 'Primera impresora: será la predeterminada'
-                    : 'Se usará por defecto al imprimir',
+                    ? l(
+                        'Primera impresora: será la predeterminada',
+                        'First printer: it will be the default',
+                      )
+                    : l(
+                        'Se usará por defecto al imprimir',
+                        'Used by default when printing',
+                      ),
               ),
               value: _isDefault || _firstPrinter,
               onChanged: _firstPrinter
@@ -1303,8 +1558,10 @@ class _AddBtDeviceSheetState extends State<_AddBtDeviceSheet> {
     if (!ok) {
       setState(() {
         _scanning = false;
-        _error =
-            'Concede Bluetooth y ubicación para buscar dispositivos cercanos.';
+        _error = tr(
+          'Concede Bluetooth y ubicación para buscar dispositivos cercanos.',
+          'Allow Bluetooth and location to scan for nearby devices.',
+        );
       });
       return;
     }
@@ -1315,11 +1572,13 @@ class _AddBtDeviceSheetState extends State<_AddBtDeviceSheet> {
         for (final d in list) {
           final key = d.macAdress.trim().toUpperCase();
           if (key.isEmpty || widget.excludeAddresses.contains(key)) continue;
-          _nearby[key] = NearbyBtDevice(
+          final nearby = NearbyBtDevice(
             name: d.name,
             address: d.macAdress.trim(),
             bonded: false,
           );
+          if (!nearby.hasVisibleName) continue;
+          _nearby[key] = nearby;
         }
         _publishFound();
         setState(() => _scanning = false);
@@ -1327,7 +1586,10 @@ class _AddBtDeviceSheetState extends State<_AddBtDeviceSheet> {
         if (!mounted) return;
         setState(() {
           _scanning = false;
-          _error = 'No se pudieron buscar dispositivos: $e';
+          _error = tr(
+            'No se pudieron buscar dispositivos: $e',
+            'Could not scan for devices: $e',
+          );
         });
       }
       return;
@@ -1345,6 +1607,7 @@ class _AddBtDeviceSheetState extends State<_AddBtDeviceSheet> {
         );
         if (device.address.isEmpty || device.bonded) return;
         if (widget.excludeAddresses.contains(device.key)) return;
+        if (!device.hasVisibleName) return;
         _nearby[device.key] = device;
         _flush?.cancel();
         _flush = Timer(const Duration(milliseconds: 180), () {
@@ -1363,7 +1626,7 @@ class _AddBtDeviceSheetState extends State<_AddBtDeviceSheet> {
       if (!mounted) return;
       setState(() {
         _scanning = false;
-        _error = e.message;
+        _error = e.localizedMessage;
       });
       if (e.code == 'location_off') {
         unawaited(BluetoothBondChannel.openLocationSettings());
@@ -1375,20 +1638,39 @@ class _AddBtDeviceSheetState extends State<_AddBtDeviceSheet> {
     if (_bonding != null) return;
     if (PlatformCaps.isAndroid) {
       setState(() => _bonding = device.address);
+      var ok = false;
       try {
         await BluetoothBondChannel.createBond(device.address);
-      } on BluetoothBondException catch (e) {
+        ok = await BluetoothBondChannel.isBonded(device.address);
+      } on BluetoothBondException {
+        try {
+          await BluetoothBondChannel.forget(device.address);
+        } catch (_) {}
         if (!mounted) return;
-        setState(() => _bonding = null);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
+        Navigator.pop(
+          context,
+          _BtChoice(name: '', address: device.address, bonded: false),
         );
         return;
-      } catch (e) {
+      } catch (_) {
+        try {
+          await BluetoothBondChannel.forget(device.address);
+        } catch (_) {}
         if (!mounted) return;
-        setState(() => _bonding = null);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('BT: $e')),
+        Navigator.pop(
+          context,
+          _BtChoice(name: '', address: device.address, bonded: false),
+        );
+        return;
+      }
+      if (!ok) {
+        try {
+          await BluetoothBondChannel.forget(device.address);
+        } catch (_) {}
+        if (!mounted) return;
+        Navigator.pop(
+          context,
+          _BtChoice(name: '', address: device.address, bonded: false),
         );
         return;
       }
@@ -1407,6 +1689,7 @@ class _AddBtDeviceSheetState extends State<_AddBtDeviceSheet> {
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.paddingOf(context).bottom;
+    final l = L.of(context);
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottom),
@@ -1415,31 +1698,37 @@ class _AddBtDeviceSheetState extends State<_AddBtDeviceSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Agregar dispositivo',
+              l('Agregar dispositivo', 'Add device'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 4),
             Text(
               PlatformCaps.isIOS
-                  ? 'Busca impresoras BLE cercanas. Toca una para usarla.'
-                  : 'Enciende la impresora. Toca una para emparejarla. El PIN suele ser 0000 o 1234.',
+                  ? l(
+                      'Busca impresoras BLE cercanas. Toca una para usarla.',
+                      'Scan for nearby BLE printers. Tap one to use it.',
+                    )
+                  : l(
+                      'Enciende la impresora. Toca una para emparejarla. Si pide PIN suele ser 0000 o 1234. En POS (Telpo y similares) a menudo se vincula sola, sin PIN.',
+                      'Turn the printer on. Tap one to pair. If it asks for a PIN, try 0000 or 1234. On POS devices (Telpo and similar) it often pairs by itself, with no PIN.',
+                    ),
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 8),
             if (_scanning)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Row(
                   children: [
-                    RepaintBoundary(
+                    const RepaintBoundary(
                       child: SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                     ),
-                    SizedBox(width: 12),
-                    Text('Buscando cercanos…'),
+                    const SizedBox(width: 12),
+                    Text(l('Buscando cercanos…', 'Scanning nearby…')),
                   ],
                 ),
               ),
@@ -1458,9 +1747,12 @@ class _AddBtDeviceSheetState extends State<_AddBtDeviceSheet> {
                   height: 280,
                   child: found.isEmpty
                       ? (!_scanning && _error == null
-                          ? const Center(
+                          ? Center(
                               child: Text(
-                                'No se encontraron dispositivos nuevos. Acerca la impresora y actualiza.',
+                                l(
+                                  'No hay impresoras con nombre. Enciende la térmica y busca de nuevo (se ocultan las que solo muestran MAC).',
+                                  'No named printers found. Turn the thermal printer on and scan again (devices that only show a MAC are hidden).',
+                                ),
                                 textAlign: TextAlign.center,
                               ),
                             )
@@ -1505,13 +1797,13 @@ class _AddBtDeviceSheetState extends State<_AddBtDeviceSheet> {
                   onPressed: _bonding != null
                       ? null
                       : () => Navigator.pop(context),
-                  child: const Text('Cancelar'),
+                  child: Text(l('Cancelar', 'Cancel')),
                 ),
                 const Spacer(),
                 TextButton.icon(
                   onPressed: (_scanning || _bonding != null) ? null : _start,
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Buscar de nuevo'),
+                  label: Text(l('Buscar de nuevo', 'Scan again')),
                 ),
               ],
             ),

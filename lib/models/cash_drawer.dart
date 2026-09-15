@@ -1,3 +1,5 @@
+import '../l10n/app_lang.dart';
+
 /// Pulso de gaveta ESC/POS (`ESC p m t1 t2`). Opcional: default none.
 enum CashDrawer {
   none,
@@ -7,7 +9,7 @@ enum CashDrawer {
   String get label {
     switch (this) {
       case CashDrawer.none:
-        return 'Sin gaveta';
+        return tr('Sin gaveta', 'No cash drawer');
       case CashDrawer.pin2:
         return 'Pin 2 (ESC p 0)';
       case CashDrawer.pin5:
@@ -18,11 +20,17 @@ enum CashDrawer {
   String get hint {
     switch (this) {
       case CashDrawer.none:
-        return 'No envía comando (impresoras sin cajón)';
+        return tr(
+          'No envía comando (impresoras sin cajón)',
+          'Sends no command (printers without a drawer)',
+        );
       case CashDrawer.pin2:
-        return 'Conector habitual; el cajon se abre cuando ya salio el ticket';
+        return tr(
+          'Conector habitual; el cajon se abre cuando ya salio el ticket',
+          'Usual connector; the drawer opens after the ticket prints',
+        );
       case CashDrawer.pin5:
-        return 'Segundo conector del cajón';
+        return tr('Segundo conector del cajón', 'Second drawer connector');
     }
   }
 

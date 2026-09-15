@@ -1,5 +1,6 @@
 import 'package:xml/xml.dart';
 
+import '../../l10n/app_lang.dart';
 import 'sunat_ticket.dart';
 
 class SunatXmlException implements Exception {
@@ -21,28 +22,42 @@ class SunatUblParser {
   static SunatTicket parse(String xmlSource) {
     final source = xmlSource.replaceFirst('\uFEFF', '').trim();
     if (source.isEmpty) {
-      throw SunatXmlException('El XML esta vacio.');
+      throw SunatXmlException(tr('El XML esta vacio.', 'The XML is empty.'));
     }
 
     final XmlDocument doc;
     try {
       doc = XmlDocument.parse(source);
     } on XmlException {
-      throw SunatXmlException('El archivo no es un XML valido.');
+      throw SunatXmlException(
+        tr(
+          'El archivo no es un XML valido.',
+          'The file is not valid XML.',
+        ),
+      );
     }
 
     final root = doc.rootElement;
     if (_rejectRoots.contains(root.localName)) {
       throw SunatXmlException(
-        'Este XML no es un comprobante imprimible '
-        '(${root.localName}: es CDR o resumen SUNAT).',
+        tr(
+          'Este XML no es un comprobante imprimible '
+          '(${root.localName}: es CDR o resumen SUNAT).',
+          'This XML is not a printable receipt '
+          '(${root.localName}: SUNAT CDR or summary).',
+        ),
       );
     }
 
     final type = _documentType(root);
     final id = _directText(root, 'ID');
     if (id.isEmpty) {
-      throw SunatXmlException('El XML no tiene serie-numero (cbc:ID).');
+      throw SunatXmlException(
+        tr(
+          'El XML no tiene serie-numero (cbc:ID).',
+          'The XML has no series-number (cbc:ID).',
+        ),
+      );
     }
     final parts = _splitId(id);
 
@@ -118,8 +133,12 @@ class SunatUblParser {
         final type = _digits(_directText(root, 'InvoiceTypeCode'));
         if (type == '07' || type == '08') {
           throw SunatXmlException(
-            'La nota ${type == '07' ? 'de credito' : 'de debito'} '
-            'debe venir como CreditNote/DebitNote, no como Invoice.',
+            tr(
+              'La nota ${type == '07' ? 'de credito' : 'de debito'} '
+              'debe venir como CreditNote/DebitNote, no como Invoice.',
+              'The ${type == '07' ? 'credit' : 'debit'} note must be '
+              'CreditNote/DebitNote, not Invoice.',
+            ),
           );
         }
         if (type.isNotEmpty) return type;
@@ -137,8 +156,12 @@ class SunatUblParser {
         return '40';
       default:
         throw SunatXmlException(
-          'Este XML no es un comprobante UBL de SUNAT '
-          '(llego ${root.localName}).',
+          tr(
+            'Este XML no es un comprobante UBL de SUNAT '
+            '(llego ${root.localName}).',
+            'This XML is not a SUNAT UBL receipt '
+            '(got ${root.localName}).',
+          ),
         );
     }
   }

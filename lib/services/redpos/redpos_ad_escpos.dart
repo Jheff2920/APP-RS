@@ -1,15 +1,22 @@
 import '../../models/cut_mode.dart';
 import '../../models/paper_width.dart';
 import '../../models/saved_printer.dart';
+import '../../l10n/app_lang.dart';
 import 'redpos_config.dart';
 
 /// Pie de publicidad ESC/POS: pegado al ticket, luego el margen y el corte.
 class RedPosAdEscPos {
-  static const lines = <String>[
-    'App de uso gratuito.',
-    'Sin publicidad: equipo RedPOS',
-    'o suscripcion.',
-  ];
+  static List<String> get lines => isAppEnglish
+      ? const [
+          'Free to use.',
+          'Ad-free: RedPOS hardware',
+          'or a subscription.',
+        ]
+      : const [
+          'App de uso gratuito.',
+          'Sin publicidad: equipo RedPOS',
+          'o suscripcion.',
+        ];
 
   static List<int> footerBytes({
     required PaperWidth paper,

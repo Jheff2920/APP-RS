@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
 
+import '../../l10n/app_lang.dart';
 import 'sunat_ubl_parser.dart';
 
 /// Lee XML SUNAT desde un `.xml` o un `.zip` (CPE + CDR).
@@ -32,7 +33,9 @@ class SunatXmlSource {
   static Future<String> load(String filePath) async {
     final bytes = await File(filePath).readAsBytes();
     if (bytes.isEmpty) {
-      throw SunatXmlException('El archivo esta vacio.');
+      throw SunatXmlException(
+        tr('El archivo esta vacio.', 'The file is empty.'),
+      );
     }
     if (_isZip(bytes) || filePath.toLowerCase().endsWith('.zip')) {
       return decode(_xmlFromZip(bytes));
@@ -66,7 +69,12 @@ class SunatXmlSource {
     try {
       archive = ZipDecoder().decodeBytes(bytes, verify: false);
     } catch (_) {
-      throw SunatXmlException('No se pudo abrir el ZIP de SUNAT.');
+      throw SunatXmlException(
+        tr(
+          'No se pudo abrir el ZIP de SUNAT.',
+          'Could not open the SUNAT ZIP.',
+        ),
+      );
     }
 
     final xmlFiles = archive.files.where((f) {
@@ -75,7 +83,12 @@ class SunatXmlSource {
     }).toList();
 
     if (xmlFiles.isEmpty) {
-      throw SunatXmlException('El ZIP no contiene un XML de SUNAT.');
+      throw SunatXmlException(
+        tr(
+          'El ZIP no contiene un XML de SUNAT.',
+          'The ZIP does not contain a SUNAT XML.',
+        ),
+      );
     }
 
     ArchiveFile? cpe;
@@ -95,7 +108,12 @@ class SunatXmlSource {
 
     final content = cpe.readBytes();
     if (content == null || content.isEmpty) {
-      throw SunatXmlException('El XML dentro del ZIP esta vacio.');
+      throw SunatXmlException(
+        tr(
+          'El XML dentro del ZIP esta vacio.',
+          'The XML inside the ZIP is empty.',
+        ),
+      );
     }
     return content;
   }

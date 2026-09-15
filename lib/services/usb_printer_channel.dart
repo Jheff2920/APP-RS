@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 
+import '../l10n/app_lang.dart';
 import '../platform_caps.dart';
 
 class UsbDeviceInfo {
@@ -97,7 +98,10 @@ class UsbPrinterChannel {
     if (!PlatformCaps.supportsUsb) {
       throw PlatformException(
         code: 'unsupported',
-        message: 'USB solo está disponible en Android.',
+        message: tr(
+          'USB solo está disponible en Android.',
+          'USB is only available on Android.',
+        ),
       );
     }
   }

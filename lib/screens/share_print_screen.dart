@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
 import '../brand.dart';
+import '../l10n/app_lang.dart';
 import '../models/saved_printer.dart';
 import '../services/print_service.dart';
 import '../services/printer_permissions.dart';
@@ -63,7 +64,9 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
       final all = await widget.printerStore.loadAll();
       final printer = PrinterStore.findByIdOrDefault(all, _selected!.id);
       if (printer == null) {
-        throw PrinterTransportException('No hay impresoras vinculadas');
+        throw PrinterTransportException(
+          tr('No hay impresoras vinculadas', 'No printers are paired'),
+        );
       }
       if (!mounted) return;
       setState(() => _selected = printer);
@@ -72,7 +75,10 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
         final ok = await PrinterPermissions.ensureBluetooth();
         if (!ok) {
           throw PrinterTransportException(
-            'Faltan permisos de Bluetooth. Concedelos en Ajustes de la app.',
+            tr(
+              'Faltan permisos de Bluetooth. Concedelos en Ajustes de la app.',
+              'Bluetooth permission is missing. Allow it in app Settings.',
+            ),
           );
         }
       }
@@ -89,7 +95,11 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
       );
       if (!mounted) return;
       messenger.showSnackBar(
-        SnackBar(content: Text('Enviado a ${printer.name}')),
+        SnackBar(
+          content: Text(
+            tr('Enviado a ${printer.name}', 'Sent to ${printer.name}'),
+          ),
+        ),
       );
       Navigator.of(context).pop(true);
     } on PrinterTransportException catch (e) {
@@ -98,7 +108,16 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
       }
     } catch (e) {
       if (mounted) {
-        messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              tr(
+                'No se pudo imprimir. Enciende la impresora e inténtalo de nuevo.',
+                'Could not print. Turn the printer on and try again.',
+              ),
+            ),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _printing = false);
@@ -108,9 +127,10 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
   @override
   Widget build(BuildContext context) {
     final name = p.basename(widget.filePath);
+    final l = L.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Imprimir archivo')),
+      appBar: AppBar(title: Text(l('Imprimir archivo', 'Print file'))),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : BoletaPage(
@@ -125,7 +145,7 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.print),
-                  label: const Text('Imprimir'),
+                  label: Text(l('Imprimir', 'Print')),
                 ),
               ),
               child: ListView(
@@ -147,7 +167,10 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
                       title: Text(name),
                       subtitle: Text(
                         _isXmlLike(name)
-                            ? 'XML SUNAT → ticket ${(_selected?.paper.label ?? '')}'
+                            ? l(
+                                'XML SUNAT → ticket ${(_selected?.paper.label ?? '')}',
+                                'SUNAT XML → ${(_selected?.paper.label ?? '')} ticket',
+                              )
                             : widget.filePath,
                         maxLines: 2,
                       ),
@@ -155,21 +178,25 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Impresora vinculada',
+                    l('Impresora vinculada', 'Paired printer'),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
                   if (_printers.isEmpty)
-                    const Text(
-                      'No hay impresoras vinculadas. Abre ${AppBrand.name}, '
-                      'agrega una impresora y vuelve a abrir el archivo.',
+                    Text(
+                      l(
+                        'No hay impresoras vinculadas. Abre ${AppBrand.name}, '
+                        'agrega una impresora y vuelve a abrir el archivo.',
+                        'No printers are paired. Open ${AppBrand.name}, add a '
+                        'printer, then open the file again.',
+                      ),
                     )
                   else
                     DropdownButtonFormField<String>(
                       initialValue: _selected?.id,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        labelText: 'Impresora',
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: l('Impresora', 'Printer'),
                       ),
                       items: _printers
                           .map(

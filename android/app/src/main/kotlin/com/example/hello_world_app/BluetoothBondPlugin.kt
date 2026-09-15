@@ -25,8 +25,10 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
 /**
- * Discovery Classic + createBond. El PIN lo muestra Android; la impresión
- * sigue por RFCOMM ([EscPosTransport] / PrintService).
+ * Discovery Classic + createBond. Impresoras POS (Telpo, etc.) a menudo
+ * emparejan Just Works, sin PIN ni ACTION_BOND_STATE_CHANGED; hay que
+ * confirmar PAIRING_REQUEST y consultar bondState. La impresión sigue
+ * por RFCOMM ([EscPosTransport] / PrintService).
  */
 class BluetoothBondPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
 
@@ -44,8 +46,11 @@ class BluetoothBondPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
     private var pendingBond: MethodChannel.Result? = null
     private var pendingBondAddress: String? = null
     private var pendingBondSawBonding = false
+    private var pendingBondSawPairing = false
     private var pendingBondIsRemove = false
     private var bondTimeout: Runnable? = null
+    private var bondPoll: Runnable? = null
+    private var pendingBondDevice: BluetoothDevice? = null
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -56,6 +61,14 @@ class BluetoothBondPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
                     emit(mapOf("type" to "scanFinished"))
                 }
                 BluetoothDevice.ACTION_BOND_STATE_CHANGED -> onBondChanged(intent)
+                BluetoothDevice.ACTION_PAIRING_REQUEST -> {
+                    if (onPairingRequest(intent)) {
+                        try {
+                            abortBroadcast()
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
             }
         }
     }
@@ -72,6 +85,8 @@ class BluetoothBondPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
             addAction(BluetoothDevice.ACTION_FOUND)
             addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
             addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+            addAction(BluetoothDevice.ACTION_PAIRING_REQUEST)
+            priority = IntentFilter.SYSTEM_HIGH_PRIORITY
         }
         ContextCompat.registerReceiver(
             binding.applicationContext,
@@ -140,6 +155,7 @@ class BluetoothBondPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
             }
             "createBond" -> createBond(call.argument<String>("address") ?: "", result)
             "removeBond" -> removeBond(call.argument<String>("address") ?: "", result)
+            "isFullyBonded" -> isFullyBonded(call.argument<String>("address") ?: "", result)
             "listBonded" -> listBonded(result)
             "openLocationSettings" -> {
                 val ctx = activity ?: appContext
@@ -275,7 +291,9 @@ class BluetoothBondPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
         stopScanInternal()
         pendingBond = result
         pendingBondAddress = device.address
+        pendingBondDevice = device
         pendingBondSawBonding = device.bondState == BluetoothDevice.BOND_BONDING
+        pendingBondSawPairing = false
         pendingBondIsRemove = false
         val started = try {
             device.createBond()
@@ -284,22 +302,16 @@ class BluetoothBondPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
             result.error("bond_failed", e.message, null)
             return
         }
-        if (!started) {
+        if (!started && device.bondState != BluetoothDevice.BOND_BONDING) {
+            if (device.bondState == BluetoothDevice.BOND_BONDED) {
+                finishBondSuccess()
+                return
+            }
             clearBondWait()
             result.error("bond_failed", "No se pudo iniciar el emparejado", null)
             return
         }
-        val timeout = Runnable {
-            val pending = pendingBond ?: return@Runnable
-            clearBondWait()
-            pending.error(
-                "timeout",
-                "No se completo el emparejado. Revisa el PIN (0000 o 1234) e intenta de nuevo.",
-                null,
-            )
-        }
-        bondTimeout = timeout
-        main.postDelayed(timeout, BOND_TIMEOUT_MS)
+        watchBond(device)
     }
 
     @SuppressLint("MissingPermission")
@@ -319,14 +331,21 @@ class BluetoothBondPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
             return
         }
         val device = try {
-            adapter.bondedDevices?.firstOrNull { it.address.equals(mac, ignoreCase = true) }
+            adapter.getRemoteDevice(mac)
         } catch (e: Exception) {
             result.error("unbond_failed", e.message, null)
             return
         }
-        if (device == null) {
-            result.success(true)
-            return
+        if (device.bondState == BluetoothDevice.BOND_NONE) {
+            val stillListed = try {
+                adapter.bondedDevices?.any { it.address.equals(mac, ignoreCase = true) } == true
+            } catch (_: Exception) {
+                false
+            }
+            if (!stillListed) {
+                result.success(true)
+                return
+            }
         }
         if (pendingBond != null) {
             result.error("busy", "Ya hay un emparejado en curso", null)
@@ -379,6 +398,27 @@ class BluetoothBondPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
     }
 
     @SuppressLint("MissingPermission")
+    private fun isFullyBonded(address: String, result: MethodChannel.Result) {
+        val mac = address.trim()
+        if (mac.isEmpty() || !hasConnectPermission()) {
+            result.success(false)
+            return
+        }
+        val adapter = adapter()
+        if (adapter == null || !adapter.isEnabled) {
+            result.success(false)
+            return
+        }
+        val device = try {
+            adapter.getRemoteDevice(mac)
+        } catch (_: Exception) {
+            result.success(false)
+            return
+        }
+        result.success(device.bondState == BluetoothDevice.BOND_BONDED)
+    }
+
+    @SuppressLint("MissingPermission")
     private fun listBonded(result: MethodChannel.Result) {
         if (!hasConnectPermission()) {
             result.error("permission", "Faltan permisos de Bluetooth", null)
@@ -420,9 +460,7 @@ class BluetoothBondPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
             }
             BluetoothDevice.BOND_BONDED -> {
                 if (pendingBondIsRemove) return
-                val pending = pendingBond
-                clearBondWait()
-                pending?.success(true)
+                finishBondSuccess()
             }
             BluetoothDevice.BOND_NONE -> {
                 if (pendingBondIsRemove) {
@@ -431,20 +469,129 @@ class BluetoothBondPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
                     main.postDelayed({ pending?.success(true) }, 200)
                     return
                 }
-                if (!pendingBondSawBonding) return
+                if (!pendingBondSawBonding && !pendingBondSawPairing) return
                 val pending = pendingBond
+                val toForget = pendingBondDevice
                 clearBondWait()
-                pending?.error("rejected", "Emparejado cancelado o PIN incorrecto", null)
+                pending?.error(
+                    "rejected",
+                    "Emparejado cancelado o PIN incorrecto",
+                    null,
+                )
+                dropBond(toForget)
             }
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun onPairingRequest(intent: Intent): Boolean {
+        val device = extraDevice(intent) ?: return false
+        val want = pendingBondAddress ?: return false
+        if (!device.address.equals(want, ignoreCase = true)) return false
+        pendingBondSawPairing = true
+        val variant = intent.getIntExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT, BluetoothDevice.ERROR)
+        return when (variant) {
+            BluetoothDevice.PAIRING_VARIANT_PIN,
+            PAIRING_VARIANT_PIN_16_DIGITS -> {
+                // PIN: el sistema muestra el teclado. No adelantar 0000/1234.
+                false
+            }
+            PAIRING_VARIANT_PASSKEY_CONFIRMATION,
+            PAIRING_VARIANT_CONSENT,
+            PAIRING_VARIANT_OOB_CONSENT -> confirmPairing(device)
+            else -> confirmPairing(device)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun dropBond(device: BluetoothDevice?) {
+        if (device == null) return
+        try {
+            val method = device.javaClass.getMethod("removeBond")
+            method.invoke(device)
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun confirmPairing(device: BluetoothDevice): Boolean {
+        return try {
+            val method = device.javaClass.getMethod(
+                "setPairingConfirmation",
+                Boolean::class.javaPrimitiveType,
+            )
+            method.invoke(device, true) as? Boolean == true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun isBonded(device: BluetoothDevice): Boolean {
+        if (device.bondState == BluetoothDevice.BOND_BONDED) return true
+        val adapter = adapter() ?: return false
+        return try {
+            adapter.bondedDevices?.any { it.address.equals(device.address, ignoreCase = true) } == true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun finishBondSuccess() {
+        val pending = pendingBond ?: return
+        clearBondWait()
+        pending.success(true)
+    }
+
+    private fun watchBond(device: BluetoothDevice) {
+        val poll = object : Runnable {
+            override fun run() {
+                if (pendingBond == null || pendingBondIsRemove) return
+                if (pendingBondSawPairing) {
+                    if (device.bondState == BluetoothDevice.BOND_BONDED) {
+                        finishBondSuccess()
+                    } else {
+                        main.postDelayed(this, BOND_POLL_MS)
+                    }
+                    return
+                }
+                if (device.bondState == BluetoothDevice.BOND_BONDED) {
+                    finishBondSuccess()
+                    return
+                }
+                main.postDelayed(this, BOND_POLL_MS)
+            }
+        }
+        bondPoll = poll
+        main.postDelayed(poll, 1_200L)
+        val timeout = Runnable {
+            val pending = pendingBond ?: return@Runnable
+            val bonded = device.bondState == BluetoothDevice.BOND_BONDED
+            clearBondWait()
+            if (bonded) {
+                pending.success(true)
+            } else {
+                pending.error(
+                    "timeout",
+                    "No se completo el emparejado. Si pide PIN, prueba 0000 o 1234.",
+                    null,
+                )
+                dropBond(device)
+            }
+        }
+        bondTimeout = timeout
+        main.postDelayed(timeout, BOND_TIMEOUT_MS)
     }
 
     private fun clearBondWait() {
         bondTimeout?.let { main.removeCallbacks(it) }
         bondTimeout = null
+        bondPoll?.let { main.removeCallbacks(it) }
+        bondPoll = null
         pendingBond = null
         pendingBondAddress = null
+        pendingBondDevice = null
         pendingBondSawBonding = false
+        pendingBondSawPairing = false
         pendingBondIsRemove = false
     }
 
@@ -456,7 +603,8 @@ class BluetoothBondPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
             device.name?.trim().orEmpty()
         } catch (_: Exception) {
             ""
-        }.ifEmpty { address }
+        }
+        if (name.isEmpty() || name.equals(address, ignoreCase = true)) return
         emit(
             mapOf(
                 "type" to "found",
@@ -535,6 +683,11 @@ class BluetoothBondPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCa
         const val CHANNEL = "boleta_print/bt_bond"
         const val EVENTS = "boleta_print/bt_bond_events"
         private const val BOND_TIMEOUT_MS = 45_000L
+        private const val BOND_POLL_MS = 400L
         private const val UNBOND_TIMEOUT_MS = 12_000L
+        private const val PAIRING_VARIANT_PASSKEY_CONFIRMATION = 2
+        private const val PAIRING_VARIANT_CONSENT = 3
+        private const val PAIRING_VARIANT_OOB_CONSENT = 6
+        private const val PAIRING_VARIANT_PIN_16_DIGITS = 7
     }
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../brand.dart';
+import '../l10n/app_lang.dart';
 import '../legal/legal_copy.dart';
 
 class LegalScreen extends StatelessWidget {
@@ -15,8 +16,11 @@ class LegalScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final title = privacy ? 'Privacidad' : 'Términos y condiciones';
-    final sections = privacy ? LegalCopy.privacy : LegalCopy.terms;
+    final l = L.of(context);
+    final title = privacy
+        ? l('Privacidad', 'Privacy')
+        : l('Términos y condiciones', 'Terms and conditions');
+    final sections = privacy ? LegalCopy.privacy(l) : LegalCopy.terms(l);
 
     return Scaffold(
       appBar: AppBar(title: Text(title)),
@@ -32,14 +36,21 @@ class LegalScreen extends StatelessWidget {
                 scrollCacheExtent: const ScrollCacheExtent.pixels(280),
                 children: [
                   Text(
-                    'Última actualización: ${LegalCopy.lastUpdated}',
+                    l('Última actualización: ${LegalCopy.lastUpdated(l)}',
+                        'Last updated: ${LegalCopy.lastUpdated(l)}'),
                     style: theme.textTheme.labelMedium,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     privacy
-                        ? 'Cómo ${AppBrand.name} usa datos en el teléfono y, más adelante, en una cuenta.'
-                        : 'Uso de ${AppBrand.name}. Esto no sustituye asesoría legal; revísalo antes de Play.',
+                        ? l(
+                            'Cómo ${AppBrand.name} usa datos en el teléfono y, si te suscribes, en Google Play.',
+                            'How ${AppBrand.name} uses data on the phone and, if you subscribe, in Google Play.',
+                          )
+                        : l(
+                            'Uso de ${AppBrand.name}. Imprimir no se bloquea sin cuenta.',
+                            'Using ${AppBrand.name}. Printing is not blocked without an account.',
+                          ),
                     style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(height: 16),

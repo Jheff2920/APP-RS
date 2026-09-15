@@ -4,6 +4,7 @@ import 'paper_width.dart';
 import 'print_margins.dart';
 import 'printer_dpi.dart';
 import 'raster_scale.dart';
+import '../l10n/app_lang.dart';
 
 enum PrinterLinkType {
   bluetooth,
@@ -15,7 +16,7 @@ enum PrinterLinkType {
       case PrinterLinkType.bluetooth:
         return 'Bluetooth';
       case PrinterLinkType.network:
-        return 'WiFi / Red';
+        return tr('WiFi / Red', 'WiFi / Network');
       case PrinterLinkType.usb:
         return 'USB';
     }

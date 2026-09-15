@@ -1,3 +1,5 @@
+import '../l10n/app_lang.dart';
+
 enum PrintJobStatus {
   queued,
   success,
@@ -6,11 +8,11 @@ enum PrintJobStatus {
   String get label {
     switch (this) {
       case PrintJobStatus.queued:
-        return 'En cola';
+        return tr('En cola', 'Queued');
       case PrintJobStatus.success:
-        return 'Impreso';
+        return tr('Impreso', 'Printed');
       case PrintJobStatus.failed:
-        return 'Fallido';
+        return tr('Fallido', 'Failed');
     }
   }
 

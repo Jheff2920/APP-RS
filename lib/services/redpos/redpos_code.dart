@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 
 import 'redpos_config.dart';
+import '../../l10n/app_lang.dart';
 
 class RedPosCodeResult {
   const RedPosCodeResult._({
@@ -18,10 +19,10 @@ class RedPosCodeResult {
   final String? message;
   final bool testAlias;
 
-  static const invalid = RedPosCodeResult._(
-    ok: false,
-    message: 'Código no válido',
-  );
+  static RedPosCodeResult get invalid => RedPosCodeResult._(
+        ok: false,
+        message: tr('Código no válido', 'Invalid code'),
+      );
 
   static RedPosCodeResult valid(String nonce, {bool testAlias = false}) {
     return RedPosCodeResult._(ok: true, nonce: nonce, testAlias: testAlias);
@@ -64,9 +65,12 @@ class RedPosCode {
   static RedPosCodeResult verify(String input, {String? secret}) {
     final trimmed = input.trim();
     if (trimmed.isEmpty) {
-      return const RedPosCodeResult._(
+      return RedPosCodeResult._(
         ok: false,
-        message: 'Escribe un código o continúa con publicidad',
+        message: tr(
+          'Escribe un código o continúa con publicidad',
+          'Enter a code or continue with ads',
+        ),
       );
     }
     if (isTestAlias(trimmed)) {

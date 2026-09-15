@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import 'platform_caps.dart';
@@ -11,6 +12,7 @@ import 'services/incoming_files.dart';
 import 'services/print_service.dart';
 import 'services/printer_store.dart';
 import 'services/redpos/redpos_license.dart';
+import 'services/redpos/redpos_play_billing.dart';
 import 'services/shared_incoming.dart';
 import 'system_print_main.dart';
 import 'brand.dart';
@@ -49,7 +51,10 @@ class _BoletaPrintAppState extends State<BoletaPrintApp> {
     // Re-sincroniza prefs nativas (impresoras ya guardadas antes del PrintService).
     unawaited(widget.store.syncNativePrefs());
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(RedPosLicenseStore.instance.hydrate(widget.store));
+      unawaited(() async {
+        await RedPosPlayBilling.instance.start(store: widget.store);
+        await RedPosLicenseStore.instance.hydrate(widget.store);
+      }());
     });
     _listenShares();
   }
@@ -137,6 +142,16 @@ class _BoletaPrintAppState extends State<BoletaPrintApp> {
       navigatorKey: _navKey,
       title: AppBrand.name,
       theme: boletaPrintTheme,
+      supportedLocales: const [Locale('es'), Locale('en')],
+      localeResolutionCallback: (locale, _) {
+        if (locale?.languageCode == 'es') return const Locale('es');
+        return const Locale('en');
+      },
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       home: PrinterListScreen(
         store: widget.store,
         printService: widget.printService,
