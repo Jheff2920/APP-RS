@@ -15,6 +15,14 @@ void main() {
     expect(await store.isAdsFree(reloadDisk: false), isTrue);
   });
 
+  test('google email persists in local prefs', () async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final store = RedPosLicenseStore(prefs: prefs);
+    expect(await store.setGoogleEmail('  buyer@gmail.com  '), isTrue);
+    expect(await store.googleEmail(reloadDisk: false), 'buyer@gmail.com');
+  });
+
   test('no token and no play entitlement keeps ads', () async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();

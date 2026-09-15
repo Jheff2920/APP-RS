@@ -60,15 +60,20 @@ class RedPosLicenseStore {
     await prefs.setBool(playEntitlementKey, active);
   }
 
-  Future<void> setGoogleEmail(String email) async {
+  /// Correo de Google usado al pagar. Solo vive en SharedPreferences de este
+  /// aparato (`redpos_google_email_v1`); no hay cuenta en un servidor RedPOS.
+  Future<bool> setGoogleEmail(String email) async {
     final trimmed = email.trim();
-    if (trimmed.isEmpty) return;
+    if (trimmed.isEmpty) return false;
     final prefs = await _ensurePrefs();
-    await prefs.setString(googleEmailKey, trimmed);
+    final saved = await prefs.setString(googleEmailKey, trimmed);
+    if (!saved) return false;
+    return prefs.getString(googleEmailKey)?.trim() == trimmed;
   }
 
-  Future<String?> googleEmail() async {
+  Future<String?> googleEmail({bool reloadDisk = true}) async {
     final prefs = await _ensurePrefs();
+    if (reloadDisk) await prefs.reload();
     final value = prefs.getString(googleEmailKey)?.trim();
     if (value == null || value.isEmpty) return null;
     return value;

@@ -42,12 +42,13 @@ class _RedPosSubscribeScreenState extends State<RedPosSubscribeScreen> {
       _email = email;
       _loading = false;
       if (product == null) {
-        _message = tr(
-          'La suscripción mensual aún no está publicada en Play Console. '
-          'Mientras tanto usa un código RedPOS o pide la licencia de por vida por correo.',
-          'The monthly subscription is not live in Play Console yet. '
-          'Use a RedPOS code or request a lifetime license by email.',
-        );
+        _message = RedPosPlayBilling.instance.lastError ??
+            tr(
+              'La suscripción mensual aún no está publicada en Play Console. '
+              'Mientras tanto usa un código RedPOS o pide la licencia de por vida por correo.',
+              'The monthly subscription is not live in Play Console yet. '
+              'Use a RedPOS code or request a lifetime license by email.',
+            );
       }
     });
   }
@@ -56,12 +57,13 @@ class _RedPosSubscribeScreenState extends State<RedPosSubscribeScreen> {
     final product = _product;
     if (product == null) {
       setState(() {
-        _message = tr(
-          'La suscripción mensual aún no está publicada en Play Console. '
-          'Mientras tanto usa un código RedPOS o pide la licencia de por vida por correo.',
-          'The monthly subscription is not live in Play Console yet. '
-          'Use a RedPOS code or request a lifetime license by email.',
-        );
+        _message = RedPosPlayBilling.instance.lastError ??
+            tr(
+              'La suscripción mensual aún no está publicada en Play Console. '
+              'Mientras tanto usa un código RedPOS o pide la licencia de por vida por correo.',
+              'The monthly subscription is not live in Play Console yet. '
+              'Use a RedPOS code or request a lifetime license by email.',
+            );
       });
       return;
     }
@@ -69,20 +71,9 @@ class _RedPosSubscribeScreenState extends State<RedPosSubscribeScreen> {
       _busy = true;
       _message = null;
     });
-    final account = await RedPosPlayBilling.instance.signIn();
+    final account = await RedPosPlayBilling.instance.trySilentSignIn();
     if (!mounted) return;
-    if (account == null) {
-      setState(() {
-        _busy = false;
-        _message = RedPosPlayBilling.instance.lastError ??
-            tr(
-              'Elige una cuenta de Google para pagar.',
-              'Choose a Google account to pay.',
-            );
-      });
-      return;
-    }
-    setState(() => _email = account.email);
+    if (account != null) setState(() => _email = account.email);
     final error = await RedPosPlayBilling.instance.buyMonthly(
       product,
       account: account,
@@ -95,14 +86,30 @@ class _RedPosSubscribeScreenState extends State<RedPosSubscribeScreen> {
       });
       return;
     }
-    await Future<void>.delayed(const Duration(milliseconds: 800));
-    await RedPosPlayBilling.instance.refresh();
+    setState(() {
+      _message = tr(
+        'Esperando la confirmación de Google Play…',
+        'Waiting for Google Play to confirm…',
+      );
+    });
+    final confirmed = await RedPosPlayBilling.instance.waitForPurchaseOutcome();
+    if (!confirmed) {
+      await RedPosPlayBilling.instance.refresh(allowRevoke: false);
+    }
     final adsFree = await RedPosLicenseStore.instance.isAdsFree();
     if (!mounted) return;
     setState(() => _busy = false);
     if (adsFree) {
       Navigator.of(context).pop(true);
+      return;
     }
+    setState(() {
+      _message = RedPosPlayBilling.instance.lastError ??
+          tr(
+            'Google Play no activó la suscripción. Si te cobraron, pulsa Restaurar.',
+            'Google Play did not activate the subscription. If you were charged, tap Restore.',
+          );
+    });
   }
 
   Future<void> _restore() async {
@@ -110,20 +117,9 @@ class _RedPosSubscribeScreenState extends State<RedPosSubscribeScreen> {
       _busy = true;
       _message = null;
     });
-    final account = await RedPosPlayBilling.instance.signIn();
+    final account = await RedPosPlayBilling.instance.trySilentSignIn();
     if (!mounted) return;
-    if (account == null) {
-      setState(() {
-        _busy = false;
-        _message = RedPosPlayBilling.instance.lastError ??
-            tr(
-              'Elige una cuenta de Google para restaurar la compra.',
-              'Choose a Google account to restore the purchase.',
-            );
-      });
-      return;
-    }
-    setState(() => _email = account.email);
+    if (account != null) setState(() => _email = account.email);
     await RedPosPlayBilling.instance.restore(account: account);
     final adsFree = await RedPosLicenseStore.instance.isAdsFree();
     if (!mounted) return;
@@ -162,10 +158,12 @@ class _RedPosSubscribeScreenState extends State<RedPosSubscribeScreen> {
                 children: [
                   Text(
                     l(
-                      'Primero inicia sesión con la misma cuenta de Google que usas en Play Store. '
-                      'Así sabemos quién pagó y puedes restaurar la compra en otro teléfono.',
-                      'First sign in with the same Google account you use in Play Store. '
-                      'That way we know who paid and you can restore on another phone.',
+                      'Google Play cobra con la cuenta que ya está en este aparato '
+                      '(la misma con la que instalaste la prueba). '
+                      'Para restaurar en otro teléfono, entra a Play Store con ese Gmail y pulsa Restaurar.',
+                      'Google Play charges the account already on this device '
+                      '(the same one you used to install the test). '
+                      'To restore on another phone, open Play Store with that Gmail and tap Restore.',
                     ),
                     style: theme.textTheme.bodyMedium,
                   ),
@@ -220,11 +218,11 @@ class _RedPosSubscribeScreenState extends State<RedPosSubscribeScreen> {
                               height: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Icon(Icons.login),
+                          : const Icon(Icons.shopping_bag_outlined),
                       label: Text(
                         l(
-                          'Entrar con Google y suscribirme',
-                          'Sign in with Google and subscribe',
+                          'Suscribirme con Google Play',
+                          'Subscribe with Google Play',
                         ),
                       ),
                     ),
