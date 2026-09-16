@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>RedPOS · control de códigos</title>
+  <meta name="robots" content="noindex, nofollow"/>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 56rem;
+      margin: 2rem auto;
+      padding: 0 1rem 3rem;
+      background: #f4f4f5;
+      color: #111;
+    }
+    h1 { color: #2b0a53; font-size: 1.4rem; margin-bottom: .35rem; }
+    h2 { color: #2b0a53; font-size: 1.05rem; margin: 1.5rem 0 .6rem; }
+    input, button { font-size: 1rem; padding: .55rem .75rem; }
+    input { width: 100%; box-sizing: border-box; margin-top: .35rem; }
+    button {
+      background: #2b0a53;
+      color: #fff;
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: #fff;
+      color: #2b0a53;
+      border: 1px solid #2b0a53;
+    }
+    .hint { color: #555; line-height: 1.45; }
+    .warn { color: #9a3412; }
+    .stats, .money {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: .75rem;
+    }
+    .stat {
+      background: #fff;
+      border-radius: 10px;
+      padding: .9rem 1rem;
+      box-shadow: 0 1px 2px rgb(0 0 0 / 6%);
+    }
+    .stat b { display: block; font-size: 1.45rem; color: #2b0a53; }
+    .stat span { color: #555; font-size: .9rem; }
+    .filters { display: flex; flex-wrap: wrap; gap: .4rem; margin: .8rem 0; }
+    .filters button[aria-pressed="true"] { background: #2b0a53; color: #fff; }
+    .table-wrap { overflow-x: auto; background: #fff; border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+    th, td { text-align: left; padding: .65rem .8rem; border-bottom: 1px solid #eee; }
+    th { color: #555; font-weight: 600; }
+    .mono { font-family: ui-monospace, monospace; letter-spacing: .04em; }
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: .15rem .55rem;
+      font-size: .8rem;
+    }
+    .ok { background: #dcfce7; color: #166534; }
+    .wait { background: #fef3c7; color: #92400e; }
+    input.price {
+      width: 7.5rem;
+      margin-top: 0;
+      padding: .35rem .45rem;
+    }
+    .price-cell { display: flex; align-items: center; gap: .35rem; white-space: nowrap; }
+    .save { font-size: .8rem; padding: .3rem .55rem; }
+    .global {
+      background: #fff;
+      border-radius: 10px;
+      padding: 1rem;
+      margin: 1rem 0 0;
+      box-shadow: 0 1px 2px rgb(0 0 0 / 6%);
+    }
+    .global-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      gap: .6rem;
+    }
+    .global-row label { flex: 1; min-width: 12rem; }
+    .tiny { color: #777; font-size: .8rem; }
+    @media (max-width: 720px) {
+      .stats, .money { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Control de códigos</h1>
+  <p class="hint">Pon un precio por defecto para todos los usados. Si uno cuesta distinto, cámbialo en su fila.</p>
+  <label>Clave de control
+    <input id="pw" type="password" autocomplete="current-password"/>
+  </label>
+  <p><button id="load" type="button" style="margin-top:1rem">Ver listado</button></p>
+  <p id="msg" class="hint"></p>
+  <div class="global">
+    <label>Precio por defecto (todos los usados)
+      <input id="global-price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Ej. 19.99"/>
+    </label>
+    <p class="global-row">
+      <button id="save-global" type="button">Guardar precio global</button>
+    </p>
+    <p class="hint">Los usados sin precio propio usan este monto. Vacío en una fila = vuelve al global.</p>
+  </div>
+
+  <h2>Cantidad</h2>
+  <div class="stats">
+    <div class="stat"><b id="n-gen">—</b><span>Generados</span></div>
+    <div class="stat"><b id="n-used">—</b><span>Usados</span></div>
+    <div class="stat"><b id="n-free">—</b><span>Disponibles</span></div>
+  </div>
+
+  <h2>Soles de usados</h2>
+  <div class="money">
+    <div class="stat"><b id="m-used">—</b><span>Suma de usados</span></div>
+    <div class="stat"><b id="n-priced">—</b><span>Con precio propio</span></div>
+    <div class="stat"><b id="n-noprice">—</b><span>Con precio global</span></div>
+  </div>
+
+  <div class="filters">
+    <button class="secondary" type="button" data-filter="all" aria-pressed="true">Todos</button>
+    <button class="secondary" type="button" data-filter="unused" aria-pressed="false">Disponibles</button>
+    <button class="secondary" type="button" data-filter="used" aria-pressed="false">Usados</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Estado</th>
+          <th>Precio</th>
+          <th>Creado</th>
+          <th>Usado</th>
+        </tr>
+      </thead>
+      <tbody id="rows">
+        <tr><td colspan="5" class="hint">Escribe la clave de control y pulsa Ver listado.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <script>
+    let filter = 'all';
+    let rows = [];
+    let globalPrice = null;
+
+    function password() {
+      return document.getElementById('pw').value;
+    }
+
+    function esc(value) {
+      return String(value || '').replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      }[c]));
+    }
+
+    function fmt(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return iso;
+      return d.toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' });
+    }
+
+    function money(n) {
+      if (n == null || n === '') return '—';
+      return 'S/ ' + Number(n).toLocaleString('es-PE', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+
+    function setMsg(text, warn) {
+      const el = document.getElementById('msg');
+      el.textContent = text || '';
+      el.className = warn ? 'hint warn' : 'hint';
+    }
+
+    function render() {
+      const body = document.getElementById('rows');
+      const visible = rows.filter((row) => {
+        if (filter === 'used') return row.used;
+        if (filter === 'unused') return !row.used;
+        return true;
+      });
+      if (!visible.length) {
+        body.innerHTML = '<tr><td colspan="5" class="hint">No hay códigos en este filtro.</td></tr>';
+        return;
+      }
+      body.innerHTML = visible.map((row) => {
+        const code = row.code || row.nonce || '';
+        const safe = esc(code);
+        const badge = row.used
+          ? '<span class="badge ok">Usado</span>'
+          : '<span class="badge wait">Disponible</span>';
+        const own = row.price != null;
+        const shown = own ? row.price : '';
+        const ph = globalPrice == null ? '' : globalPrice;
+        const priceCell = row.used
+          ? `<div class="price-cell">
+              <input class="price" type="number" min="0" step="0.01" inputmode="decimal"
+                data-nonce="${esc(row.nonce)}"
+                placeholder="${esc(ph)}"
+                value="${shown === '' ? '' : esc(shown)}"/>
+              <button class="save" type="button" data-nonce="${esc(row.nonce)}">Guardar</button>
+              <span class="tiny">${own ? 'propio' : 'global'}</span>
+            </div>`
+          : '—';
+        return `<tr>
+          <td class="mono">${safe} <button class="copy" type="button" data-copy="${safe}">Copiar</button></td>
+          <td>${badge}</td>
+          <td>${priceCell}</td>
+          <td>${fmt(row.createdAt)}</td>
+          <td>${fmt(row.usedAt)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    async function loadList() {
+      setMsg('Cargando…');
+      const res = await fetch('/api/codes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: password() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setMsg(data.error === 'clave' ? 'Clave incorrecta.' : (data.error || 'No se pudo cargar.'), true);
+        return;
+      }
+      rows = data.codes || [];
+      globalPrice = data.globalPrice == null ? null : data.globalPrice;
+      document.getElementById('global-price').value =
+        globalPrice == null ? '' : globalPrice;
+      document.getElementById('n-gen').textContent = data.generated ?? rows.length;
+      document.getElementById('n-used').textContent = data.used ?? 0;
+      document.getElementById('n-free').textContent = data.unused ?? 0;
+      document.getElementById('m-used').textContent = money(data.money && data.money.used);
+      document.getElementById('n-priced').textContent = data.money && data.money.overrides != null
+        ? data.money.overrides
+        : 0;
+      document.getElementById('n-noprice').textContent = data.money && data.money.withGlobal != null
+        ? data.money.withGlobal
+        : 0;
+      render();
+      if (data.kv === false) {
+        setMsg('El listado en la nube necesita KV conectado en Vercel.', true);
+      } else {
+        setMsg('');
+      }
+    }
+
+    document.getElementById('load').onclick = () => loadList();
+    document.getElementById('save-global').onclick = async () => {
+      const raw = document.getElementById('global-price').value.trim();
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          password: password(),
+          price: raw === '' ? null : Number(raw.replace(',', '.')),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setMsg(data.error === 'clave' ? 'Clave incorrecta.' : (data.error || 'No se guardó el precio global.'), true);
+        return;
+      }
+      await loadList();
+    };
+    document.querySelector('.filters').onclick = (ev) => {
+      const btn = ev.target.closest('[data-filter]');
+      if (!btn) return;
+      filter = btn.getAttribute('data-filter');
+      document.querySelectorAll('[data-filter]').forEach((el) => {
+        el.setAttribute('aria-pressed', el === btn ? 'true' : 'false');
+      });
+      render();
+    };
+    document.getElementById('rows').onclick = async (ev) => {
+      const copyBtn = ev.target.closest('[data-copy]');
+      if (copyBtn) {
+        const value = copyBtn.getAttribute('data-copy') || '';
+        try {
+          await navigator.clipboard.writeText(value);
+          copyBtn.textContent = 'Copiado';
+          setTimeout(() => { copyBtn.textContent = 'Copiar'; }, 1200);
+        } catch (_) {}
+        return;
+      }
+      const saveBtn = ev.target.closest('.save');
+      if (!saveBtn) return;
+      const nonce = saveBtn.getAttribute('data-nonce') || '';
+      const input = document.querySelector(`input.price[data-nonce="${nonce}"]`);
+      const raw = input ? input.value.trim() : '';
+      saveBtn.disabled = true;
+      const res = await fetch('/api/price', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          password: password(),
+          nonce,
+          price: raw === '' ? null : Number(raw.replace(',', '.')),
+        }),
+      });
+      const data = await res.json();
+      saveBtn.disabled = false;
+      if (!res.ok || !data.ok) {
+        const err = data.error === 'not_used'
+          ? 'Solo se puede poner precio a un código ya usado.'
+          : data.error === 'clave'
+            ? 'Clave incorrecta.'
+            : (data.error || 'No se guardó.');
+        setMsg(err, true);
+        return;
+      }
+      await loadList();
+    };
+  </script>
+</body>
+</html>

@@ -152,6 +152,7 @@ class SunatEscPosPrint {
       paperDotsWidth: printer.dotsWidth,
       cut: printer.cut,
       dotsPerMm: printer.dpi.dotsPerMm,
+      network: printer.type == PrinterLinkType.network,
     );
     return bytes;
   }

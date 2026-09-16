@@ -4,15 +4,20 @@ Controlador **Android e iOS** de impresoras térmicas ESC/POS (58 y 80 mm).
 Imprime PDF/imagen del POS **o** convierte el **XML/ZIP UBL de SUNAT** (boleta, factura, NC/ND, guía de remisión, retención/percepción) a ticket 58/80 mm.
 
 **Repo:** https://github.com/Jheff2920/APP-RS  
-**Versión:** 1.8.3+44 · Package ID: `com.redpos.service`  
-**Rama estable:** `main` · **Rama de esta prueba:** `test/redpos-activacion` (código RedPOS + ads; no mergear a `main` hasta validar)
+**Versión:** 1.8.5+46 · Package ID: `com.redpos.service`  
+**Rama estable:** `main`
 
 > Memoria técnica: [CONTEXTO.md](CONTEXTO.md) · Rendimiento: [docs/PRINT_PERFORMANCE.md](docs/PRINT_PERFORMANCE.md) · Play/RedPOS: [docs/DISTRIBUCION.md](docs/DISTRIBUCION.md)
 
 ---
 
-## Dónde quedamos (2026-09-09)
+## Dónde quedamos (2026-09-16)
 
+- **LAN 803L:** un solo cliente en `:9100`. App y Chrome/PrintService comparten el socket nativo. A los **3 s** sin otro ticket se suelta el puerto para que otra tablet pueda imprimir.
+- PDF en red (Android): raster nativo fuera de la UI (el `encode_page` en Dart congelaba el spinner).
+- Cierre de ticket en red: `ESC d` + `GS V 0x00` (sin GS v 0 en blanco).
+- Play: la suscripción cobra con la cuenta de Play Store (producto `redpos_ads_free_monthly`).
+- Códigos sin ads: generador para staff y panel de control aparte (listado, usados, precio global o por código). URLs: [docs/DISTRIBUCION.md](docs/DISTRIBUCION.md).
 - Raster nativo (`NativePdfEscPos`): recorte de tinta + umbral promedio + `GS v 0`.
 - **Nitidez x1/x2/x3** imprime al **mismo tamaño** (384/576). x2/x3 solo rasterizan el recorte a más puntos (no aplastan Google/Max).
 - Chrome 58 mm: ancho 3000 mils (~76 mm) para que el ticket no se encoja a la mitad. 80 mm sigue en 3150.
@@ -25,7 +30,6 @@ Imprime PDF/imagen del POS **o** convierte el **XML/ZIP UBL de SUNAT** (boleta, 
 - **iOS:** misma app. Imprime por **WiFi TCP :9100**. USB, PrintService y GPIO Falcon quedan en Android. Abrir PDF/XML/ZIP desde la app o “Abrir en RedPOS Service”.
 - **Bluetooth Android:** emparejar desde la app (PIN del sistema). La pestaña lista solo equipos ya vinculados; **Agregar dispositivo** busca cercanos. **Desvincular** también olvida el vínculo del teléfono. En Android 10 el scan Classic pide ubicación encendida.
 - **UI:** lista + detalle en tablet (≥840 dp), Guardar/Probar fijos abajo, scan BT sin tirones al ir apareciendo equipos.
-- **Prueba RedPOS (solo rama `test/redpos-activacion`):** código opcional al vincular; sin código hay banner y pie en el papel. Demo `REDPOS-PRUEBA-1`. Web local: `dart run tool/redpos_admin.dart`. Detalle: [docs/DISTRIBUCION.md](docs/DISTRIBUCION.md).
 
 ---
 
@@ -45,7 +49,7 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 ---
 
-## Estado actual (v1.8.3)
+## Estado actual (v1.8.5)
 
 | Hecho | Pendiente |
 |-------|-----------|
@@ -60,6 +64,9 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 | Shell adaptativo (teléfono / tablet) + scan BT sin jank | |
 | Dedupe impresoras (ID estable + MAC / USB vid:pid) | |
 | Pipeline más rápido + métricas `BoletaPrintTiming` | |
+| LAN: socket nativo compartido + suelta `:9100` a los 3 s de idle | |
+| Play Billing (suscripción mensual) + códigos RedPOS | |
+| Panel de códigos: generados / usados + precio global o propio | |
 | Tests GS v0 / EscPosChunker + benchmark local | |
 | Repo limpio en GitHub | |
 
@@ -137,6 +144,30 @@ flutter run -d <id-del-iphone>
 **contenido → avance inferior → corte → espera → gaveta**. Guardar tras cambiar ajustes.
 
 En **Bluetooth** la espera es ~2.5–8 s (el cajón no debe abrirse mientras aún sale el ticket). En USB Falcon ~0.8 s y luego GPIO; en LAN ~0.3 s + `ESC p`.
+
+---
+
+## WiFi / LAN (`:9100`)
+
+La 803L (y la mayoría de térmicas Ethernet) solo admite **un cliente TCP**. Si una tablet deja el puerto abierto, la otra no imprime.
+
+- En Android, la app y Chrome/PrintService usan el **mismo** socket nativo.
+- Tras el último ticket, si no hay otro envío en **3 segundos**, se cierra el puerto. La siguiente tablet puede conectar.
+- Si se imprime otra vez dentro de esos 3 s (gaveta, segundo ticket), el temporizador se reinicia.
+- No hace falta cerrar la app; tampoco pueden imprimir las dos a la vez.
+
+---
+
+## Códigos RedPOS (sin publicidad)
+
+El cliente escribe el código en la app. Staff genera y controla en Vercel:
+
+| Quién | URL |
+|--------|-----|
+| Generar (amigo / vendedor) | https://redpos-codigos-prueba.vercel.app/ |
+| Control (listado, usos, precios) | https://redpos-codigos-prueba.vercel.app/control.html |
+
+El panel tiene **precio global** para todos los usados y, si hace falta, un precio distinto en una fila. Claves distintas para generador y control (`REDPOS_STAFF_PASSWORD` / `REDPOS_DASHBOARD_PASSWORD` en Vercel). Detalle: [docs/DISTRIBUCION.md](docs/DISTRIBUCION.md) y [admin-web/README.md](admin-web/README.md).
 
 ---
 
@@ -229,6 +260,9 @@ lib/services/     escpos_pdf_print, sunat/, print_timing, transports/, usb_print
 lib/services/bluetooth_bond_channel.dart
 android/.../BluetoothBondPlugin.kt   createBond / removeBond / listBonded + scan Classic
 android/.../printservice/   BoletaPrintService, EscPosTransport, UsbEscPos, IminCashBox
+android/.../NetworkLanPlugin.kt   TCP :9100 nativo (app + PrintService)
+lib/services/network_lan_channel.dart
+admin-web/   generador `/` y panel `/control.html`
 android/.../SharedIncomingFile.kt   copia URI Compartir/Abrir a caché
 ios/Runner/   Info.plist, IncomingFile.swift, AppDelegate, SceneDelegate
 docs/PRINT_PERFORMANCE.md
@@ -239,7 +273,8 @@ tool/benchmark_escpos.dart
 
 ## Roadmap
 
-1. **v1.7.0** — iOS WiFi + XML/PDF/ZIP; emparejar/olvidar BT en Android; shell tablet
+1. **v1.8.5** — LAN idle 3 s, raster PDF nativo en red, panel de códigos (usados + precios)
+2. **v1.7.0** — iOS WiFi + XML/PDF/ZIP; emparejar/olvidar BT en Android; shell tablet
 2. **v1.6.18** — CPE del ZIP SUNAT: boleta, factura, NC/ND, guía, retención/percepción; copia a caché en Android 10
 3. **v1.6.17** — Compartir XML/ZIP como IMPRIMIRSUNAT (caché + latin1)
 4. **v1.6.16** — Nota de crédito 07 y débito 08

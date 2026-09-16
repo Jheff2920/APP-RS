@@ -97,6 +97,7 @@ class EscPosPdfPrint {
           paperDotsWidth: layout.fullWidth,
           cut: printer.cut,
           dotsPerMm: printer.dpi.dotsPerMm,
+          network: printer.type == PrinterLinkType.network,
         ),
       );
       timing?.event('raster_complete', fields: {
@@ -158,6 +159,7 @@ class EscPosPdfPrint {
         paperDotsWidth: layout.fullWidth,
         cut: printer.cut,
         dotsPerMm: printer.dpi.dotsPerMm,
+        network: printer.type == PrinterLinkType.network,
       ),
     ];
     timing?.event('raster_complete', fields: {

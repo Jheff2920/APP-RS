@@ -15,6 +15,7 @@ import 'drawer_wait.dart';
 import 'print_history_store.dart';
 import 'print_timing.dart';
 import 'printer_permissions.dart';
+import 'network_lan_channel.dart';
 import 'sunat/sunat_escpos_print.dart';
 import 'sunat/sunat_ubl_parser.dart';
 import 'sunat/sunat_xml_source.dart';
@@ -67,6 +68,20 @@ class PrintService {
       requestPermissions: requestPermissions,
       buildBytes: (timing) async {
         if (lower.endsWith('.pdf')) {
+          if (printer.type == PrinterLinkType.network &&
+              NetworkLanChannel.isSupported) {
+            return timing.measure(
+              'native_raster',
+              () => NetworkLanChannel.rasterizePdf(
+                filePath: filePath,
+                paper: printer.paper.name,
+                bottomMm: printer.margins.bottomMm,
+                cut: printer.cut.name,
+                dpi: printer.dpi.value,
+                rasterScale: printer.rasterScale.factor,
+              ),
+            );
+          }
           return EscPosPdfPrint.build(
             printer,
             filePath: filePath,

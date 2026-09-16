@@ -3,6 +3,8 @@ package com.example.hello_world_app.printservice
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothSocket
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import java.io.OutputStream
 import java.net.InetSocketAddress
@@ -18,12 +20,18 @@ object EscPosTransport {
     private val SPP: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
     /** La 803B tira los primeros bytes; los ceros no marcan el papel. */
     private const val BT_LEAD_IN = 128
+    /** Suelta :9100 si no hay otro ticket, para que otra tablet pueda entrar. */
+    private const val NET_IDLE_RELEASE_MS = 3_000L
     private val heldLock = Any()
     private var heldSocket: BluetoothSocket? = null
     private var heldNeedsLeadIn = false
     private val netLock = Any()
     private var heldNet: Socket? = null
     private var heldNetKey: String? = null
+    private var lastNetHost: String? = null
+    private var lastNetPort: Int = 9100
+    private val netIdleHandler = Handler(Looper.getMainLooper())
+    private var netIdleGen = 0
 
     fun drawerBytes(cashDrawer: String, linkType: String = ""): ByteArray {
         val escP = when (cashDrawer) {
@@ -142,6 +150,38 @@ object EscPosTransport {
         writeBluetooth(socket, data, jobId, drawer, drawerWaitMs)
     }
 
+    fun openHeldNet(host: String, port: Int) {
+        ensureNetwork(host, port, jobId = "dart")
+    }
+
+    fun writeHeldNet(data: ByteArray) {
+        synchronized(netLock) {
+            cancelNetIdleLocked()
+            val host = lastNetHost
+            val existing = heldNet
+            val socket = if (
+                existing != null &&
+                !existing.isClosed &&
+                existing.isConnected
+            ) {
+                existing
+            } else if (host != null) {
+                ensureNetwork(host, lastNetPort, jobId = "dart")
+            } else {
+                throw IllegalStateException("No hay conexion WiFi/TCP activa.")
+            }
+            try {
+                val out = socket.getOutputStream()
+                out.write(data)
+                out.flush()
+                scheduleNetIdleLocked()
+            } catch (e: Exception) {
+                dropNetLocked()
+                throw e
+            }
+        }
+    }
+
     fun sendNetwork(
         host: String,
         port: Int,
@@ -150,36 +190,85 @@ object EscPosTransport {
         drawer: ByteArray = byteArrayOf(),
         drawerWaitMs: Long = 0,
     ) {
-        val key = "${host.trim()}:$port"
-        val socket = synchronized(netLock) {
-            val existing = heldNet
-            if (existing != null && !existing.isClosed && heldNetKey == key) {
-                existing
-            } else {
-                try {
-                    existing?.close()
-                } catch (_: Exception) {
+        var last: Exception? = null
+        repeat(2) {
+            try {
+                synchronized(netLock) {
+                    val socket = ensureNetwork(host, port, jobId)
+                    writeTicketThenDrawer(
+                        socket.getOutputStream(),
+                        data,
+                        drawer,
+                        drawerWaitMs,
+                        jobId,
+                        "network",
+                    )
+                    scheduleNetIdleLocked()
                 }
-                val next = Socket()
-                next.tcpNoDelay = true
-                val connectStartedAt = PrintTiming.now()
-                next.connect(InetSocketAddress(host.trim(), port), 8_000)
-                PrintTiming.phase(jobId, "network_connect", connectStartedAt)
-                next.soTimeout = 30_000
-                heldNet = next
-                heldNetKey = key
-                next
+                Log.i(TAG, "Sent ${data.size} bytes TCP")
+                return
+            } catch (e: Exception) {
+                last = e
+                synchronized(netLock) { dropNetLocked() }
             }
         }
-        writeTicketThenDrawer(
-            socket.getOutputStream(),
-            data,
-            drawer,
-            drawerWaitMs,
-            jobId,
-            "network",
-        )
-        Log.i(TAG, "Sent ${data.size} bytes TCP")
+        throw last ?: IllegalStateException("No se pudo enviar por WiFi")
+    }
+
+    private fun ensureNetwork(host: String, port: Int, jobId: String): Socket {
+        val key = "${host.trim()}:$port"
+        synchronized(netLock) {
+            lastNetHost = host.trim()
+            lastNetPort = port
+            cancelNetIdleLocked()
+            val existing = heldNet
+            if (existing != null &&
+                !existing.isClosed &&
+                existing.isConnected &&
+                heldNetKey == key
+            ) {
+                return existing
+            }
+            dropNetLocked()
+            val next = Socket()
+            next.tcpNoDelay = true
+            val connectStartedAt = PrintTiming.now()
+            next.connect(InetSocketAddress(host.trim(), port), 8_000)
+            PrintTiming.phase(jobId, "network_connect", connectStartedAt)
+            next.soTimeout = 30_000
+            heldNet = next
+            heldNetKey = key
+            return next
+        }
+    }
+
+    private fun cancelNetIdleLocked() {
+        netIdleGen++
+        netIdleHandler.removeCallbacksAndMessages(null)
+    }
+
+    /** Tras 3 s sin otro ticket, suelta :9100 para otra tablet. */
+    private fun scheduleNetIdleLocked() {
+        val gen = ++netIdleGen
+        netIdleHandler.removeCallbacksAndMessages(null)
+        netIdleHandler.postDelayed({
+            synchronized(netLock) {
+                if (gen != netIdleGen) return@synchronized
+                Log.i(TAG, "LAN idle 3s: releasing :9100")
+                dropNetLocked()
+            }
+        }, NET_IDLE_RELEASE_MS)
+    }
+
+    private fun dropNetLocked() {
+        netIdleGen++
+        netIdleHandler.removeCallbacksAndMessages(null)
+        try {
+            heldNet?.close()
+        } catch (_: Exception) {
+        }
+        heldNet = null
+        heldNetKey = null
     }
 
     fun sendUsb(

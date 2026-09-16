@@ -1,23 +1,6 @@
 const { generate, verify } = require('../lib/code');
+const { staffOk } = require('../lib/staff');
 const { recordGenerated } = require('../lib/store');
-
-function readBody(req) {
-  if (req.body && typeof req.body === 'object') return req.body;
-  if (typeof req.body === 'string' && req.body) {
-    try {
-      return JSON.parse(req.body);
-    } catch {
-      return {};
-    }
-  }
-  return {};
-}
-
-function staffOk(req) {
-  const expected = process.env.REDPOS_STAFF_PASSWORD || 'R100301S';
-  const body = readBody(req);
-  return body.password === expected;
-}
 
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {

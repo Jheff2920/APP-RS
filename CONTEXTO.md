@@ -2,9 +2,9 @@
 
 > **Para Cursor / agente IA:** Lee este archivo al inicio de cada sesión nueva.
 
-**Última actualización:** 2026-09-09 (v1.7.0)  
+**Última actualización:** 2026-09-16 (v1.8.5)  
 **Carpeta:** `C:\Users\RS-Soporte\Documents\app`  
-**Versión:** `1.7.0+36`  
+**Versión:** `1.8.5+46`  
 **Package ID:** `com.redpos.service`  
 **iOS bundle:** `com.redpos.service`
 
@@ -42,7 +42,10 @@
 - [x] Android: emparejar Classic desde la app (`createBond` + PIN del sistema) y olvidar al desvincular (`removeBond`)
 - [x] Formulario BT: emparejados vs Agregar dispositivo; scan pide ubicación en Android 10
 - [x] Shell adaptativo (lista/detalle tablet) + scan BT sin relayout de toda la hoja
-- [ ] Rama `test/redpos-activacion`: código opcional + ads (no está en `main`)
+- [x] LAN: un socket nativo `:9100` (app + Chrome); idle 3 s suelta el puerto
+- [x] PDF WiFi en Android: raster nativo (no `encode_page` en UI)
+- [x] Play Billing + códigos RedPOS en `main`
+- [x] Panel staff: generador `/` y control `/control.html` (precio global o por código)
 - [ ] Validar `flutter run` en Mac / iPhone
 - [ ] v2 — jobs del POS (HTTP / cola)
 
@@ -88,6 +91,7 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 | iOS | WiFi TCP 9100; BT solo BLE/MFi; USB/PrintService/GPIO Android-only; Abrir archivo + document types |
 | Caps | `lib/platform_caps.dart` — no llamar canales USB en iOS |
 | BT Android | Plugin `BluetoothBondPlugin`: scan Classic, `createBond`, `removeBond`, `listBonded`. Sin `neverForLocation`. Location on + permiso para discovery. Desvincular también olvida el bond. iOS no puede unpair por API. |
+| LAN 803L | Un cliente `:9100`. App + PrintService = mismo `heldNet`. Idle 3 s cierra el socket. Corte red: `ESC d` + `GS V 0x00`. |
 | UI | `BoletaPage` + lista/detalle ≥840 dp. Scan BT: lista altura fija + `ValueNotifier`, no `shrinkWrap`. |
 
 ---
@@ -98,6 +102,7 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 |------|--------|
 | Xiaomi | ADB `863d005830483132385114e3efc08c` |
 | Lenovo YT-X705F | ADB `HA1KL54R` · Android 10 |
+| Lenovo TB-X306F | ADB `HPV4MC8C` |
 | Impresora 58 | HL200B_0000 · `86:67:7A:04:C0:55` |
 | Impresora 80 | HQ300_348C · `86:67:7A:02:34:8C` |
 | IMIN Falcon 1 | 2 GB RAM · impresora integrada USB (como RawBT) |
@@ -120,6 +125,9 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 - `android/.../printservice/BoletaPrinterDiscoverySession.kt`
 - `android/.../printservice/SystemPrintOverlay.kt`
 - `android/.../printservice/EscPosTransport.kt`
+- `android/.../NetworkLanPlugin.kt`
+- `lib/services/network_lan_channel.dart`
+- `admin-web/` (generador `/`, panel `/control.html`)
 - `android/.../printservice/UsbEscPos.kt`
 - `android/.../printservice/IminCashBox.kt`
 - `android/.../UsbPrinterPlugin.kt`

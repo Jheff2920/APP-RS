@@ -40,10 +40,12 @@ object NativePdfEscPos {
         cut: String,
         dpi: Int = 203,
         rasterScale: Int = 1,
+        linkType: String = "",
     ): ByteArray {
         val width = dotsWidth(mediaSizeId, mediaWidthMils, savedPaper, dpi)
         val hi = rasterScale.coerceIn(1, 3)
         val tallChrome = true
+        val network = linkType == "network"
         val out = ByteArrayOutputStream()
         out.write(byteArrayOf(0x1b, 0x40))
 
@@ -67,8 +69,8 @@ object NativePdfEscPos {
             }
         }
 
-        appendFeed(out, width, bottomMm, dpi)
-        out.write(cutBytes(cut))
+        appendFeed(out, width, bottomMm, dpi, network)
+        out.write(cutBytes(cut, network))
         val data = out.toByteArray()
         if (data.size < 16) throw IllegalStateException("Ticket vacio")
         return data
@@ -473,8 +475,14 @@ object NativePdfEscPos {
         width: Int,
         bottomMm: Double,
         dpi: Int,
+        network: Boolean,
     ) {
         if (bottomMm <= 0) return
+        if (network) {
+            val lines = (bottomMm / 3.5).roundToInt().coerceIn(3, 12)
+            out.write(byteArrayOf(0x1b, 0x64, lines.toByte()))
+            return
+        }
         val aligned = width - (width % 8)
         if (aligned < 8) return
         val dotsPerMm = dpi.coerceAtLeast(180) / 25.4
@@ -499,9 +507,13 @@ object NativePdfEscPos {
         }
     }
 
-    private fun cutBytes(cut: String): ByteArray {
+    private fun cutBytes(cut: String, network: Boolean): ByteArray {
         return when (cut) {
-            "fullGsV0" -> byteArrayOf(0x1d, 0x56, 0x30)
+            "fullGsV0" -> if (network) {
+                byteArrayOf(0x1d, 0x56, 0x00)
+            } else {
+                byteArrayOf(0x1d, 0x56, 0x30)
+            }
             "fullGsVA" -> byteArrayOf(0x1d, 0x56, 0x41, 0x00)
             "fullEscI" -> byteArrayOf(0x1b, 0x69)
             "fullEscD0" -> byteArrayOf(0x1b, 0x64, 0x00)

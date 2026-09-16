@@ -4,16 +4,21 @@ App **pública en Play** (Android). Imprimir **nunca se bloquea**.
 Sin publicidad con **código de activación** (equipo o licencia de por vida), o **suscripción mensual** (Google Play).  
 Sin código y sin pago: la app funciona igual, con anuncios en pantalla y pie en el papel.
 
-**Identidad:** `com.redpos.service` · versión en `pubspec.yaml` (hoy `1.8.3+44`).  
+**Identidad:** `com.redpos.service` · versión en `pubspec.yaml` (hoy `1.8.5+46`).  
 **Producto Play:** `redpos_ads_free_monthly` (plan base mensual).  
 **URLs legales (Play Console):**
 
 - Privacidad: https://redpos-codigos-prueba.vercel.app/privacidad.html
 - Términos: https://redpos-codigos-prueba.vercel.app/terminos.html
 
-Los HTML ya están en GitHub (`test/redpos-vercel-codigos`). Si Vercel aún muestra 404, en el proyecto `redpos-codigos-prueba` pulsa **Redeploy** (el CLI de Vercel no tiene sesión en esta PC).
+Los HTML ya están en GitHub. Sitio: https://redpos-codigos-prueba.vercel.app/
 
-Web staff + API HTTPS: carpeta `admin-web/` (Vercel, rama `test/redpos-vercel-codigos`).  
+| Página | Uso |
+|--------|-----|
+| `/` | Generar códigos (clave de generador) |
+| `/control.html` | Listado, usados, precio global o por código (clave de control) |
+
+Web staff + API HTTPS: carpeta `admin-web/` (proyecto Vercel `redpos-codigos-prueba`).  
 El HMAC de prueba no es producción; en Vercel el KV marca cada código como usado.
 
 ---
@@ -22,10 +27,12 @@ El HMAC de prueba no es producción; en Vercel el KV marca cada código como usa
 
 1. Al **vincular** hay campo opcional de código y **Continuar con publicidad**.
 2. Banner: **Tengo un código**, **Suscripción mensual**, **Licencia de por vida**.
-3. Generar códigos:
+3. Generar y controlar códigos:
 
-- Local (PC): `dart run tool/redpos_admin.dart` → http://127.0.0.1:8787 (clave staff `R100301S`).
-- Nube de prueba (HTTPS): [admin-web/README.md](../admin-web/README.md).
+- Generador: https://redpos-codigos-prueba.vercel.app/
+- Panel: https://redpos-codigos-prueba.vercel.app/control.html
+- Local (PC): `dart run tool/redpos_admin.dart` → http://127.0.0.1:8787
+- Detalle: [admin-web/README.md](../admin-web/README.md).
 
 4. Sin pase: banner en la lista / Compartir, y pie en el papel **después** del ticket/QR y **antes** del corte (también PrintService/Chrome).
 5. Un código válido o una suscripción vigente quita la publicidad en **toda la instalación**.
@@ -107,6 +114,7 @@ Sube `versionCode` en cada release (`pubspec.yaml`, el número después de `+`).
 ### 1. Web interna de códigos (staff)
 
 - [x] Generar código (`tool/redpos_admin.dart` y `admin-web/`)
+- [x] Dashboard staff: generados / usados / precio global o propio
 - [ ] Login de **empleados** RedPOS (ahora una clave local)
 - [ ] Atar a MAC / modelo al vender
 - [x] Rama de prueba Vercel: `test/redpos-vercel-codigos` (`admin-web/`)

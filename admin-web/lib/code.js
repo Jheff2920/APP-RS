@@ -81,4 +81,8 @@ function verify(input, secret = defaultSecret()) {
   return { ok: true, nonce, testAlias: false };
 }
 
-module.exports = { generate, verify, format, normalize, macChars };
+function fromNonce(nonce, secret = defaultSecret()) {
+  return format(nonce + macChars(secret, nonce));
+}
+
+module.exports = { generate, verify, format, normalize, macChars, fromNonce };

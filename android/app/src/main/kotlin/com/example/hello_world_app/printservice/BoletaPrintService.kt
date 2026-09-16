@@ -156,6 +156,7 @@ class BoletaPrintService : PrintService() {
                     row.cut,
                     row.dpi,
                     row.rasterScale,
+                    row.type,
                 )
             } catch (nativeError: Exception) {
                 Log.w(TAG, "Native raster fallback to Flutter", nativeError)

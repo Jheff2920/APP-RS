@@ -3,6 +3,6 @@
   "private": true,
   "description": "Web staff de prueba para generar códigos RedPOS Service (Vercel).",
   "scripts": {
-    "test": "node test/hmac.test.js"
+    "test": "node test/hmac.test.js && node test/store.test.js && node test/price.test.js"
   }
 }
