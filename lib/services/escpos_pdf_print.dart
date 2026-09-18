@@ -12,6 +12,7 @@ import '../models/system_print_media.dart';
 import 'escpos_capability_profile.dart';
 import 'escpos_feed.dart';
 import 'escpos_gs_v0.dart';
+import 'escpos_image_prep.dart';
 import 'print_timing.dart';
 
 class EscPosPdfPrint {
@@ -136,7 +137,7 @@ class EscPosPdfPrint {
         fullWidth: layout.fullWidth,
         leftPad: layout.leftPad,
         contentWidth: layout.contentWidth,
-        trimChromeMargins: layout.chromeFit,
+        fitSharedImage: true,
       ),
     );
     if (body.isEmpty) {
@@ -230,28 +231,35 @@ List<int> _encodePngToGsV0({
   required int leftPad,
   required int contentWidth,
   bool trimChromeMargins = false,
+  bool fitSharedImage = false,
 }) {
   final prepared = _prepareBitmap(
     pngBytes,
     fullWidth: fullWidth,
     trimChromeMargins: trimChromeMargins,
+    fitSharedImage: fitSharedImage,
   );
   if (prepared == null) return const [];
   return EscPosGsV0.encodeLuminance(
     prepared,
-    threshold: _thresholdFor(prepared),
+    threshold: EscPosImagePrep.thresholdFor(
+      prepared,
+      minThreshold: fitSharedImage ? EscPosImagePrep.sharedMinThreshold : 0,
+      maxThreshold: fitSharedImage ? EscPosImagePrep.sharedMaxThreshold : 254,
+    ),
     outputWidth: fullWidth,
     leftPad: 0,
     trimVertical: true,
   );
 }
 
-/// Compartir/POS: no recortar ni estirar. Chrome: recortar el ticket y
-/// ajustarlo al ancho del rollo (escala uniforme, no deforma).
+/// Compartir imagen: recortar el voucher y llenar el rollo.
+/// PDF Chrome: recortar márgenes. PDF Compartir: 1:1.
 img.Image? _prepareBitmap(
   List<int> bytes, {
   required int fullWidth,
   bool trimChromeMargins = false,
+  bool fitSharedImage = false,
 }) {
   final decoded = img.decodeImage(Uint8List.fromList(bytes));
   if (decoded == null) return null;
@@ -268,7 +276,11 @@ img.Image? _prepareBitmap(
     work = canvas;
   }
 
-  if (_averageLuminance(work) < 90) {
+  if (fitSharedImage) {
+    work = EscPosImagePrep.cropVoucher(work);
+  }
+
+  if (_averageLuminance(work) < 70) {
     work = img.invert(work);
   }
 
@@ -279,7 +291,9 @@ img.Image? _prepareBitmap(
   return _alignToFullWidth(
     work,
     fullWidth,
-    scaleToFill: trimChromeMargins || work.width > fullWidth + 8,
+    scaleToFill: trimChromeMargins ||
+        fitSharedImage ||
+        work.width > fullWidth + 8,
   );
 }
 
@@ -353,25 +367,6 @@ img.Image _alignToFullWidth(
   img.fill(sheet, color: img.ColorRgb8(255, 255, 255));
   img.compositeImage(sheet, work, dstX: 0, dstY: 0);
   return sheet;
-}
-
-/// Promedio del gris (0.25R+0.5G+0.25B), tope 254. Mismo criterio que
-/// el filtro 0 de las térmicas de referencia.
-int _thresholdFor(img.Image work) {
-  var sum = 0;
-  var n = 0;
-  for (var y = 0; y < work.height; y++) {
-    for (var x = 0; x < work.width; x++) {
-      final p = work.getPixel(x, y);
-      var g = (p.r.toInt() >> 2) + (p.g.toInt() >> 1) + (p.b.toInt() >> 2);
-      if (g > 249) g = 255;
-      sum += g;
-      n++;
-    }
-  }
-  if (n == 0) return 254;
-  final mean = sum ~/ n;
-  return mean > 254 ? 254 : mean;
 }
 
 double _averageLuminance(img.Image image) {

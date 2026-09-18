@@ -4,7 +4,7 @@ App **pública en Play** (Android). Imprimir **nunca se bloquea**.
 Sin publicidad con **código de activación** (equipo o licencia de por vida), o **suscripción mensual** (Google Play).  
 Sin código y sin pago: la app funciona igual, con anuncios en pantalla y pie en el papel.
 
-**Identidad:** `com.redpos.service` · versión en `pubspec.yaml` (hoy `1.8.5+46`).  
+**Identidad:** `com.redpos.service` · versión en `pubspec.yaml` (hoy `1.8.7+48`).  
 **Producto Play:** `redpos_ads_free_monthly` (plan base mensual).  
 **URLs legales (Play Console):**
 

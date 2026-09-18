@@ -2,9 +2,9 @@
 
 > **Para Cursor / agente IA:** Lee este archivo al inicio de cada sesión nueva.
 
-**Última actualización:** 2026-09-16 (v1.8.5)  
+**Última actualización:** 2026-09-18 (v1.8.7)  
 **Carpeta:** `C:\Users\RS-Soporte\Documents\app`  
-**Versión:** `1.8.5+46`  
+**Versión:** `1.8.7+48`  
 **Package ID:** `com.redpos.service`  
 **iOS bundle:** `com.redpos.service`
 
@@ -46,6 +46,7 @@
 - [x] PDF WiFi en Android: raster nativo (no `encode_page` en UI)
 - [x] Play Billing + códigos RedPOS en `main`
 - [x] Panel staff: generador `/` y control `/control.html` (precio global o por código)
+- [x] Compartir imagen: recorte de voucher + umbral 168–200 (gris BCP = papel)
 - [ ] Validar `flutter run` en Mac / iPhone
 - [ ] v2 — jobs del POS (HTTP / cola)
 
@@ -92,6 +93,7 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 | Caps | `lib/platform_caps.dart` — no llamar canales USB en iOS |
 | BT Android | Plugin `BluetoothBondPlugin`: scan Classic, `createBond`, `removeBond`, `listBonded`. Sin `neverForLocation`. Location on + permiso para discovery. Desvincular también olvida el bond. iOS no puede unpair por API. |
 | LAN 803L | Un cliente `:9100`. App + PrintService = mismo `heldNet`. Idle 3 s cierra el socket. Corte red: `ESC d` + `GS V 0x00`. |
+| Compartir imagen | Recorta el recuadro claro (`EscPosImagePrep.cropVoucher`). Umbral promedio con piso 168 y tope 200 para no pintar pastilla/greca BCP. |
 | UI | `BoletaPage` + lista/detalle ≥840 dp. Scan BT: lista altura fija + `ValueNotifier`, no `shrinkWrap`. |
 
 ---

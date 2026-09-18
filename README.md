@@ -4,15 +4,16 @@ Controlador **Android e iOS** de impresoras térmicas ESC/POS (58 y 80 mm).
 Imprime PDF/imagen del POS **o** convierte el **XML/ZIP UBL de SUNAT** (boleta, factura, NC/ND, guía de remisión, retención/percepción) a ticket 58/80 mm.
 
 **Repo:** https://github.com/Jheff2920/APP-RS  
-**Versión:** 1.8.5+46 · Package ID: `com.redpos.service`  
+**Versión:** 1.8.7+48 · Package ID: `com.redpos.service`  
 **Rama estable:** `main`
 
 > Memoria técnica: [CONTEXTO.md](CONTEXTO.md) · Rendimiento: [docs/PRINT_PERFORMANCE.md](docs/PRINT_PERFORMANCE.md) · Play/RedPOS: [docs/DISTRIBUCION.md](docs/DISTRIBUCION.md)
 
 ---
 
-## Dónde quedamos (2026-09-16)
+## Dónde quedamos (2026-09-18)
 
+- **Compartir imagen (Yape/BCP):** recorta el voucher claro y limita el umbral para que el gris de BCP no salga negro.
 - **LAN 803L:** un solo cliente en `:9100`. App y Chrome/PrintService comparten el socket nativo. A los **3 s** sin otro ticket se suelta el puerto para que otra tablet pueda imprimir.
 - PDF en red (Android): raster nativo fuera de la UI (el `encode_page` en Dart congelaba el spinner).
 - Cierre de ticket en red: `ESC d` + `GS V 0x00` (sin GS v 0 en blanco).
@@ -49,7 +50,7 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 ---
 
-## Estado actual (v1.8.5)
+## Estado actual (v1.8.7)
 
 | Hecho | Pendiente |
 |-------|-----------|
@@ -273,7 +274,8 @@ tool/benchmark_escpos.dart
 
 ## Roadmap
 
-1. **v1.8.5** — LAN idle 3 s, raster PDF nativo en red, panel de códigos (usados + precios)
+1. **v1.8.7** — Compartir imagen: recorte de voucher Yape/BCP y umbral tope para el gris claro
+2. **v1.8.5** — LAN idle 3 s, raster PDF nativo en red, panel de códigos (usados + precios)
 2. **v1.7.0** — iOS WiFi + XML/PDF/ZIP; emparejar/olvidar BT en Android; shell tablet
 2. **v1.6.18** — CPE del ZIP SUNAT: boleta, factura, NC/ND, guía, retención/percepción; copia a caché en Android 10
 3. **v1.6.17** — Compartir XML/ZIP como IMPRIMIRSUNAT (caché + latin1)
