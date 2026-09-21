@@ -102,7 +102,7 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 ## USB (IMIN / Falcon)
 
-Solo Android. Bluetooth y WiFi no pierden el vínculo al apagar.
+Solo Android. Bluetooth y WiFi **no** pierden el vínculo al apagar.
 
 - Al apagar el equipo, Android borra el permiso USB. La impresora **sigue vinculada** en RedPOS Service.
 - Al encender: abrir la app o imprimir (también desde Google). Aparece el aviso de USB; hay que aceptarlo. No hace falta vincular de nuevo.
@@ -267,8 +267,8 @@ lib/services/network_lan_channel.dart
 admin-web/   generador `/` y panel `/control.html`
 android/.../SharedIncomingFile.kt   copia URI Compartir/Abrir a caché
 ios/Runner/   Info.plist, IncomingFile.swift, AppDelegate, SceneDelegate
- docs/PRINT_PERFORMANCE.md
- tool/benchmark_escpos.dart
+docs/PRINT_PERFORMANCE.md
+tool/benchmark_escpos.dart
 ```
 
 ---
