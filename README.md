@@ -27,7 +27,7 @@ Imprime PDF/imagen del POS **o** convierte el **XML/ZIP UBL de SUNAT** (boleta, 
 - USB host (impresora integrada IMIN/Falcon): lista, permiso `vid:pid` y envío bulk ESC/POS.
 - **USB tras apagar:** Android olvida el permiso USB (solo USB, no BT/WiFi). La impresora sigue vinculada. Al abrir la app o al imprimir (también desde Chrome) se pide otra vez el aviso; no hay que volver a vincular.
 - En Falcon la gaveta **no va por USB**: se pulsa el GPIO del equipo (`cashbox_en`), como el plugin IMIN. En BT/LAN se sigue usando `ESC p`.
-- **XML/ZIP SUNAT:** Compartir o Abrir el CPE. En Android 10+ se copia a caché (Descargas no es legible). El CDR (`R-...`) no se imprime.
+- **XML/ZIP SUNAT:** Compartir o Abrir el CPE. En Android 10+ se copia a caché (Descargas no es legible). El CDR (`R-...xml`) no se imprime.
 - **iOS:** misma app. Imprime por **WiFi TCP :9100**. USB, PrintService y GPIO Falcon quedan en Android. Abrir PDF/XML/ZIP desde la app o “Abrir en RedPOS Service”.
 - **Bluetooth Android:** emparejar desde la app (PIN del sistema). La pestaña lista solo equipos ya vinculados; **Agregar dispositivo** busca cercanos. **Desvincular** también olvida el vínculo del teléfono. En Android 10 el scan Classic pide ubicación encendida.
 - **UI:** lista + detalle en tablet (≥840 dp), Guardar/Probar fijos abajo, scan BT sin tirones al ir apareciendo equipos.
@@ -102,7 +102,7 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 ## USB (IMIN / Falcon)
 
-Solo Android. Bluetooth y WiFi **no** pierden el vínculo al apagar.
+Solo Android. Bluetooth y WiFi no pierden el vínculo al apagar.
 
 - Al apagar el equipo, Android borra el permiso USB. La impresora **sigue vinculada** en RedPOS Service.
 - Al encender: abrir la app o imprimir (también desde Google). Aparece el aviso de USB; hay que aceptarlo. No hace falta vincular de nuevo.
@@ -177,7 +177,7 @@ El panel tiene **precio global** para todos los usados y, si hace falta, un prec
 En **Imprimir** elige el ancho del papel. El PDF se imprime **tal cual** (sin estirar):
 
 | Tamaño | Ancho | Vista previa |
-|--------|--------|----------------|
+|--------|-------|----------------|
 | Rollo 58 mm / Max / Google | 384 puntos | Página alta + recorte al rollo (igual que 80 Max) |
 | Rollo 80 mm / Max / Google | 576 puntos | Página alta + recorte al rollo |
 
@@ -205,6 +205,7 @@ Desde **Archivos** o la consulta CPE: **Compartir** o **Abrir con → RedPOS Ser
 
 - El ZIP de SUNAT trae el CPE y el CDR (`R-...xml` / `ApplicationResponse`). Solo se imprime el CPE.
 - El ancho es el de la impresora (58 o 80 mm). QR SUNAT: `RUC|tipo|serie|numero|IGV|total|fecha|doc|nro`.
+- **Ticket SUNAT** (menú de la lista, o Ayuda): formato Compacto / Claro / Detallado, logo de la empresa y nota al pie. Se guardan en el teléfono. Al compartir un XML o ZIP, la nota se puede editar antes de imprimir; ese cambio no pisa la nota guardada.
 - NC/ND muestran el documento afectado (`Afecta: F002-...`). La guía muestra motivo, placa, partida y llegada (sin IGV/total).
 - En Android 10+ hay que **Compartir** o **Abrir con**; la app copia el archivo a su caché (no lee Descargas directo).
 - El diálogo Imprimir del sistema sigue siendo para PDF.
@@ -266,8 +267,8 @@ lib/services/network_lan_channel.dart
 admin-web/   generador `/` y panel `/control.html`
 android/.../SharedIncomingFile.kt   copia URI Compartir/Abrir a caché
 ios/Runner/   Info.plist, IncomingFile.swift, AppDelegate, SceneDelegate
-docs/PRINT_PERFORMANCE.md
-tool/benchmark_escpos.dart
+ docs/PRINT_PERFORMANCE.md
+ tool/benchmark_escpos.dart
 ```
 
 ---
