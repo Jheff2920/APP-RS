@@ -95,7 +95,7 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 | Ticket SUNAT | Formato compacto / claro (default) / detallado, QR y leyenda on/off. Logo PNG/JPG reducido en `SharedPreferences` (`sunat_print_logo_b64_v1`), centrado arriba con `GS v 0`. Nota al pie: default en ajustes; en Compartir se puede cambiar solo para ese trabajo (`sunatNote`). No toca PDF/imagen ni el pie de publicidad. |
 | iOS | WiFi TCP 9100; BT solo BLE/MFi; USB/PrintService/GPIO Android-only; Abrir archivo + document types |
 | Caps | `lib/platform_caps.dart` — no llamar canales USB en iOS |
-| BT Android | Plugin `BluetoothBondPlugin`: scan Classic, `createBond`, `removeBond`, `listBonded`. Sin `neverForLocation`. Location on + permiso para discovery. iOS no puede unpair por API. |
+| BT Android | Plugin `BluetoothBondPlugin`: scan Classic, `createBond`, `removeBond`, `listBonded`. Sin `neverForLocation`. Location on + permiso para discovery. Desvincular también olvida el bond. iOS no puede unpair por API. |
 | LAN 803L | Un cliente `:9100`. App + PrintService = mismo `heldNet`. Idle 3 s cierra el socket. Corte red: `ESC d` + `GS V 0x00`. |
 | Compartir imagen | Recorta el recuadro claro (`EscPosImagePrep.cropVoucher`). Umbral promedio con piso 168 y tope 200 para no pintar pastilla/greca BCP. |
 | UI | `BoletaPage` + lista/detalle ≥840 dp. Scan BT: lista altura fija + `ValueNotifier`, no `shrinkWrap`. |
