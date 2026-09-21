@@ -4,12 +4,16 @@ class SunatLine {
     required this.description,
     required this.unitPrice,
     required this.amount,
+    this.unit = '',
   });
 
   final double quantity;
   final String description;
   final double unitPrice;
   final double amount;
+
+  /// Código de unidad UBL (`NIU`, `KGM`, …). Vacío si el XML no lo trae.
+  final String unit;
 }
 
 class SunatTicket {
@@ -33,6 +37,8 @@ class SunatTicket {
     this.referenceId = '',
     this.details = const [],
     this.showTotals = true,
+    this.customerAddress = '',
+    this.issueTime = '',
   });
 
   /// Catalogo 01: 01 factura, 03 boleta, 07 NC, 08 ND, 09/31 guia, 20 retencion, 40 percepcion.
@@ -57,6 +63,10 @@ class SunatTicket {
   /// Extra de guia/retencion (motivo, placa, partida, llegada).
   final List<String> details;
   final bool showTotals;
+  final String customerAddress;
+
+  /// Hora UBL (`HH:mm:ss`). Vacía si el XML no lo trae.
+  final String issueTime;
 
   bool get isDespatch =>
       documentTypeCode == '09' || documentTypeCode == '31';

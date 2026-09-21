@@ -17,6 +17,7 @@ import 'print_timing.dart';
 import 'printer_permissions.dart';
 import 'network_lan_channel.dart';
 import 'sunat/sunat_escpos_print.dart';
+import 'sunat/sunat_print_settings.dart';
 import 'sunat/sunat_ubl_parser.dart';
 import 'sunat/sunat_xml_source.dart';
 import 'transports/printer_transport.dart';
@@ -26,10 +27,14 @@ import 'redpos/redpos_ad_escpos.dart';
 import 'redpos/redpos_license.dart';
 
 class PrintService {
-  PrintService({PrintHistoryStore? history})
-      : _history = history ?? PrintHistoryStore();
+  PrintService({
+    PrintHistoryStore? history,
+    SunatPrintStore? sunatPrint,
+  })  : _history = history ?? PrintHistoryStore(),
+        _sunatPrint = sunatPrint ?? SunatPrintStore();
 
   final PrintHistoryStore _history;
+  final SunatPrintStore _sunatPrint;
   Future<void> _historyWrites = Future<void>.value();
 
   PrintHistoryStore get history => _history;
@@ -55,6 +60,8 @@ class PrintService {
     String source = 'share',
     bool requestPermissions = true,
     String? jobId,
+    // Nota de este trabajo SUNAT. null usa la nota guardada.
+    String? sunatNote,
   }) async {
     final name = p.basename(filePath);
     final lower = filePath.toLowerCase();
@@ -96,7 +103,7 @@ class PrintService {
           );
         }
         if (await _isSunatXml(filePath) || lower.endsWith('.zip')) {
-          return _buildSunatTicket(printer, filePath);
+          return _buildSunatTicket(printer, filePath, noteOverride: sunatNote);
         }
         throw PrinterTransportException(
           tr(
@@ -276,14 +283,22 @@ class PrintService {
     });
   }
 
-  static Future<List<int>> _buildSunatTicket(
+  Future<List<int>> _buildSunatTicket(
     SavedPrinter printer,
-    String filePath,
-  ) async {
+    String filePath, {
+    String? noteOverride,
+  }) async {
     try {
       final xml = await SunatXmlSource.load(filePath);
       final ticket = SunatUblParser.parse(xml);
-      return await SunatEscPosPrint.build(printer, ticket);
+      final saved = await _sunatPrint.load();
+      final logo = await _sunatPrint.loadLogoBytes();
+      return await SunatEscPosPrint.build(
+        printer,
+        ticket,
+        settings: saved.forJob(noteOverride),
+        logoBytes: logo,
+      );
     } on SunatXmlException catch (e) {
       throw PrinterTransportException(e.message);
     } on FileSystemException {

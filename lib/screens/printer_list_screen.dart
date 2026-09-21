@@ -22,6 +22,7 @@ import 'print_history_screen.dart';
 import 'printer_form_screen.dart';
 import 'share_print_screen.dart';
 import 'legal_screen.dart';
+import 'sunat_print_settings_screen.dart';
 
 const _expandedBreakpoint = 840.0;
 
@@ -526,6 +527,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
             tooltip: l('Ayuda y legal', 'Help and legal'),
             onSelected: (value) {
               final page = switch (value) {
+                'sunat' => const SunatPrintSettingsScreen(),
                 'help' => HelpScreen(store: widget.store),
                 'terms' => const LegalScreen.terms(),
                 'privacy' => const LegalScreen.privacy(),
@@ -539,6 +541,10 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
             itemBuilder: (ctx) {
               final loc = L.of(ctx);
               return [
+                PopupMenuItem(
+                  value: 'sunat',
+                  child: Text(loc('Ticket SUNAT', 'SUNAT ticket')),
+                ),
                 PopupMenuItem(
                   value: 'help',
                   child: Text(loc('Ayuda y soporte', 'Help & support')),
