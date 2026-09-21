@@ -65,7 +65,7 @@ class SunatTicket {
   final bool showTotals;
   final String customerAddress;
 
-  /// Hora UBL (`HH:mm:ss`). Vacía si el XML no la trae.
+  /// Hora UBL (`HH:mm:ss`). Vacía si el XML no lo trae.
   final String issueTime;
 
   bool get isDespatch =>
