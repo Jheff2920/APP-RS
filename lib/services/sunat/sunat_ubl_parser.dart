@@ -115,6 +115,8 @@ class SunatUblParser {
         _text(customer, 'RegistrationName'),
         _text(customer, 'Name'),
       ]),
+      customerAddress: _address(customer),
+      issueTime: _directText(root, 'IssueTime'),
       lines: _lines(root),
       subtotal: subtotal,
       igv: igv,
@@ -233,10 +235,27 @@ class SunatUblParser {
           description: desc.ifEmpty('Item'),
           unitPrice: price.isFinite ? price : 0,
           amount: amount,
+          unit: _quantityUnit(line),
         ),
       );
     }
     return out;
+  }
+
+  static String _quantityUnit(XmlElement line) {
+    for (final name in const [
+      'InvoicedQuantity',
+      'CreditedQuantity',
+      'DebitedQuantity',
+      'DeliveredQuantity',
+    ]) {
+      final el = line.childElements
+          .where((e) => e.localName == name)
+          .firstOrNull;
+      final unit = el?.getAttribute('unitCode')?.trim() ?? '';
+      if (unit.isNotEmpty) return unit;
+    }
+    return '';
   }
 
   static List<String> _details(XmlElement root, String type) {
