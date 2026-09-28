@@ -35,7 +35,6 @@ class CustomTicketEditScreen extends StatefulWidget {
 
 class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
   final _nameCtrl = TextEditingController();
-  final _titleCtrl = TextEditingController();
   final _companyNameCtrl = TextEditingController();
   final _rucCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
@@ -61,6 +60,7 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
   Uint8List? _logo;
   List<CustomTicketLine> _lines = [];
   String _id = '';
+
   /// Si el usuario edita totales a mano, no pisar hasta que cambien líneas o pulse Recalcular.
   var _totalsManual = false;
   static const _uuid = Uuid();
@@ -74,7 +74,6 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _titleCtrl.dispose();
     _companyNameCtrl.dispose();
     _rucCtrl.dispose();
     _addressCtrl.dispose();
@@ -113,7 +112,6 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
     }
     _id = t.id;
     _nameCtrl.text = t.name;
-    _titleCtrl.text = t.title;
     _companyNameCtrl.text = t.companyName;
     _rucCtrl.text = t.ruc;
     _addressCtrl.text = t.address;
@@ -154,7 +152,7 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
     return CustomTicketTemplate(
       id: _id,
       name: _nameCtrl.text,
-      title: _titleCtrl.text,
+      title: _companyNameCtrl.text,
       lines: List.of(_lines),
       showLogo: _showLogo,
       logoBytes: _logo,
@@ -248,7 +246,8 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(l('No se pudo guardar el logo.', 'Could not save the logo.')),
+          content: Text(
+              l('No se pudo guardar el logo.', 'Could not save the logo.')),
         ),
       );
     } finally {
@@ -308,7 +307,8 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
     _recalcTotals();
   }
 
-  void _updateLine(int index, CustomTicketLine line, {bool recomputeAmount = false}) {
+  void _updateLine(int index, CustomTicketLine line,
+      {bool recomputeAmount = false}) {
     final next = recomputeAmount ? _withAutoAmount(line) : line;
     setState(() {
       _lines = List.of(_lines)..[index] = next;
@@ -359,6 +359,7 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   children: [
                     TextField(
+                      key: const ValueKey('template-name'),
                       controller: _nameCtrl,
                       maxLength: CustomTicketTemplate.maxNameLength,
                       textCapitalization: TextCapitalization.sentences,
@@ -410,13 +411,15 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Icon(Icons.image_outlined),
                           label: Text(l('Elegir imagen', 'Choose image')),
                         ),
                         OutlinedButton.icon(
-                          onPressed: _logo == null || _savingLogo ? null : _clearLogo,
+                          onPressed:
+                              _logo == null || _savingLogo ? null : _clearLogo,
                           icon: const Icon(Icons.hide_image_outlined),
                           label: Text(l('Quitar logo', 'Remove logo')),
                         ),
@@ -429,12 +432,14 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                     ),
                     const SizedBox(height: 8),
                     TextField(
+                      key: const ValueKey('company-name'),
                       controller: _companyNameCtrl,
                       maxLength: CustomTicketTemplate.maxCompanyNameLength,
                       textCapitalization: TextCapitalization.characters,
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
-                        labelText: l('Nombre de la tienda / empresa', 'Store / company name'),
+                        labelText: l('Nombre de la tienda / empresa',
+                            'Store / company name'),
                         helperText: l(
                           'Se imprime centrado bajo el logo.',
                           'Printed centered under the logo.',
@@ -463,7 +468,8 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                       textCapitalization: TextCapitalization.sentences,
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
-                        labelText: l('Dirección / ubicación', 'Address / location'),
+                        labelText:
+                            l('Dirección / ubicación', 'Address / location'),
                         alignLabelWithHint: true,
                         helperText: l(
                           'Se imprime centrado bajo el RUC.',
@@ -472,20 +478,6 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    TextField(
-                      controller: _titleCtrl,
-                      maxLength: CustomTicketTemplate.maxTitleLength,
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        labelText: l('Título', 'Title'),
-                        helperText: l(
-                          'Se imprime centrado y en negrita.',
-                          'Printed centered and bold.',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Expanded(
@@ -534,7 +526,8 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                         index: i,
                         line: _lines[i],
                         onChanged: (line, {bool recomputeAmount = false}) =>
-                            _updateLine(i, line, recomputeAmount: recomputeAmount),
+                            _updateLine(i, line,
+                                recomputeAmount: recomputeAmount),
                         onRemove: () => _removeLine(i),
                       ),
                     const SizedBox(height: 16),
@@ -587,7 +580,8 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                               controller: _subtotalLabelCtrl,
                               decoration: InputDecoration(
                                 border: const OutlineInputBorder(),
-                                labelText: l('Etiqueta subtotal', 'Subtotal label'),
+                                labelText:
+                                    l('Etiqueta subtotal', 'Subtotal label'),
                               ),
                             ),
                           ),
@@ -596,7 +590,8 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                       const SizedBox(height: 8),
                       TextField(
                         controller: _subtotalCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                         onChanged: (_) => _onTotalsManualEdit(),
                         decoration: InputDecoration(
                           border: const OutlineInputBorder(),
@@ -622,7 +617,9 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                           Expanded(
                             child: TextField(
                               controller: _taxCtrl,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
                               onChanged: (_) => _onTotalsManualEdit(),
                               decoration: InputDecoration(
                                 border: const OutlineInputBorder(),
@@ -648,7 +645,9 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                           Expanded(
                             child: TextField(
                               controller: _totalCtrl,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
                               onChanged: (_) => _onTotalsManualEdit(),
                               decoration: InputDecoration(
                                 border: const OutlineInputBorder(),
@@ -854,8 +853,10 @@ class _LineEditorState extends State<_LineEditor> {
                 Expanded(
                   child: Text(
                     line.isItem
-                        ? l('Ítem ${widget.index + 1}', 'Item ${widget.index + 1}')
-                        : l('Línea ${widget.index + 1}', 'Line ${widget.index + 1}'),
+                        ? l('Ítem ${widget.index + 1}',
+                            'Item ${widget.index + 1}')
+                        : l('Línea ${widget.index + 1}',
+                            'Line ${widget.index + 1}'),
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                 ),
@@ -876,7 +877,8 @@ class _LineEditorState extends State<_LineEditor> {
                       controller: _qtyCtrl,
                       focusNode: _qtyFocus,
                       onChanged: (_) => _emit(recomputeAmount: true),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
                         labelText: l('Cant.', 'Qty'),
@@ -909,7 +911,8 @@ class _LineEditorState extends State<_LineEditor> {
                       controller: _unitPriceCtrl,
                       focusNode: _unitPriceFocus,
                       onChanged: (_) => _emit(recomputeAmount: true),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
                         labelText: l('P.U. (sin IGV)', 'Unit (ex-IGV)'),
@@ -924,7 +927,8 @@ class _LineEditorState extends State<_LineEditor> {
                       controller: _amountCtrl,
                       focusNode: _amountFocus,
                       onChanged: (_) => _emit(),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
                         labelText: l('Importe (sin IGV)', 'Amount (ex-IGV)'),

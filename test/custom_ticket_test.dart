@@ -99,6 +99,7 @@ void main() {
     final restored = CustomTicketTemplate.fromJson(original.toJson());
     expect(restored.id, 't1');
     expect(restored.name, 'Demo');
+    expect(restored.title, 'TITULO');
     expect(restored.companyName, 'MI TIENDA SAC');
     expect(restored.ruc, '20123456789');
     expect(restored.address, 'Av. Principal 123');
@@ -108,7 +109,8 @@ void main() {
     expect(restored.footer, 'Pie');
   });
 
-  test('escpos builder emits company header, totals, qr and barcode markers', () async {
+  test('escpos builder emits company header, totals, qr and barcode markers',
+      () async {
     final ticket = CustomTicketTemplate(
       id: 't1',
       name: 'Demo',
@@ -174,7 +176,6 @@ void main() {
     expect(_visible(bytes), contains('Solo texto'));
   });
 
-
   test('money parse and format normalize messy inputs', () {
     expect(CustomTicketMoney.parse('150.00'), 150.0);
     expect(CustomTicketMoney.parse('S/ 150.50'), 150.5);
@@ -227,7 +228,8 @@ void main() {
     final p32 = ticket.previewLines(cols: 32);
     expect(p32.any((l) => l.contains('Ct') && l.contains('P.U.')), isTrue);
     expect(p32.any((l) => l.contains('CtDESCRIPCION')), isFalse);
-    expect(p32.any((l) => l.contains('Ct') && l.contains('DESCRIPCION')), isTrue);
+    expect(
+        p32.any((l) => l.contains('Ct') && l.contains('DESCRIPCION')), isTrue);
     final header32 = p32.firstWhere((l) => l.contains('Ct'));
     expect(header32.contains('Ct '), isTrue);
     expect(p32.any((l) => l.contains('10.00')), isTrue);
@@ -316,7 +318,6 @@ void main() {
     // latin1-safe keeps printable ASCII product name
     expect(text, contains('CAFE'));
   });
-
 }
 
 SavedPrinter _printer(PaperWidth paper) {

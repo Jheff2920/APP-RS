@@ -131,7 +131,8 @@ class _CustomTicketsListScreenState extends State<CustomTicketsListScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          L.of(context)('Copia creada: ${copy.name}', 'Copy created: ${copy.name}'),
+          L.of(context)(
+              'Copia creada: ${copy.name}', 'Copy created: ${copy.name}'),
         ),
       ),
     );
@@ -182,12 +183,12 @@ class _CustomTicketsListScreenState extends State<CustomTicketsListScreen> {
                         const SizedBox(height: 8),
                         Text(
                           l(
-                            'Crea una plantilla con logo, título, líneas, '
-                            'totales, QR o código de barras, y previsualízala '
-                            'antes de imprimir.',
-                            'Create a template with logo, title, lines, '
-                            'totals, QR or barcode, and preview it before '
-                            'printing.',
+                            'Crea una plantilla con logo, líneas, '
+                                'totales, QR o código de barras, y previsualízala '
+                                'antes de imprimir.',
+                            'Create a template with logo, lines, '
+                                'totals, QR or barcode, and preview it before '
+                                'printing.',
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -200,7 +201,8 @@ class _CustomTicketsListScreenState extends State<CustomTicketsListScreen> {
                       itemBuilder: (context, index) {
                         final t = _items[index];
                         final subtitle = [
-                          if (t.title.trim().isNotEmpty) t.title.trim(),
+                          if (t.companyName.trim().isNotEmpty)
+                            t.companyName.trim(),
                           '${t.lines.length} ${l('líneas', 'lines')}',
                           if (t.showQr) 'QR',
                           if (t.showBarcode) l('Barras', 'Barcode'),
@@ -240,7 +242,8 @@ class _CustomTicketsListScreenState extends State<CustomTicketsListScreen> {
                                   PopupMenuItem(
                                     value: 'preview',
                                     child: Text(
-                                      loc('Vista previa / Imprimir', 'Preview / Print'),
+                                      loc('Vista previa / Imprimir',
+                                          'Preview / Print'),
                                     ),
                                   ),
                                   PopupMenuItem(

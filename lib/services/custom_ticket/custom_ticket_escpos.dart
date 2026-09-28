@@ -90,7 +90,7 @@ class CustomTicketEscPos {
       center(addr);
     }
 
-    // Title is form-only; header already shows company / RUC / address.
+    // Title is kept in storage for old templates but is not shown or printed.
     if (company.isNotEmpty ||
         ruc.isNotEmpty ||
         addr.isNotEmpty ||
@@ -227,10 +227,8 @@ class CustomTicketEscPos {
       }
     }
 
-    final note = ticket.footer
-        .replaceAll('\r\n', '\n')
-        .replaceAll('\r', '\n')
-        .trim();
+    final note =
+        ticket.footer.replaceAll('\r\n', '\n').replaceAll('\r', '\n').trim();
     if (note.isNotEmpty) {
       sep();
       for (final part in note.split('\n')) {
