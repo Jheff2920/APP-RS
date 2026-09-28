@@ -123,7 +123,7 @@ class LegalCopy {
             'the code and an optional printer identifier are sent only to redeem it.',
           )
         : l(
-            'El servidor de canje de códigos RedPOS recibe el código y, si lo indicias, '
+            'El servidor de canje de códigos RedPOS recibe el código y, si lo indicas, '
             'un identificador de impresora. URL base de API: ${RedPosConfig.apiBase}.',
             'The RedPOS code-redemption server receives the code and, if provided, a '
             'printer identifier. API base URL: ${RedPosConfig.apiBase}.',
