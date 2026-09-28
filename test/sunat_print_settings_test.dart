@@ -12,11 +12,18 @@ import 'package:hello_world_app/screens/share_print_screen.dart';
 import 'package:hello_world_app/screens/sunat_print_settings_screen.dart';
 import 'package:hello_world_app/services/print_service.dart';
 import 'package:hello_world_app/services/printer_store.dart';
+import 'package:hello_world_app/services/redpos/redpos_license.dart';
 import 'package:hello_world_app/services/sunat/sunat_logo.dart';
 import 'package:hello_world_app/services/sunat/sunat_print_settings.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  Future<void> _licensePrefs(Map<String, Object> values) async {
+    SharedPreferences.setMockInitialValues(values);
+    final prefs = await SharedPreferences.getInstance();
+    RedPosLicenseStore.instance.resetForTest(prefs: prefs);
+  }
 
   test('persists format, note, and logo across a new store', () async {
     SharedPreferences.setMockInitialValues({});
@@ -69,7 +76,9 @@ void main() {
   });
 
   testWidgets('settings screen saves the footer note', (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    await _licensePrefs({
+      RedPosLicenseStore.playEntitlementKey: true,
+    });
     await tester.pumpWidget(
       const MaterialApp(
         locale: Locale('es'),
@@ -96,7 +105,9 @@ void main() {
   });
 
   testWidgets('printer list opens SUNAT ticket settings', (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    await _licensePrefs({
+      RedPosLicenseStore.playEntitlementKey: true,
+    });
     await tester.pumpWidget(
       _esApp(
         PrinterListScreen(
@@ -123,7 +134,8 @@ void main() {
   });
 
   testWidgets('share screen edits the saved SUNAT note only for xml', (tester) async {
-    SharedPreferences.setMockInitialValues({
+    await _licensePrefs({
+      RedPosLicenseStore.playEntitlementKey: true,
       SunatPrintStore.settingsKey: jsonEncode(
         const SunatPrintSettings(footerNote: 'Nota guardada').toJson(),
       ),
@@ -160,6 +172,71 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Nota del ticket'), findsNothing);
+  });
+
+  test('withoutPaidExtras strips note and legend, keeps default QR', () {
+    const saved = SunatPrintSettings(
+      footerNote: 'Nota',
+      showQr: false,
+      showLegend: true,
+    );
+    final free = saved.withoutPaidExtras();
+    expect(free.footerNote, isEmpty);
+    expect(free.showQr, isTrue);
+    expect(free.showLegend, isFalse);
+    expect(saved.footerNote, 'Nota');
+  });
+
+  testWidgets('locked settings hide paid SUNAT extras', (tester) async {
+    await _licensePrefs({});
+    await tester.pumpWidget(
+      const MaterialApp(
+        locale: Locale('es'),
+        localizationsDelegates: [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: [Locale('es'), Locale('en')],
+        home: SunatPrintSettingsScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Ticket SUNAT'), findsOneWidget);
+    expect(find.text('Formato'), findsOneWidget);
+    expect(find.text('Elegir imagen'), findsNothing);
+    expect(find.text('Nota al pie'), findsWidgets);
+    expect(find.textContaining('Función de pago'), findsWidgets);
+    expect(find.byIcon(Icons.lock_outline), findsWidgets);
+  });
+
+  testWidgets('unlocked settings show paid SUNAT extras', (tester) async {
+    await _licensePrefs({
+      RedPosLicenseStore.playEntitlementKey: true,
+    });
+    await tester.pumpWidget(
+      const MaterialApp(
+        locale: Locale('es'),
+        localizationsDelegates: [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: [Locale('es'), Locale('en')],
+        home: SunatPrintSettingsScreen(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Logo de la empresa'), findsOneWidget);
+    expect(find.text('Elegir imagen'), findsOneWidget);
+    expect(find.text('Nota al pie'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Monto en letras'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Monto en letras'), findsOneWidget);
+    expect(find.textContaining('Función de pago'), findsNothing);
   });
 }
 

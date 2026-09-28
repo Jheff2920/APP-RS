@@ -63,6 +63,17 @@ class PrintService {
     void Function(PrintPhase phase)? onPhase,
     bool requestPermissions = true,
   }) async {
+    final unlocked = await RedPosLicenseStore.instance.isAdsFree();
+    if (!unlocked) {
+      throw PrinterTransportException(
+        tr(
+          'Tickets propios es una función de pago. Necesitas un código RedPOS, '
+          'una suscripción mensual o una licencia de por vida.',
+          'Custom tickets is a paid feature. You need a RedPOS code, '
+          'a monthly subscription, or a lifetime license.',
+        ),
+      );
+    }
     await _runJob(
       printer: printer,
       title: template.name.isEmpty ? 'Ticket propio' : template.name,
@@ -311,11 +322,16 @@ class PrintService {
       final xml = await SunatXmlSource.load(filePath);
       final ticket = SunatUblParser.parse(xml);
       final saved = await _sunatPrint.load();
-      final logo = await _sunatPrint.loadLogoBytes();
+      final unlocked = await RedPosLicenseStore.instance.isAdsFree();
+      final settings = unlocked
+          ? saved.forJob(noteOverride)
+          : saved.withoutPaidExtras();
+      final logo =
+          unlocked ? await _sunatPrint.loadLogoBytes() : null;
       return await SunatEscPosPrint.build(
         printer,
         ticket,
-        settings: saved.forJob(noteOverride),
+        settings: settings,
         logoBytes: logo,
       );
     } on SunatXmlException catch (e) {

@@ -70,6 +70,16 @@ class SunatPrintSettings {
     return copyWith(footerNote: normalizeNote(noteOverride));
   }
 
+  /// Sin pase de pago: sin nota, sin monto en letras; QR con valor por defecto.
+  /// El logo se omite aparte en el builder de impresión.
+  SunatPrintSettings withoutPaidExtras() {
+    return copyWith(
+      footerNote: '',
+      showQr: true,
+      showLegend: false,
+    );
+  }
+
   SunatPrintSettings copyWith({
     SunatTicketFormat? format,
     String? footerNote,

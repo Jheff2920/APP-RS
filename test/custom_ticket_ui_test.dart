@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hello_world_app/services/redpos/redpos_license.dart';
 
 import 'package:hello_world_app/screens/custom_ticket_edit_screen.dart';
 import 'package:hello_world_app/screens/custom_tickets_list_screen.dart';
@@ -12,6 +14,12 @@ import 'package:hello_world_app/services/printer_store.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  Future<void> _licensePrefs(Map<String, Object> values) async {
+    SharedPreferences.setMockInitialValues(values);
+    final prefs = await SharedPreferences.getInstance();
+    RedPosLicenseStore.instance.resetForTest(prefs: prefs);
+  }
+
   Future<void> setView(WidgetTester tester) async {
     tester.view.physicalSize = const Size(800, 1600);
     tester.view.devicePixelRatio = 1;
@@ -22,7 +30,9 @@ void main() {
   }
 
   testWidgets('edit screen has no title field', (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    await _licensePrefs({
+      RedPosLicenseStore.playEntitlementKey: true,
+    });
     await setView(tester);
 
     final store = CustomTicketStore();
@@ -66,7 +76,9 @@ void main() {
   });
 
   testWidgets('edit save stores company name as title', (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    await _licensePrefs({
+      RedPosLicenseStore.playEntitlementKey: true,
+    });
     await setView(tester);
 
     final store = CustomTicketStore();
@@ -117,7 +129,9 @@ void main() {
   });
 
   testWidgets('list shows company name instead of title', (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    await _licensePrefs({
+      RedPosLicenseStore.playEntitlementKey: true,
+    });
     await setView(tester);
 
     final store = CustomTicketStore();
@@ -154,7 +168,9 @@ void main() {
 
   testWidgets('Incluir IGV toggle hides tax fields and persists false',
       (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    await _licensePrefs({
+      RedPosLicenseStore.playEntitlementKey: true,
+    });
     await setView(tester);
 
     final store = CustomTicketStore();
@@ -239,5 +255,29 @@ void main() {
     expect(loaded.total, '100.00');
     expect(loaded.tax, isEmpty);
     expect(loaded.subtotal, isEmpty);
+  });
+
+  testWidgets('locked custom tickets show paid gate', (tester) async {
+    await _licensePrefs({});
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('es'),
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('es'), Locale('en')],
+        home: CustomTicketsListScreen(
+          printerStore: PrinterStore(),
+          printService: PrintService(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Tickets propios'), findsOneWidget);
+    expect(find.text('Contenido bloqueado'), findsOneWidget);
+    expect(find.textContaining('Función de pago'), findsWidgets);
+    expect(find.text('Nueva'), findsNothing);
   });
 }
