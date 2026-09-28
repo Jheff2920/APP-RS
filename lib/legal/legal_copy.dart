@@ -132,10 +132,10 @@ class LegalCopy {
       LegalSection(
         l('1. Responsable', '1. Controller'),
         l(
-          'RedPOS (marca de Redd Soluciones / redsoluciones.com.pe) trata los datos '
+          'RedPOS (marca de Red Soluciones / redsoluciones.com.pe) trata los datos '
           'de $name. Contacto: ${RedPosConfig.supportEmail} · '
           '${RedPosConfig.siteUrlWithScheme}.',
-          'RedPOS (Redd Soluciones / redsoluciones.com.pe) processes $name data. '
+          'RedPOS (Red Soluciones / redsoluciones.com.pe) processes $name data. '
           'Contact: ${RedPosConfig.supportEmail} · ${RedPosConfig.siteUrlWithScheme}.',
         ),
       ),
