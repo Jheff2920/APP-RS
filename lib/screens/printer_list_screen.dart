@@ -528,7 +528,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
             tooltip: l('Ayuda y legal', 'Help and legal'),
             onSelected: (value) {
               final Widget? page = switch (value) {
-                'sunat' => const SunatPrintSettingsScreen(),
+                'sunat' => SunatPrintSettingsScreen(printerStore: widget.store),
                 'custom' => CustomTicketsListScreen(
                     printerStore: widget.store,
                     printService: widget.printService,

@@ -6,14 +6,18 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../l10n/app_lang.dart';
+import '../services/printer_store.dart';
+import '../services/redpos/redpos_license.dart';
 import '../services/sunat/sunat_logo.dart';
 import '../services/sunat/sunat_print_settings.dart';
 import '../widgets/boleta_page.dart';
+import '../widgets/redpos_paid_gate.dart';
 
 class SunatPrintSettingsScreen extends StatefulWidget {
-  const SunatPrintSettingsScreen({super.key, this.store});
+  const SunatPrintSettingsScreen({super.key, this.store, this.printerStore});
 
   final SunatPrintStore? store;
+  final PrinterStore? printerStore;
 
   @override
   State<SunatPrintSettingsScreen> createState() =>
@@ -22,9 +26,12 @@ class SunatPrintSettingsScreen extends StatefulWidget {
 
 class _SunatPrintSettingsScreenState extends State<SunatPrintSettingsScreen> {
   late final SunatPrintStore _store = widget.store ?? SunatPrintStore();
+  late final PrinterStore _printerStore =
+      widget.printerStore ?? PrinterStore();
   final _noteController = TextEditingController();
   var _loading = true;
   var _savingLogo = false;
+  var _unlocked = false;
   var _format = SunatTicketFormat.claro;
   var _showQr = true;
   var _showLegend = true;
@@ -45,6 +52,8 @@ class _SunatPrintSettingsScreenState extends State<SunatPrintSettingsScreen> {
   Future<void> _load() async {
     final settings = await _store.load();
     final logo = await _store.loadLogoBytes();
+    final unlocked =
+        await RedPosLicenseStore.instance.isAdsFree(reloadDisk: false);
     if (!mounted) return;
     _noteController.text = settings.footerNote;
     setState(() {
@@ -52,8 +61,15 @@ class _SunatPrintSettingsScreenState extends State<SunatPrintSettingsScreen> {
       _showQr = settings.showQr;
       _showLegend = settings.showLegend;
       _logo = logo;
+      _unlocked = unlocked;
       _loading = false;
     });
+  }
+
+  Future<void> _refreshUnlock() async {
+    final unlocked = await RedPosLicenseStore.instance.isAdsFree();
+    if (!mounted) return;
+    setState(() => _unlocked = unlocked);
   }
 
   SunatPrintSettings _current() {
@@ -66,7 +82,15 @@ class _SunatPrintSettingsScreenState extends State<SunatPrintSettingsScreen> {
   }
 
   Future<void> _persist() async {
-    await _store.save(_current());
+    // El formato es gratis; los extras de pago solo se guardan con pase.
+    if (_unlocked) {
+      await _store.save(_current());
+      return;
+    }
+    final saved = await _store.load();
+    await _store.save(
+      saved.copyWith(format: _format),
+    );
   }
 
   Future<void> _saveAndClose() async {
@@ -76,6 +100,7 @@ class _SunatPrintSettingsScreenState extends State<SunatPrintSettingsScreen> {
   }
 
   Future<void> _pickLogo() async {
+    if (!_unlocked) return;
     final l = L.of(context);
     setState(() => _savingLogo = true);
     await Future<void>.delayed(Duration.zero);
@@ -127,9 +152,40 @@ class _SunatPrintSettingsScreenState extends State<SunatPrintSettingsScreen> {
   }
 
   Future<void> _clearLogo() async {
+    if (!_unlocked) return;
     await _store.clearLogo();
     if (!mounted) return;
     setState(() => _logo = null);
+  }
+
+  Widget _lockedSection({
+    required String title,
+    required String freeHint,
+  }) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.lock_outline,
+                size: 18, color: theme.colorScheme.outline),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(title, style: theme.textTheme.titleMedium),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(freeHint, style: theme.textTheme.bodyMedium),
+        const SizedBox(height: 8),
+        RedPosPaidGateBanner(
+          store: _printerStore,
+          onUnlocked: () => unawaited(_refreshUnlock()),
+          compact: true,
+        ),
+      ],
+    );
   }
 
   @override
@@ -185,128 +241,162 @@ class _SunatPrintSettingsScreenState extends State<SunatPrintSettingsScreen> {
                       style: theme.textTheme.bodySmall,
                     ),
                     const SizedBox(height: 24),
-                    Text(
-                      l('Logo de la empresa', 'Company logo'),
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      l(
-                        'Se imprime centrado, arriba del ticket. Si no eliges '
-                        'imagen, el comprobante sale sin logo.',
-                        'Printed centered at the top of the ticket. If you do '
-                        'not pick an image, the receipt has no logo.',
+                    if (_unlocked) ...[
+                      Text(
+                        l('Logo de la empresa', 'Company logo'),
+                        style: theme.textTheme.titleMedium,
                       ),
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 12),
-                    if (_logo != null) ...[
-                      Semantics(
-                        label: l('Logo de la empresa', 'Company logo'),
-                        image: true,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Image.memory(
-                              _logo!,
-                              height: 96,
-                              fit: BoxFit.contain,
+                      const SizedBox(height: 8),
+                      Text(
+                        l(
+                          'Se imprime centrado, arriba del ticket. Si no eliges '
+                          'imagen, el comprobante sale sin logo.',
+                          'Printed centered at the top of the ticket. If you do '
+                          'not pick an image, the receipt has no logo.',
+                        ),
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 12),
+                      if (_logo != null) ...[
+                        Semantics(
+                          label: l('Logo de la empresa', 'Company logo'),
+                          image: true,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Image.memory(
+                                _logo!,
+                                height: 96,
+                                fit: BoxFit.contain,
+                              ),
                             ),
                           ),
                         ),
+                        const SizedBox(height: 12),
+                      ],
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          FilledButton.tonalIcon(
+                            onPressed: _savingLogo ? null : _pickLogo,
+                            icon: _savingLogo
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.image_outlined),
+                            label: Text(l('Elegir imagen', 'Choose image')),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: _logo == null || _savingLogo
+                                ? null
+                                : _clearLogo,
+                            icon: const Icon(Icons.hide_image_outlined),
+                            label: Text(l('Quitar logo', 'Remove logo')),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        l('Nota al pie', 'Footer note'),
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        l(
+                          'Texto por defecto al imprimir un XML o ZIP SUNAT. '
+                          'En la pantalla de impresión puedes cambiarlo para ese trabajo.',
+                          'Default text when printing a SUNAT XML or ZIP. '
+                          'On the print screen you can change it for that job.',
+                        ),
+                        style: theme.textTheme.bodyMedium,
                       ),
                       const SizedBox(height: 12),
+                      TextField(
+                        controller: _noteController,
+                        maxLength: SunatPrintSettings.maxNoteLength,
+                        maxLines: 4,
+                        textCapitalization: TextCapitalization.sentences,
+                        decoration: InputDecoration(
+                          border: const OutlineInputBorder(),
+                          labelText: l('Nota', 'Note'),
+                          alignLabelWithHint: true,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        l('Contenido', 'Content'),
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(l('Código QR', 'QR code')),
+                        subtitle: Text(
+                          l(
+                            'Para consultar el comprobante en SUNAT.',
+                            'To look up the receipt on SUNAT.',
+                          ),
+                        ),
+                        value: _showQr,
+                        onChanged: (value) {
+                          setState(() => _showQr = value);
+                          unawaited(_persist());
+                        },
+                      ),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(l('Monto en letras', 'Amount in words')),
+                        subtitle: Text(
+                          l(
+                            'La leyenda del XML, si viene.',
+                            'The XML legend, when present.',
+                          ),
+                        ),
+                        value: _showLegend,
+                        onChanged: (value) {
+                          setState(() => _showLegend = value);
+                          unawaited(_persist());
+                        },
+                      ),
+                    ] else ...[
+                      _lockedSection(
+                        title: l('Logo de la empresa', 'Company logo'),
+                        freeHint: l(
+                          'El ticket SUNAT básico sigue disponible. El logo '
+                          'es una función de pago.',
+                          'Basic SUNAT printing stays available. The company '
+                          'logo is a paid feature.',
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      _lockedSection(
+                        title: l('Nota al pie', 'Footer note'),
+                        freeHint: l(
+                          'Personalizar la nota al pie requiere desbloqueo.',
+                          'Customizing the footer note requires unlock.',
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      _lockedSection(
+                        title: l(
+                          'Código QR y monto en letras',
+                          'QR code and amount in words',
+                        ),
+                        freeHint: l(
+                          'Puedes imprimir el comprobante con el QR por defecto. '
+                          'Activar u ocultar el QR y el monto en letras es de pago.',
+                          'You can still print with the default QR. Toggling '
+                          'QR and amount in words is paid.',
+                        ),
+                      ),
                     ],
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        FilledButton.tonalIcon(
-                          onPressed: _savingLogo ? null : _pickLogo,
-                          icon: _savingLogo
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.image_outlined),
-                          label: Text(l('Elegir imagen', 'Choose image')),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _logo == null || _savingLogo
-                              ? null
-                              : _clearLogo,
-                          icon: const Icon(Icons.hide_image_outlined),
-                          label: Text(l('Quitar logo', 'Remove logo')),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
-                      l('Nota al pie', 'Footer note'),
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      l(
-                        'Texto por defecto al imprimir un XML o ZIP SUNAT. '
-                        'En la pantalla de impresión puedes cambiarlo para ese trabajo.',
-                        'Default text when printing a SUNAT XML or ZIP. '
-                        'On the print screen you can change it for that job.',
-                      ),
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _noteController,
-                      maxLength: SunatPrintSettings.maxNoteLength,
-                      maxLines: 4,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        labelText: l('Nota', 'Note'),
-                        alignLabelWithHint: true,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      l('Contenido', 'Content'),
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(l('Código QR', 'QR code')),
-                      subtitle: Text(
-                        l(
-                          'Para consultar el comprobante en SUNAT.',
-                          'To look up the receipt on SUNAT.',
-                        ),
-                      ),
-                      value: _showQr,
-                      onChanged: (value) {
-                        setState(() => _showQr = value);
-                        unawaited(_persist());
-                      },
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(l('Monto en letras', 'Amount in words')),
-                      subtitle: Text(
-                        l(
-                          'La leyenda del XML, si viene.',
-                          'The XML legend, when present.',
-                        ),
-                      ),
-                      value: _showLegend,
-                      onChanged: (value) {
-                        setState(() => _showLegend = value);
-                        unawaited(_persist());
-                      },
-                    ),
                   ],
                 ),
               ),

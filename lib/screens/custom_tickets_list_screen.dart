@@ -4,8 +4,10 @@ import '../l10n/app_lang.dart';
 import '../services/custom_ticket/custom_ticket.dart';
 import '../services/custom_ticket/custom_ticket_store.dart';
 import '../services/print_service.dart';
+import '../services/redpos/redpos_license.dart';
 import '../services/printer_store.dart';
 import '../widgets/boleta_page.dart';
+import '../widgets/redpos_paid_gate.dart';
 import 'custom_ticket_edit_screen.dart';
 import 'custom_ticket_preview_screen.dart';
 
@@ -32,6 +34,7 @@ class _CustomTicketsListScreenState extends State<CustomTicketsListScreen> {
   List<CustomTicketTemplate> _items = [];
   var _loading = true;
   var _creating = false;
+  var _unlocked = false;
 
   @override
   void initState() {
@@ -41,9 +44,12 @@ class _CustomTicketsListScreenState extends State<CustomTicketsListScreen> {
 
   Future<void> _reload() async {
     final all = await _store.loadAll();
+    final unlocked =
+        await RedPosLicenseStore.instance.isAdsFree(reloadDisk: false);
     if (!mounted) return;
     setState(() {
       _items = all;
+      _unlocked = unlocked;
       _loading = false;
     });
   }
@@ -142,10 +148,19 @@ class _CustomTicketsListScreenState extends State<CustomTicketsListScreen> {
   @override
   Widget build(BuildContext context) {
     final l = L.of(context);
+    final title = l('Tickets propios', 'Custom tickets');
+
+    if (!_loading && !_unlocked) {
+      return RedPosPaidGatePage(
+        title: title,
+        store: widget.printerStore,
+        onUnlocked: () => _reload(),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l('Tickets propios', 'Custom tickets')),
+        title: Text(title),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _creating || _loading ? null : _create,

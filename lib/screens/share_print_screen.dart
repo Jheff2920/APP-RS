@@ -13,6 +13,7 @@ import '../services/transports/printer_transport.dart';
 import '../widgets/boleta_page.dart';
 import '../widgets/print_status_dialog.dart';
 import '../widgets/redpos_ad_banner.dart';
+import '../widgets/redpos_paid_gate.dart';
 import 'sunat_print_settings_screen.dart';
 
 class SharePrintScreen extends StatefulWidget {
@@ -81,7 +82,7 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
   Future<void> _openSunatSettings() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => SunatPrintSettingsScreen(store: _sunatStore),
+        builder: (_) => SunatPrintSettingsScreen(store: _sunatStore, printerStore: widget.printerStore),
       ),
     );
     if (!mounted) return;
@@ -133,7 +134,7 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
           filePath: widget.filePath,
           onPhase: setPhase,
           requestPermissions: false,
-          sunatNote: _sunatFile ? _noteController.text : null,
+          sunatNote: _sunatFile && _adsFree ? _noteController.text : null,
         ),
       );
       if (!mounted) return;
@@ -286,25 +287,41 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
                         ),
                       ),
                     ),
-                    TextField(
-                      controller: _noteController,
-                      enabled: !_printing,
-                      maxLength: SunatPrintSettings.maxNoteLength,
-                      maxLines: 3,
-                      textCapitalization: TextCapitalization.sentences,
-                      onChanged: (value) {
-                        _noteDirty = value != _loadedNote;
-                      },
-                      decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        labelText: l('Nota del ticket', 'Ticket note'),
-                        helperText: l(
-                          'Se imprime al pie. El cambio vale solo para este trabajo.',
-                          'Printed at the bottom. The change applies only to this job.',
+                    if (_adsFree)
+                      TextField(
+                        controller: _noteController,
+                        enabled: !_printing,
+                        maxLength: SunatPrintSettings.maxNoteLength,
+                        maxLines: 3,
+                        textCapitalization: TextCapitalization.sentences,
+                        onChanged: (value) {
+                          _noteDirty = value != _loadedNote;
+                        },
+                        decoration: InputDecoration(
+                          border: const OutlineInputBorder(),
+                          labelText: l('Nota del ticket', 'Ticket note'),
+                          helperText: l(
+                            'Se imprime al pie. El cambio vale solo para este trabajo.',
+                            'Printed at the bottom. The change applies only to this job.',
+                          ),
+                          alignLabelWithHint: true,
                         ),
-                        alignLabelWithHint: true,
+                      )
+                    else ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        l(
+                          'La nota al pie es una función de pago.',
+                          'The footer note is a paid feature.',
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      RedPosPaidGateBanner(
+                        store: widget.printerStore,
+                        onUnlocked: _load,
+                        compact: true,
+                      ),
+                    ],
                   ],
                 ],
               ),

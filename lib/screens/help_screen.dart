@@ -135,7 +135,7 @@ class HelpScreen extends StatelessWidget {
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => const SunatPrintSettingsScreen(),
+                        builder: (_) => SunatPrintSettingsScreen(printerStore: store),
                       ),
                     ),
                   ),

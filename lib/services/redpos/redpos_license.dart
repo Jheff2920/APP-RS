@@ -44,6 +44,12 @@ class RedPosLicenseStore {
 
   SharedPreferences? _prefs;
 
+  /// Solo tests: suelta el cache de SharedPreferences del singleton.
+  @visibleForTesting
+  void resetForTest({SharedPreferences? prefs}) {
+    _prefs = prefs;
+  }
+
   Future<SharedPreferences> _ensurePrefs() async {
     return _prefs ??= await SharedPreferences.getInstance();
   }
