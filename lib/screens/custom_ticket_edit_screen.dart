@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 import '../l10n/app_lang.dart';
 import '../services/custom_ticket/custom_ticket.dart';
@@ -59,6 +60,7 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
   String _id = '';
   /// Si el usuario edita totales a mano, no pisar hasta que cambien líneas o pulse Recalcular.
   var _totalsManual = false;
+  static const _uuid = Uuid();
 
   @override
   void initState() {
@@ -82,6 +84,16 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
     _barcodeCtrl.dispose();
     super.dispose();
   }
+
+  String _newLineId() => _uuid.v4();
+
+  CustomTicketLine _ensureLineId(CustomTicketLine line) {
+    if (line.id.isNotEmpty) return line;
+    return line.copyWith(id: _newLineId());
+  }
+
+  List<CustomTicketLine> _ensureLineIds(List<CustomTicketLine> lines) =>
+      [for (final line in lines) _ensureLineId(line)];
 
   Future<void> _load() async {
     final t = await widget.store.loadById(widget.templateId);
@@ -112,7 +124,7 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
       _showQr = t.showQr;
       _showBarcode = t.showBarcode;
       _logo = t.logoBytes;
-      _lines = List.of(t.lines);
+      _lines = _ensureLineIds(List.of(t.lines));
       _loading = false;
     });
     final hasTotals = t.subtotal.trim().isNotEmpty ||
@@ -268,6 +280,7 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
       _lines = [
         ..._lines,
         CustomTicketLine(
+          id: _newLineId(),
           type: type,
           qty: type == CustomTicketLineType.item ? '1' : '',
         ),
@@ -456,6 +469,7 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                     const SizedBox(height: 8),
                     for (var i = 0; i < _lines.length; i++)
                       _LineEditor(
+                        key: ValueKey(_lines[i].id),
                         index: i,
                         line: _lines[i],
                         onChanged: (line, {bool recomputeAmount = false}) =>
@@ -655,8 +669,9 @@ typedef _LineChanged = void Function(
   bool recomputeAmount,
 });
 
-class _LineEditor extends StatelessWidget {
+class _LineEditor extends StatefulWidget {
   const _LineEditor({
+    super.key,
     required this.index,
     required this.line,
     required this.onChanged,
@@ -669,8 +684,103 @@ class _LineEditor extends StatelessWidget {
   final VoidCallback onRemove;
 
   @override
+  State<_LineEditor> createState() => _LineEditorState();
+}
+
+class _LineEditorState extends State<_LineEditor> {
+  late final TextEditingController _qtyCtrl;
+  late final TextEditingController _textCtrl;
+  late final TextEditingController _unitPriceCtrl;
+  late final TextEditingController _amountCtrl;
+  late final FocusNode _qtyFocus;
+  late final FocusNode _textFocus;
+  late final FocusNode _unitPriceFocus;
+  late final FocusNode _amountFocus;
+
+  /// True while applying programmatic controller updates (avoids feedback loops).
+  var _syncing = false;
+
+  CustomTicketLine get line => widget.line;
+
+  @override
+  void initState() {
+    super.initState();
+    _qtyCtrl = TextEditingController(text: line.qty);
+    _textCtrl = TextEditingController(text: line.text);
+    _unitPriceCtrl = TextEditingController(text: line.unitPrice);
+    _amountCtrl = TextEditingController(text: line.amount);
+    _qtyFocus = FocusNode();
+    _textFocus = FocusNode();
+    _unitPriceFocus = FocusNode();
+    _amountFocus = FocusNode();
+  }
+
+  @override
+  void didUpdateWidget(covariant _LineEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Keep typed text; only pull parent-driven changes (e.g. auto importe) when
+    // that field is not focused, so setState/totals never steal caret.
+    _syncIfUnfocused(_qtyCtrl, _qtyFocus, line.qty);
+    _syncIfUnfocused(_textCtrl, _textFocus, line.text);
+    _syncIfUnfocused(_unitPriceCtrl, _unitPriceFocus, line.unitPrice);
+    _syncIfUnfocused(_amountCtrl, _amountFocus, line.amount);
+  }
+
+  void _syncIfUnfocused(
+    TextEditingController ctrl,
+    FocusNode focus,
+    String value,
+  ) {
+    if (focus.hasFocus) return;
+    if (ctrl.text == value) return;
+    _syncing = true;
+    ctrl.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
+    _syncing = false;
+  }
+
+  @override
+  void dispose() {
+    _qtyCtrl.dispose();
+    _textCtrl.dispose();
+    _unitPriceCtrl.dispose();
+    _amountCtrl.dispose();
+    _qtyFocus.dispose();
+    _textFocus.dispose();
+    _unitPriceFocus.dispose();
+    _amountFocus.dispose();
+    super.dispose();
+  }
+
+  CustomTicketLine _snapshot({
+    String? qty,
+    String? text,
+    String? unitPrice,
+    String? amount,
+    bool? bold,
+    bool? center,
+  }) {
+    return line.copyWith(
+      qty: qty ?? _qtyCtrl.text,
+      text: text ?? _textCtrl.text,
+      unitPrice: unitPrice ?? _unitPriceCtrl.text,
+      amount: amount ?? _amountCtrl.text,
+      bold: bold,
+      center: center,
+    );
+  }
+
+  void _emit({bool recomputeAmount = false}) {
+    if (_syncing) return;
+    widget.onChanged(_snapshot(), recomputeAmount: recomputeAmount);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l = L.of(context);
+    final id = line.id;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
@@ -683,14 +793,14 @@ class _LineEditor extends StatelessWidget {
                 Expanded(
                   child: Text(
                     line.isItem
-                        ? l('Ítem ${index + 1}', 'Item ${index + 1}')
-                        : l('Línea ${index + 1}', 'Line ${index + 1}'),
+                        ? l('Ítem ${widget.index + 1}', 'Item ${widget.index + 1}')
+                        : l('Línea ${widget.index + 1}', 'Line ${widget.index + 1}'),
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                 ),
                 IconButton(
                   tooltip: l('Eliminar', 'Delete'),
-                  onPressed: onRemove,
+                  onPressed: widget.onRemove,
                   icon: const Icon(Icons.delete_outline),
                 ),
               ],
@@ -700,9 +810,12 @@ class _LineEditor extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: 72,
-                    child: TextFormField(
-                      initialValue: line.qty,
-                      onChanged: (v) => onChanged(line.copyWith(qty: v), recomputeAmount: true),
+                    child: TextField(
+                      key: ValueKey('qty-$id'),
+                      controller: _qtyCtrl,
+                      focusNode: _qtyFocus,
+                      onChanged: (_) => _emit(recomputeAmount: true),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
                         labelText: l('Cant.', 'Qty'),
@@ -712,9 +825,11 @@ class _LineEditor extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: TextFormField(
-                      initialValue: line.text,
-                      onChanged: (v) => onChanged(line.copyWith(text: v)),
+                    child: TextField(
+                      key: ValueKey('desc-$id'),
+                      controller: _textCtrl,
+                      focusNode: _textFocus,
+                      onChanged: (_) => _emit(),
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
                         labelText: l('Descripción', 'Description'),
@@ -728,10 +843,12 @@ class _LineEditor extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: TextFormField(
-                      key: ValueKey('pu-$index-${line.unitPrice}'),
-                      initialValue: line.unitPrice,
-                      onChanged: (v) => onChanged(line.copyWith(unitPrice: v), recomputeAmount: true),
+                    child: TextField(
+                      key: ValueKey('pu-$id'),
+                      controller: _unitPriceCtrl,
+                      focusNode: _unitPriceFocus,
+                      onChanged: (_) => _emit(recomputeAmount: true),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
                         labelText: l('P.U. (sin IGV)', 'Unit (ex-IGV)'),
@@ -741,10 +858,12 @@ class _LineEditor extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: TextFormField(
-                      key: ValueKey('amt-$index-${line.amount}'),
-                      initialValue: line.amount,
-                      onChanged: (v) => onChanged(line.copyWith(amount: v)),
+                    child: TextField(
+                      key: ValueKey('amt-$id'),
+                      controller: _amountCtrl,
+                      focusNode: _amountFocus,
+                      onChanged: (_) => _emit(),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
                         labelText: l('Importe (sin IGV)', 'Amount (ex-IGV)'),
@@ -755,10 +874,12 @@ class _LineEditor extends StatelessWidget {
                 ],
               ),
             ] else ...[
-              TextFormField(
-                initialValue: line.text,
+              TextField(
+                key: ValueKey('text-$id'),
+                controller: _textCtrl,
+                focusNode: _textFocus,
                 maxLines: 2,
-                onChanged: (v) => onChanged(line.copyWith(text: v)),
+                onChanged: (_) => _emit(),
                 decoration: InputDecoration(
                   border: const OutlineInputBorder(),
                   labelText: l('Texto', 'Text'),
@@ -770,13 +891,13 @@ class _LineEditor extends StatelessWidget {
                   FilterChip(
                     label: Text(l('Negrita', 'Bold')),
                     selected: line.bold,
-                    onSelected: (v) => onChanged(line.copyWith(bold: v)),
+                    onSelected: (v) => widget.onChanged(_snapshot(bold: v)),
                   ),
                   const SizedBox(width: 8),
                   FilterChip(
                     label: Text(l('Centrar', 'Center')),
                     selected: line.center,
-                    onSelected: (v) => onChanged(line.copyWith(center: v)),
+                    onSelected: (v) => widget.onChanged(_snapshot(center: v)),
                   ),
                 ],
               ),

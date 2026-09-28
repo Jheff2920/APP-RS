@@ -17,6 +17,7 @@ enum CustomTicketLineType {
 /// Línea libre o ítem (cantidad / descripción / precios).
 class CustomTicketLine {
   const CustomTicketLine({
+    this.id = '',
     this.type = CustomTicketLineType.text,
     this.text = '',
     this.bold = false,
@@ -26,6 +27,8 @@ class CustomTicketLine {
     this.amount = '',
   });
 
+  /// Stable id for list keys / TextEditingControllers across rebuilds.
+  final String id;
   final CustomTicketLineType type;
   final String text;
   final bool bold;
@@ -37,6 +40,7 @@ class CustomTicketLine {
   bool get isItem => type == CustomTicketLineType.item;
 
   CustomTicketLine copyWith({
+    String? id,
     CustomTicketLineType? type,
     String? text,
     bool? bold,
@@ -46,6 +50,7 @@ class CustomTicketLine {
     String? amount,
   }) {
     return CustomTicketLine(
+      id: id ?? this.id,
       type: type ?? this.type,
       text: text ?? this.text,
       bold: bold ?? this.bold,
@@ -57,6 +62,7 @@ class CustomTicketLine {
   }
 
   Map<String, dynamic> toJson() => {
+        if (id.isNotEmpty) 'id': id,
         'type': type.name,
         'text': text,
         'bold': bold,
@@ -68,6 +74,7 @@ class CustomTicketLine {
 
   factory CustomTicketLine.fromJson(Map<String, dynamic> json) {
     return CustomTicketLine(
+      id: (json['id'] as String?) ?? '',
       type: CustomTicketLineType.fromName(json['type'] as String?),
       text: (json['text'] as String?) ?? '',
       bold: json['bold'] as bool? ?? false,
