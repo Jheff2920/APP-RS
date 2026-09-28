@@ -151,4 +151,93 @@ void main() {
     expect(find.textContaining('MI TIENDA SAC'), findsOneWidget);
     expect(find.textContaining('OLD TITLE'), findsNothing);
   });
+
+  testWidgets('Incluir IGV toggle hides tax fields and persists false',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await setView(tester);
+
+    final store = CustomTicketStore();
+    final created = await store.create(name: 'Sin IGV biz');
+    await store.save(
+      created.copyWith(
+        lines: const [
+          CustomTicketLine(
+            type: CustomTicketLineType.item,
+            text: 'Servicio',
+            qty: '1',
+            unitPrice: '100',
+            amount: '100',
+          ),
+        ],
+        showTotals: true,
+        includeIgv: true,
+        subtotal: '100.00',
+        tax: '18.00',
+        total: '118.00',
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) {
+            return TextButton(
+              onPressed: () {
+                Navigator.of(context).push<void>(
+                  MaterialPageRoute(
+                    builder: (_) => CustomTicketEditScreen(
+                      store: store,
+                      templateId: created.id,
+                      printerStore: PrinterStore(),
+                      printService: PrintService(),
+                    ),
+                  ),
+                );
+              },
+              child: const Text('open'),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    final igvToggle = find.textContaining('Incluir IGV').evaluate().isNotEmpty
+        ? find.textContaining('Incluir IGV')
+        : find.textContaining('Include IGV');
+    expect(igvToggle, findsOneWidget);
+    expect(
+      find.text('Op. Gravada').evaluate().isNotEmpty ||
+          find.text('Taxable ops').evaluate().isNotEmpty,
+      isTrue,
+    );
+
+    await tester.ensureVisible(igvToggle);
+    await tester.tap(igvToggle);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Op. Gravada'), findsNothing);
+    expect(find.text('Taxable ops'), findsNothing);
+    expect(find.text('IGV 18%'), findsNothing);
+    expect(find.text('VAT 18%'), findsNothing);
+    expect(
+      find.textContaining('Sin IGV').evaluate().isNotEmpty ||
+          find.textContaining('No IGV').evaluate().isNotEmpty,
+      isTrue,
+    );
+
+    final save = find.byType(FilledButton);
+    await tester.ensureVisible(save.last);
+    await tester.tap(save.last);
+    await tester.pumpAndSettle();
+
+    final loaded = await store.loadById(created.id);
+    expect(loaded, isNotNull);
+    expect(loaded!.includeIgv, isFalse);
+    expect(loaded.total, '100.00');
+    expect(loaded.tax, isEmpty);
+    expect(loaded.subtotal, isEmpty);
+  });
 }

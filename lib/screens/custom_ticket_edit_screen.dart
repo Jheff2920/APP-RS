@@ -55,6 +55,7 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
   var _missing = false;
   var _showLogo = false;
   var _showTotals = true;
+  var _includeIgv = true;
   var _showQr = false;
   var _showBarcode = false;
   Uint8List? _logo;
@@ -128,6 +129,7 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
     setState(() {
       _showLogo = t.showLogo;
       _showTotals = t.showTotals;
+      _includeIgv = t.includeIgv;
       _showQr = t.showQr;
       _showBarcode = t.showBarcode;
       _logo = t.logoBytes;
@@ -139,6 +141,12 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
         t.total.trim().isNotEmpty;
     if (!hasTotals) {
       _recalcTotals(force: true);
+    } else if (!t.includeIgv) {
+      // Sin IGV: solo TOTAL; no mostrar/guardar Op. Gravada ni IGV.
+      _subtotalCtrl.text = '';
+      _taxCtrl.text = '';
+      _totalCtrl.text = CustomTicketMoney.formatRaw(t.total);
+      _totalsManual = false;
     } else {
       // Valores guardados: formatear dinero y dejar auto hasta que edite a mano.
       _subtotalCtrl.text = CustomTicketMoney.formatRaw(t.subtotal);
@@ -161,6 +169,7 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
       address: _addressCtrl.text,
       footer: _footerCtrl.text,
       showTotals: _showTotals,
+      includeIgv: _includeIgv,
       currencySymbol: _currencyCtrl.text,
       subtotalLabel: _subtotalLabelCtrl.text,
       subtotal: _subtotalCtrl.text,
@@ -265,12 +274,25 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
 
   void _recalcTotals({bool force = false}) {
     if (_totalsManual && !force) return;
-    final calc = CustomTicketTotals.fromLines(_lines);
-    _subtotalCtrl.text = CustomTicketMoney.format(calc.subtotal);
-    _taxCtrl.text = CustomTicketMoney.format(calc.igv);
+    final calc = CustomTicketTotals.fromLines(
+      _lines,
+      includeIgv: _includeIgv,
+    );
+    if (_includeIgv) {
+      _subtotalCtrl.text = CustomTicketMoney.format(calc.subtotal);
+      _taxCtrl.text = CustomTicketMoney.format(calc.igv);
+    } else {
+      _subtotalCtrl.text = '';
+      _taxCtrl.text = '';
+    }
     _totalCtrl.text = CustomTicketMoney.format(calc.total);
     _totalsManual = false;
     if (mounted) setState(() {});
+  }
+
+  void _setIncludeIgv(bool value) {
+    setState(() => _includeIgv = value);
+    _recalcTotals(force: true);
   }
 
   void _onTotalsManualEdit() {
@@ -525,6 +547,7 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                         key: ValueKey(_lines[i].id),
                         index: i,
                         line: _lines[i],
+                        includeIgv: _includeIgv,
                         onChanged: (line, {bool recomputeAmount = false}) =>
                             _updateLine(i, line,
                                 recomputeAmount: recomputeAmount),
@@ -542,11 +565,29 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                       onChanged: (v) => setState(() => _showTotals = v),
                     ),
                     if (_showTotals) ...[
-                      Text(
-                        l(
-                          'Montos de ítem sin IGV. Op. Gravada = suma; IGV = 18%; Total = Op. Gravada + IGV. Se recalcula al cambiar líneas (puedes editar a mano).',
-                          'Line amounts exclude IGV. Op. Gravada = sum; IGV = 18%; Total = Op. Gravada + IGV. Recalculates when lines change (you can override).',
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(l('Incluir IGV', 'Include IGV')),
+                        subtitle: Text(
+                          l(
+                            'Desactiva si tu negocio no cobra IGV.',
+                            'Turn off if your business does not charge IGV.',
+                          ),
+                          style: theme.textTheme.bodySmall,
                         ),
+                        value: _includeIgv,
+                        onChanged: _setIncludeIgv,
+                      ),
+                      Text(
+                        _includeIgv
+                            ? l(
+                                'Montos de ítem sin IGV. Op. Gravada = suma; IGV = 18%; Total = Op. Gravada + IGV. Se recalcula al cambiar líneas (puedes editar a mano).',
+                                'Line amounts exclude IGV. Op. Gravada = sum; IGV = 18%; Total = Op. Gravada + IGV. Recalculates when lines change (you can override).',
+                              )
+                            : l(
+                                'Sin IGV. TOTAL = suma de importes de línea. Se recalcula al cambiar líneas (puedes editar a mano).',
+                                'No IGV. TOTAL = sum of line amounts. Recalculates when lines change (you can override).',
+                              ),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -561,75 +602,87 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: TextField(
-                              controller: _currencyCtrl,
-                              decoration: InputDecoration(
-                                border: const OutlineInputBorder(),
-                                labelText: l('Moneda', 'Currency'),
+                      if (_includeIgv) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: TextField(
+                                controller: _currencyCtrl,
+                                decoration: InputDecoration(
+                                  border: const OutlineInputBorder(),
+                                  labelText: l('Moneda', 'Currency'),
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            flex: 3,
-                            child: TextField(
-                              controller: _subtotalLabelCtrl,
-                              decoration: InputDecoration(
-                                border: const OutlineInputBorder(),
-                                labelText:
-                                    l('Etiqueta subtotal', 'Subtotal label'),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 3,
+                              child: TextField(
+                                controller: _subtotalLabelCtrl,
+                                decoration: InputDecoration(
+                                  border: const OutlineInputBorder(),
+                                  labelText:
+                                      l('Etiqueta subtotal', 'Subtotal label'),
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: _subtotalCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
-                        onChanged: (_) => _onTotalsManualEdit(),
-                        decoration: InputDecoration(
-                          border: const OutlineInputBorder(),
-                          labelText: l('Op. Gravada', 'Taxable ops'),
-                          helperText: _totalsManual
-                              ? l('Editado manualmente', 'Manually edited')
-                              : null,
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _taxLabelCtrl,
-                              decoration: InputDecoration(
-                                border: const OutlineInputBorder(),
-                                labelText: l('Etiqueta impuesto', 'Tax label'),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _subtotalCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          onChanged: (_) => _onTotalsManualEdit(),
+                          decoration: InputDecoration(
+                            border: const OutlineInputBorder(),
+                            labelText: l('Op. Gravada', 'Taxable ops'),
+                            helperText: _totalsManual
+                                ? l('Editado manualmente', 'Manually edited')
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _taxLabelCtrl,
+                                decoration: InputDecoration(
+                                  border: const OutlineInputBorder(),
+                                  labelText:
+                                      l('Etiqueta impuesto', 'Tax label'),
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextField(
-                              controller: _taxCtrl,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                      decimal: true),
-                              onChanged: (_) => _onTotalsManualEdit(),
-                              decoration: InputDecoration(
-                                border: const OutlineInputBorder(),
-                                labelText: l('IGV 18%', 'VAT 18%'),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _taxCtrl,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
+                                onChanged: (_) => _onTotalsManualEdit(),
+                                decoration: InputDecoration(
+                                  border: const OutlineInputBorder(),
+                                  labelText: l('IGV 18%', 'VAT 18%'),
+                                ),
                               ),
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                      ] else ...[
+                        TextField(
+                          controller: _currencyCtrl,
+                          decoration: InputDecoration(
+                            border: const OutlineInputBorder(),
+                            labelText: l('Moneda', 'Currency'),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
                       Row(
                         children: [
                           Expanded(
@@ -652,6 +705,10 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                               decoration: InputDecoration(
                                 border: const OutlineInputBorder(),
                                 labelText: l('Total', 'Total'),
+                                helperText: !_includeIgv && _totalsManual
+                                    ? l('Editado manualmente',
+                                        'Manually edited')
+                                    : null,
                               ),
                             ),
                           ),
@@ -734,12 +791,14 @@ class _LineEditor extends StatefulWidget {
     super.key,
     required this.index,
     required this.line,
+    required this.includeIgv,
     required this.onChanged,
     required this.onRemove,
   });
 
   final int index;
   final CustomTicketLine line;
+  final bool includeIgv;
   final _LineChanged onChanged;
   final VoidCallback onRemove;
 
@@ -915,7 +974,9 @@ class _LineEditorState extends State<_LineEditor> {
                           const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
-                        labelText: l('P.U. (sin IGV)', 'Unit (ex-IGV)'),
+                        labelText: widget.includeIgv
+                            ? l('P.U. (sin IGV)', 'Unit (ex-IGV)')
+                            : l('P.U.', 'Unit'),
                         isDense: true,
                       ),
                     ),
@@ -931,7 +992,9 @@ class _LineEditorState extends State<_LineEditor> {
                           const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
-                        labelText: l('Importe (sin IGV)', 'Amount (ex-IGV)'),
+                        labelText: widget.includeIgv
+                            ? l('Importe (sin IGV)', 'Amount (ex-IGV)')
+                            : l('Importe', 'Amount'),
                         isDense: true,
                       ),
                     ),
