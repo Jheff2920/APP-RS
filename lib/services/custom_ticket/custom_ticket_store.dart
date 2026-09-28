@@ -85,6 +85,10 @@ class CustomTicketStore {
     return template;
   }
 
+  Future<void> clearAll() async {
+    await _writeAll([]);
+  }
+
   Future<void> delete(String id) async {
     if (id.isEmpty) return;
     final all = await loadAll();

@@ -178,6 +178,12 @@ class SunatPrintStore {
     await prefs.setString(logoKey, base64Encode(prepared));
   }
 
+  Future<void> clearAll() async {
+    final prefs = await _ensure();
+    await prefs.remove(settingsKey);
+    await prefs.remove(logoKey);
+  }
+
   Future<void> clearLogo() async {
     final prefs = await _ensure();
     await prefs.remove(logoKey);

@@ -85,6 +85,17 @@ class RedPosLicenseStore {
     return value;
   }
 
+  /// Quita pase local, nonces usados, entitlement Play y correo Google guardados.
+  /// No cancela la suscripción en Google Play ni el canje en el API RedPOS.
+  Future<void> clearLocalLicense() async {
+    final prefs = await _ensurePrefs();
+    await prefs.remove(_key);
+    await prefs.remove(_usedKey);
+    await prefs.remove(playEntitlementKey);
+    await prefs.remove(googleEmailKey);
+    await _syncNative(false);
+  }
+
   Future<void> applyToPrinters(PrinterStore store) async {
     final adsFree = await isAdsFree();
     await store.applyAdsFree(adsFree);

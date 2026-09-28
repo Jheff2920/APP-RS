@@ -38,8 +38,13 @@ void main() {
     expect(find.text('Ayuda y soporte'), findsWidgets);
     expect(find.text('jcefe.2920@gmail.com'), findsOneWidget);
     await tester.scrollUntilVisible(
-      find.text('Términos y condiciones'),
+      find.text('Datos y privacidad'),
       120,
+    );
+    expect(find.text('Datos y privacidad'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Términos y condiciones'),
+      80,
     );
     expect(find.text('Términos y condiciones'), findsOneWidget);
     await tester.scrollUntilVisible(

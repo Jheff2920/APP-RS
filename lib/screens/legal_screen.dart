@@ -6,6 +6,8 @@ import 'package:flutter/rendering.dart';
 import '../brand.dart';
 import '../l10n/app_lang.dart';
 import '../legal/legal_copy.dart';
+import '../services/redpos/redpos_config.dart';
+import '../services/redpos/redpos_links.dart';
 
 class LegalScreen extends StatelessWidget {
   const LegalScreen.terms({super.key}) : privacy = false;
@@ -53,6 +55,36 @@ class LegalScreen extends StatelessWidget {
                           ),
                     style: theme.textTheme.bodySmall,
                   ),
+                  if (privacy) ...[
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        final url = l.english
+                            ? RedPosConfig.privacyUrlEn
+                            : RedPosConfig.privacyUrl;
+                        openRedPosLink(context, Uri.parse(url));
+                      },
+                      icon: const Icon(Icons.open_in_browser),
+                      label: Text(
+                        l(
+                          'Abrir política en el navegador (Play)',
+                          'Open policy in browser (Play)',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () {
+                        final url = l.english
+                            ? RedPosConfig.deleteAccountUrlEn
+                            : RedPosConfig.deleteAccountUrl;
+                        openRedPosLink(context, Uri.parse(url));
+                      },
+                      child: Text(
+                        l('Eliminar cuenta / datos', 'Delete account / data'),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   for (final section in sections) ...[
                     Text(section.title, style: theme.textTheme.titleMedium),

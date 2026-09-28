@@ -3,32 +3,53 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Política de privacidad · RedPOS Service</title>
+  <title>Política de privacidad — RedPOS Service</title>
   <link rel="stylesheet" href="/legal.css"/>
 </head>
 <body>
   <h1>Política de privacidad</h1>
-  <p class="meta">RedPOS Service · Última actualización: 14 de septiembre de 2026</p>
+  <p class="meta">RedPOS Service — Última actualización: 28 de septiembre de 2026</p>
   <nav>
     <a href="/terminos.html">Términos y condiciones</a>
+    <a href="/eliminar-cuenta.html">Eliminar cuenta</a>
   </nav>
 
   <h2>1. Responsable</h2>
-  <p>RedPOS trata los datos de RedPOS Service. Contacto: jcefe.2920@gmail.com · https://www.redsoluciones.com.pe.</p>
+  <p>RedPOS (marca de Redd Soluciones / <a href="https://www.redsoluciones.com.pe">redsoluciones.com.pe</a>) trata los datos de RedPOS Service. Contacto: <a href="mailto:jcefe.2920@gmail.com">jcefe.2920@gmail.com</a>.</p>
 
-  <h2>2. Qué se guarda en el aparato</h2>
-  <p>Impresoras vinculadas (nombre, tipo, dirección Bluetooth/MAC, IP, USB), ajustes de papel y corte, historial local de trabajos e, si activas un código o una suscripción, un pase de licencia en el teléfono. Eso queda en el dispositivo.</p>
+  <h2>2. Qué se recoge y qué no</h2>
+  <p><strong>En el aparato (local):</strong> impresoras vinculadas (nombre, tipo, Bluetooth/MAC, IP, USB), márgenes y corte, historial local de trabajos, plantillas de tickets propios (incl. logos), ajustes y logo del ticket SUNAT, pase de licencia/código, estado de suscripción Play y, si te suscribes, el correo de Google usado al pagar.</p>
+  <p><strong>Hacia RedPOS:</strong> solo el canje de un código de activación cuando hay API configurada (código + dato opcional de impresora). <strong>No</strong> subimos el PDF, la imagen ni el XML/ZIP de la boleta a un servidor de RedPOS para imprimir.</p>
+  <p><strong>No usamos</strong> Firebase, Crashlytics, Google Analytics, AdMob ni kits de seguimiento publicitario. No hay cuenta RedPOS obligatoria para imprimir.</p>
 
-  <h2>3. Qué no hacemos</h2>
-  <p>RedPOS Service no sube a un servidor de RedPOS el PDF, la imagen ni el XML de la boleta para imprimir. La impresión sale del teléfono o tablet hacia la impresora. Un código de activación puede enviarse a nuestro servidor solo para canjearlo, cuando esa validación esté en producción.</p>
+  <h2>3. Inteligencia artificial</h2>
+  <p><strong>Esta app no utiliza inteligencia artificial generativa</strong> ni modelos de aprendizaje automático (ML) para crear, analizar o transformar el contenido del usuario. El raster ESC/POS, el recorte de vouchers y el parseo XML SUNAT son algoritmos tradicionales de imagen y texto, no IA generativa.</p>
 
-  <h2>4. Cuenta y pago</h2>
+  <h2>4. Terceros y APIs</h2>
+  <ul>
+    <li><strong>Google Play Billing</strong> (<code>in_app_purchase</code>) — suscripción mensual <code>redpos_ads_free_monthly</code>.</li>
+    <li><strong>Google Sign-In</strong> — solo al contratar la suscripción; el correo puede guardarse en el aparato.</li>
+    <li><strong>API de códigos RedPOS</strong> (HTTPS, p. ej. <code>redpos-codigos-prueba.vercel.app</code>) — canje de código.</li>
+    <li><strong>url_launcher</strong> — abrir correo, web o WhatsApp que tú eliges.</li>
+    <li><strong>Plugins locales de impresión</strong> — Bluetooth, USB, red TCP :9100, PDF/imagen (<code>esc_pos_utils_plus</code>, <code>print_bluetooth_thermal</code>, <code>pdfx</code>, <code>image</code>, etc.).</li>
+    <li><strong>SharedPreferences</strong> — almacenamiento local.</li>
+  </ul>
+  <p>Los avisos en pantalla y el pie en el papel son publicidad de RedPOS (primera parte); no usamos AdMob ni redes de anuncios de terceros.</p>
+
+  <h2>5. Cuenta y pago</h2>
   <p>Si inicias sesión y contratas la suscripción mensual, Google trata el correo o identificador de la cuenta y el estado del pago (Google Play Billing). No hace falta cuenta para imprimir ni para canjear un código. La licencia de por vida se gestiona por correo con jcefe.2920@gmail.com.</p>
 
-  <h2>5. Permisos</h2>
+  <h2>6. Permisos</h2>
   <p>Bluetooth y ubicación (solo para buscar impresoras Classic en Android 10), USB, archivos que tú abres o compartes, e impresión del sistema («Mostrar sobre otras apps») si quieres imprimir desde Chrome u otra app.</p>
 
-  <h2>6. Tus derechos</h2>
-  <p>Puedes borrar impresoras e historial desde la app, o desinstalarla. Para eliminar la cuenta y los datos asociados: <a href="/eliminar-cuenta.html">eliminar cuenta</a>. Preguntas: jcefe.2920@gmail.com.</p>
+  <h2>7. Eliminación de datos</h2>
+  <ol>
+    <li><strong>En la app:</strong> menú Ayuda → Datos y privacidad → Borrar datos locales (impresoras, historial, plantillas, logos SUNAT, pase de licencia local y correo Google guardado). También puedes desinstalar la app.</li>
+    <li><strong>Suscripción Play:</strong> Google Play → Pagos y suscripciones → cancelar (lo gestiona Google).</li>
+    <li><strong>Servidor / solicitud formal:</strong> <a href="/eliminar-cuenta.html">eliminar cuenta</a> o escribe a <a href="mailto:jcefe.2920@gmail.com?subject=Eliminar%20cuenta%20RedPOS%20Service">jcefe.2920@gmail.com</a>. Plazo orientativo: 30 días.</li>
+  </ol>
+
+  <h2>8. Tus derechos</h2>
+  <p>Puedes acceder, rectificar o pedir el borrado de datos locales desde la app, y solicitar el borrado de datos de canje/contacto por correo. Términos: <a href="/terminos.html">terminos.html</a>. Eliminar cuenta: <a href="/eliminar-cuenta.html">eliminar-cuenta.html</a>.</p>
 </body>
 </html>

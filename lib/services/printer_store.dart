@@ -123,6 +123,11 @@ class PrinterStore {
     return next;
   }
 
+  /// Borra todas las impresoras vinculadas (prefs + nativo PrintService).
+  Future<void> clearAll() async {
+    await _saveAll([]);
+  }
+
   Future<List<SavedPrinter>> delete(String id) async {
     var next = (await loadAll()).where((p) => p.id != id).toList();
     next = _ensureSingleDefault(next);
