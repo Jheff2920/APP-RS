@@ -387,13 +387,10 @@ class CustomTicketTemplate {
     if (addr.isNotEmpty) {
       out.addAll(_wrapCenter(addr, cols));
     }
-    if (title.trim().isNotEmpty) {
-      out.addAll(_wrapCenter(title.trim(), cols));
-    }
+    // Title is form-only; header already shows company / RUC / address.
     final hasHeader = company.isNotEmpty ||
         rucTrim.isNotEmpty ||
         addr.isNotEmpty ||
-        title.trim().isNotEmpty ||
         (showLogo && logoBytes != null);
     if (hasHeader) {
       out.add('-' * cols);

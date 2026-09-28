@@ -108,11 +108,12 @@ void main() {
     expect(restored.footer, 'Pie');
   });
 
-  test('escpos builder emits title, totals, qr and barcode markers', () async {
+  test('escpos builder emits company header, totals, qr and barcode markers', () async {
     final ticket = CustomTicketTemplate(
       id: 't1',
       name: 'Demo',
-      title: 'MI TIENDA',
+      companyName: 'MI TIENDA',
+      title: 'SHOULD NOT PRINT',
       lines: const [
         CustomTicketLine(
           type: CustomTicketLineType.item,
@@ -138,6 +139,7 @@ void main() {
     );
     final text = _visible(bytes);
     expect(text, contains('MI TIENDA'));
+    expect(text, isNot(contains('SHOULD NOT PRINT')));
     expect(text, contains('PRODUCTO'));
     expect(text, contains('TOTAL'));
     expect(text, contains('11.80'));
@@ -263,6 +265,7 @@ void main() {
     expect(preview.any((l) => l.contains('BODEGA CENTRAL')), isTrue);
     expect(preview.any((l) => l.contains('RUC: 20654321098')), isTrue);
     expect(preview.any((l) => l.contains('Jr. Lima 100')), isTrue);
+    expect(preview.any((l) => l.contains('NOTA')), isFalse);
 
     final bytes = await CustomTicketEscPos.build(
       _printer(PaperWidth.mm58),
@@ -272,6 +275,7 @@ void main() {
     expect(text, contains('BODEGA CENTRAL'));
     expect(text, contains('RUC: 20654321098'));
     expect(text, contains('Jr. Lima 100'));
+    expect(text, isNot(contains('NOTA')));
     expect(text, contains('Ct'));
     expect(text.contains('CtDESCRIPCION'), isFalse);
   });

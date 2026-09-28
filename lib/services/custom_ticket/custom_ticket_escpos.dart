@@ -90,20 +90,10 @@ class CustomTicketEscPos {
       center(addr);
     }
 
-    final title = ticket.title.trim();
-    if (title.isNotEmpty) {
-      center(
-        title,
-        styles: const PosStyles(
-          bold: true,
-          height: PosTextSize.size2,
-        ),
-      );
-    }
+    // Title is form-only; header already shows company / RUC / address.
     if (company.isNotEmpty ||
         ruc.isNotEmpty ||
         addr.isNotEmpty ||
-        title.isNotEmpty ||
         (logoBytes != null && logoBytes.isNotEmpty)) {
       sep();
     }
