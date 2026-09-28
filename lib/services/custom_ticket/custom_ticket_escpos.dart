@@ -108,8 +108,8 @@ class CustomTicketEscPos {
 
     // Columnas en 58/80 cuando hay espacio (>= 28). Patrón SUNAT claro.
     final moneyCols = ticket.showTotals && usable >= 28;
-    // qtyW >= 5 so header "CANT" keeps a trailing space before DESCRIPCION.
-    final qtyW = 5;
+    // Keep quantity compact while fitting 2- and 3-digit values.
+    final qtyW = 3;
     final puW = usable >= 40 ? 8 : 7;
     final impW = usable >= 40 ? 9 : 8;
     final descW =
@@ -122,11 +122,11 @@ class CustomTicketEscPos {
         if (!wroteItemHeader) {
           if (moneyCols) {
             left(_cols(
-              ['CANT', 'DESCRIPCION', 'P.U.', 'IMP.'],
+              ['Ct', 'DESCRIPCION', 'P.U.', 'IMP.'],
               widths,
             ));
           } else {
-            left('CANT  DESCRIPCION');
+            left('Ct DESCRIPCION');
           }
           wroteItemHeader = true;
         }

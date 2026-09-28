@@ -400,8 +400,8 @@ class CustomTicketTemplate {
     }
 
     final moneyCols = showTotals && cols >= 28;
-    // qtyW >= 5 so header "CANT" keeps a trailing space before DESCRIPCION.
-    final qtyW = 5;
+    // Keep quantity compact while fitting 2- and 3-digit values.
+    final qtyW = 3;
     final puW = cols >= 40 ? 8 : 7;
     final impW = cols >= 40 ? 9 : 8;
     final descW =
@@ -413,11 +413,11 @@ class CustomTicketTemplate {
         if (!wroteItemHeader) {
           if (moneyCols) {
             out.add(_cols(
-              ['CANT', 'DESCRIPCION', 'P.U.', 'IMP.'],
+              ['Ct', 'DESCRIPCION', 'P.U.', 'IMP.'],
               [qtyW, descW, puW, impW],
             ));
           } else {
-            out.add('CANT  DESCRIPCION');
+            out.add('Ct DESCRIPCION');
           }
           wroteItemHeader = true;
         }

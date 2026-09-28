@@ -223,11 +223,11 @@ void main() {
       total: '11.80',
     );
     final p32 = ticket.previewLines(cols: 32);
-    expect(p32.any((l) => l.contains('CANT') && l.contains('P.U.')), isTrue);
-    expect(p32.any((l) => l.contains('CANTDESCRIPCION')), isFalse);
-    expect(p32.any((l) => l.contains('CANT') && l.contains('DESCRIPCION')), isTrue);
-    final header32 = p32.firstWhere((l) => l.contains('CANT'));
-    expect(header32.contains('CANT '), isTrue);
+    expect(p32.any((l) => l.contains('Ct') && l.contains('P.U.')), isTrue);
+    expect(p32.any((l) => l.contains('CtDESCRIPCION')), isFalse);
+    expect(p32.any((l) => l.contains('Ct') && l.contains('DESCRIPCION')), isTrue);
+    final header32 = p32.firstWhere((l) => l.contains('Ct'));
+    expect(header32.contains('Ct '), isTrue);
     expect(p32.any((l) => l.contains('10.00')), isTrue);
     final moneyLine = p32.firstWhere((l) => l.contains('Producto'));
     // P.U. and IMP on same row as qty+desc (not a following-only money row)
@@ -272,8 +272,8 @@ void main() {
     expect(text, contains('BODEGA CENTRAL'));
     expect(text, contains('RUC: 20654321098'));
     expect(text, contains('Jr. Lima 100'));
-    expect(text, contains('CANT'));
-    expect(text.contains('CANTDESCRIPCION'), isFalse);
+    expect(text, contains('Ct'));
+    expect(text.contains('CtDESCRIPCION'), isFalse);
   });
 
   test('escpos 58 mm prints item money on same row as columns', () async {
@@ -302,7 +302,7 @@ void main() {
       ticket,
     );
     final text = _visible(bytes);
-    expect(text, contains('CANT'));
+    expect(text, contains('Ct'));
     expect(text, contains('P.U.'));
     expect(text, contains('5.50'));
     expect(text, contains('11.00'));
