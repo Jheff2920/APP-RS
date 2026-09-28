@@ -176,14 +176,14 @@ class CustomTicketEscPos {
       final cur = ticket.currencySymbol.trim().isEmpty
           ? 'S/'
           : ticket.currencySymbol.trim();
-      if (ticket.subtotal.trim().isNotEmpty) {
+      if (ticket.includeIgv && ticket.subtotal.trim().isNotEmpty) {
         left(_pair(
           usable,
           ticket.subtotalLabel,
           CustomTicketMoney.withSymbolRaw(cur, ticket.subtotal),
         ));
       }
-      if (ticket.tax.trim().isNotEmpty) {
+      if (ticket.includeIgv && ticket.tax.trim().isNotEmpty) {
         left(_pair(
           usable,
           ticket.taxLabel,

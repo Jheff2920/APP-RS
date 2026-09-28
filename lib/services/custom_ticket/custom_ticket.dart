@@ -153,7 +153,10 @@ class CustomTicketTotals {
   final double igv;
   final double total;
 
-  static CustomTicketTotals fromLines(List<CustomTicketLine> lines) {
+  static CustomTicketTotals fromLines(
+    List<CustomTicketLine> lines, {
+    bool includeIgv = true,
+  }) {
     var sum = 0.0;
     for (final line in lines) {
       if (!line.isItem) continue;
@@ -167,6 +170,13 @@ class CustomTicketTotals {
       if (pu != null) sum += q * pu;
     }
     final sub = _round2(sum);
+    if (!includeIgv) {
+      return CustomTicketTotals(
+        subtotal: sub,
+        igv: 0,
+        total: sub,
+      );
+    }
     final igv = _round2(sum * CustomTicketMoney.igvRate);
     return CustomTicketTotals(
       subtotal: sub,
@@ -192,6 +202,7 @@ class CustomTicketTemplate {
     this.address = '',
     this.footer = '',
     this.showTotals = true,
+    this.includeIgv = true,
     this.currencySymbol = 'S/',
     this.subtotalLabel = 'Op. Gravada',
     this.subtotal = '',
@@ -232,6 +243,10 @@ class CustomTicketTemplate {
   final String address;
   final String footer;
   final bool showTotals;
+
+  /// When true (default), print Op. Gravada + IGV 18% + TOTAL.
+  /// When false, only TOTAL (= sum of line amounts). Missing JSON → true.
+  final bool includeIgv;
   final String currencySymbol;
   final String subtotalLabel;
   final String subtotal;
@@ -258,6 +273,7 @@ class CustomTicketTemplate {
     String? address,
     String? footer,
     bool? showTotals,
+    bool? includeIgv,
     String? currencySymbol,
     String? subtotalLabel,
     String? subtotal,
@@ -283,6 +299,7 @@ class CustomTicketTemplate {
       address: address ?? this.address,
       footer: footer ?? this.footer,
       showTotals: showTotals ?? this.showTotals,
+      includeIgv: includeIgv ?? this.includeIgv,
       currencySymbol: currencySymbol ?? this.currencySymbol,
       subtotalLabel: subtotalLabel ?? this.subtotalLabel,
       subtotal: subtotal ?? this.subtotal,
@@ -311,6 +328,7 @@ class CustomTicketTemplate {
         'address': address,
         'footer': footer,
         'showTotals': showTotals,
+        'includeIgv': includeIgv,
         'currencySymbol': currencySymbol,
         'subtotalLabel': subtotalLabel,
         'subtotal': subtotal,
@@ -356,10 +374,11 @@ class CustomTicketTemplate {
       address: _clip((json['address'] as String?) ?? '', maxAddressLength),
       footer: _clip((json['footer'] as String?) ?? '', maxFooterLength),
       showTotals: json['showTotals'] as bool? ?? true,
-      currencySymbol:
-          ((json['currencySymbol'] as String?) ?? 'S/').trim().isEmpty
-              ? 'S/'
-              : (json['currencySymbol'] as String).trim(),
+      includeIgv: json['includeIgv'] as bool? ?? true,
+      currencySymbol: () {
+        final cur = ((json['currencySymbol'] as String?) ?? 'S/').trim();
+        return cur.isEmpty ? 'S/' : cur;
+      }(),
       subtotalLabel: (json['subtotalLabel'] as String?) ?? 'Op. Gravada',
       subtotal: (json['subtotal'] as String?) ?? '',
       taxLabel: (json['taxLabel'] as String?) ?? 'IGV 18%',
@@ -472,14 +491,14 @@ class CustomTicketTemplate {
             total.trim().isNotEmpty)) {
       out.add('-' * cols);
       final cur = currencySymbol.trim().isEmpty ? 'S/' : currencySymbol.trim();
-      if (subtotal.trim().isNotEmpty) {
+      if (includeIgv && subtotal.trim().isNotEmpty) {
         out.add(_pair(
           cols,
           subtotalLabel,
           CustomTicketMoney.withSymbolRaw(cur, subtotal),
         ));
       }
-      if (tax.trim().isNotEmpty) {
+      if (includeIgv && tax.trim().isNotEmpty) {
         out.add(_pair(
           cols,
           taxLabel,

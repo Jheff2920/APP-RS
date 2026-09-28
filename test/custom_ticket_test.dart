@@ -107,6 +107,7 @@ void main() {
     expect(restored.lines.last.isItem, isTrue);
     expect(restored.qrData, 'payload');
     expect(restored.footer, 'Pie');
+    expect(restored.includeIgv, isTrue);
   });
 
   test('escpos builder emits company header, totals, qr and barcode markers',
@@ -205,6 +206,52 @@ void main() {
     expect(t.subtotal, 13.0);
     expect(t.igv, closeTo(2.34, 0.001));
     expect(t.total, closeTo(15.34, 0.001));
+  });
+
+  test('totals from lines with includeIgv false: total equals sum', () {
+    const lines = [
+      CustomTicketLine(
+        type: CustomTicketLineType.item,
+        text: 'Cafe',
+        qty: '2',
+        unitPrice: '5.00',
+        amount: '10.00',
+      ),
+      CustomTicketLine(
+        type: CustomTicketLineType.item,
+        text: 'Te',
+        qty: '1',
+        unitPrice: '3.00',
+        amount: '3.00',
+      ),
+    ];
+    final t = CustomTicketTotals.fromLines(lines, includeIgv: false);
+    expect(t.subtotal, 13.0);
+    expect(t.igv, 0);
+    expect(t.total, 13.0);
+  });
+
+  test('fromJson missing includeIgv defaults to true', () {
+    final restored = CustomTicketTemplate.fromJson({
+      'id': 'old',
+      'name': 'Legacy',
+      'lines': [],
+    });
+    expect(restored.includeIgv, isTrue);
+  });
+
+  test('includeIgv false persists in JSON round-trip', () {
+    const original = CustomTicketTemplate(
+      id: 't-no-igv',
+      name: 'Sin IGV',
+      includeIgv: false,
+      showTotals: true,
+      total: '13.00',
+    );
+    final json = original.toJson();
+    expect(json['includeIgv'], isFalse);
+    final restored = CustomTicketTemplate.fromJson(json);
+    expect(restored.includeIgv, isFalse);
   });
 
   test('preview uses columns for 32 and 48 cols', () {
@@ -317,6 +364,46 @@ void main() {
     expect(text, contains('IGV 18%'));
     // latin1-safe keeps printable ASCII product name
     expect(text, contains('CAFE'));
+  });
+
+  test('preview and escpos omit Op. Gravada/IGV when includeIgv false', () async {
+    const ticket = CustomTicketTemplate(
+      id: 't-no-igv',
+      name: 'Demo',
+      includeIgv: false,
+      showTotals: true,
+      lines: [
+        CustomTicketLine(
+          type: CustomTicketLineType.item,
+          text: 'SERVICIO',
+          qty: '1',
+          unitPrice: '50',
+          amount: '50',
+        ),
+      ],
+      // Stale tax fields must not appear when includeIgv is false.
+      subtotal: '50.00',
+      tax: '9.00',
+      total: '50.00',
+    );
+    final preview = ticket.previewLines(cols: 32);
+    expect(preview.any((l) => l.contains('TOTAL')), isTrue);
+    expect(preview.any((l) => l.contains('50.00')), isTrue);
+    expect(preview.any((l) => l.contains('Op. Gravada')), isFalse);
+    expect(preview.any((l) => l.contains('IGV')), isFalse);
+    expect(preview.any((l) => l.contains('9.00')), isFalse);
+
+    final bytes = await CustomTicketEscPos.build(
+      _printer(PaperWidth.mm58),
+      ticket,
+    );
+    final text = _visible(bytes);
+    expect(text, contains('TOTAL'));
+    expect(text, contains('50.00'));
+    expect(text, isNot(contains('Op. Gravada')));
+    expect(text, isNot(contains('IGV')));
+    expect(text, isNot(contains('9.00')));
+    expect(text, contains('SERVICIO'));
   });
 }
 
