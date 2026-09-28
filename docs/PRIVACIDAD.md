@@ -10,7 +10,7 @@ Copia en markdown de la política alojada. La app también muestra el texto en
 
 ## 1. Responsable
 
-RedPOS (marca de Redd Soluciones / [redsoluciones.com.pe](https://www.redsoluciones.com.pe)).  
+RedPOS (marca de Red Soluciones / [redsoluciones.com.pe](https://www.redsoluciones.com.pe)).  
 Contacto: jcefe.2920@gmail.com
 
 ## 2. Qué se recoge y qué no
