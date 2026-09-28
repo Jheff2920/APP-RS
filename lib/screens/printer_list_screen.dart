@@ -22,6 +22,7 @@ import 'print_history_screen.dart';
 import 'printer_form_screen.dart';
 import 'share_print_screen.dart';
 import 'legal_screen.dart';
+import 'privacy_data_screen.dart';
 import 'custom_tickets_list_screen.dart';
 import 'sunat_print_settings_screen.dart';
 
@@ -534,6 +535,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
                     printService: widget.printService,
                   ),
                 'help' => HelpScreen(store: widget.store),
+                'privacy_data' => PrivacyDataScreen(store: widget.store),
                 'terms' => const LegalScreen.terms(),
                 'privacy' => const LegalScreen.privacy(),
                 _ => null,
@@ -557,6 +559,10 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
                 PopupMenuItem(
                   value: 'help',
                   child: Text(loc('Ayuda y soporte', 'Help & support')),
+                ),
+                PopupMenuItem(
+                  value: 'privacy_data',
+                  child: Text(loc('Datos y privacidad', 'Data & privacy')),
                 ),
                 PopupMenuItem(
                   value: 'terms',

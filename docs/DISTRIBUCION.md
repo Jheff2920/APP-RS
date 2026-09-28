@@ -9,6 +9,8 @@ Sin código y sin pago: la app funciona igual, con anuncios en pantalla y pie en
 **URLs legales (Play Console):**
 
 - Privacidad: https://redpos-codigos-prueba.vercel.app/privacidad.html
+- Eliminar cuenta: https://redpos-codigos-prueba.vercel.app/eliminar-cuenta.html
+- Copia markdown: [PRIVACIDAD.md](PRIVACIDAD.md)
 - Términos: https://redpos-codigos-prueba.vercel.app/terminos.html
 
 Los HTML ya están en GitHub. Sitio: https://redpos-codigos-prueba.vercel.app/

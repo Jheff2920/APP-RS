@@ -11,6 +11,7 @@ import '../services/redpos/redpos_config.dart';
 import '../services/redpos/redpos_links.dart';
 import '../widgets/redpos_unlock_actions.dart';
 import 'legal_screen.dart';
+import 'privacy_data_screen.dart';
 import 'sunat_print_settings_screen.dart';
 
 class HelpScreen extends StatelessWidget {
@@ -194,6 +195,17 @@ class HelpScreen extends StatelessWidget {
                     onTap: () => openLifetimeLicenseMail(context),
                   ),
                   const SizedBox(height: 16),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.shield_outlined),
+                    title: Text(l('Datos y privacidad', 'Data & privacy')),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => PrivacyDataScreen(store: store),
+                      ),
+                    ),
+                  ),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.article_outlined),
