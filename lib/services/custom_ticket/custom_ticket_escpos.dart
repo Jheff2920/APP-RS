@@ -36,6 +36,8 @@ class CustomTicketEscPos {
 
     List<int> bytes = [];
     bytes += generator.reset();
+    // CP1252 (id 16) matches latin1 codec for Spanish accents (n-tilde, a/e/i/o/u acute).
+    bytes += generator.setGlobalCodeTable('CP1252');
 
     final logoBytes =
         logoOverride ?? (ticket.showLogo ? ticket.logoBytes : null);
