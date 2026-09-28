@@ -201,7 +201,7 @@ class SunatEscPosPrint {
       bytes += generator.qrcode(
         ticket.qrPayload,
         align: PosAlign.center,
-        size: wide && !compact ? QRSize.size5 : QRSize.size4,
+        size: wide && !compact ? QRSize.size7 : QRSize.size6,
       );
       center('Consulte en SUNAT');
     }
