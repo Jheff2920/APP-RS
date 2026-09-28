@@ -73,6 +73,9 @@ void main() {
       id: 't1',
       name: 'Demo',
       title: 'TITULO',
+      companyName: 'MI TIENDA SAC',
+      ruc: '20123456789',
+      address: 'Av. Principal 123',
       lines: [
         CustomTicketLine(type: CustomTicketLineType.text, text: 'Hola'),
         CustomTicketLine(
@@ -96,6 +99,9 @@ void main() {
     final restored = CustomTicketTemplate.fromJson(original.toJson());
     expect(restored.id, 't1');
     expect(restored.name, 'Demo');
+    expect(restored.companyName, 'MI TIENDA SAC');
+    expect(restored.ruc, '20123456789');
+    expect(restored.address, 'Av. Principal 123');
     expect(restored.lines, hasLength(2));
     expect(restored.lines.last.isItem, isTrue);
     expect(restored.qrData, 'payload');
@@ -218,6 +224,10 @@ void main() {
     );
     final p32 = ticket.previewLines(cols: 32);
     expect(p32.any((l) => l.contains('CANT') && l.contains('P.U.')), isTrue);
+    expect(p32.any((l) => l.contains('CANTDESCRIPCION')), isFalse);
+    expect(p32.any((l) => l.contains('CANT') && l.contains('DESCRIPCION')), isTrue);
+    final header32 = p32.firstWhere((l) => l.contains('CANT'));
+    expect(header32.contains('CANT '), isTrue);
     expect(p32.any((l) => l.contains('10.00')), isTrue);
     final moneyLine = p32.firstWhere((l) => l.contains('Producto'));
     // P.U. and IMP on same row as qty+desc (not a following-only money row)
@@ -225,6 +235,45 @@ void main() {
 
     final p48 = ticket.previewLines(cols: 48);
     expect(p48.any((l) => l.contains('DESCRIPCION')), isTrue);
+  });
+
+  test('preview and escpos print company header under logo', () async {
+    final ticket = CustomTicketTemplate(
+      id: 'th',
+      name: 'Demo',
+      companyName: 'BODEGA CENTRAL',
+      ruc: '20654321098',
+      address: 'Jr. Lima 100',
+      title: 'NOTA',
+      lines: const [
+        CustomTicketLine(
+          type: CustomTicketLineType.item,
+          text: 'Pan',
+          qty: '1',
+          unitPrice: '1',
+          amount: '1',
+        ),
+      ],
+      showTotals: true,
+      subtotal: '1.00',
+      tax: '0.18',
+      total: '1.18',
+    );
+    final preview = ticket.previewLines(cols: 32);
+    expect(preview.any((l) => l.contains('BODEGA CENTRAL')), isTrue);
+    expect(preview.any((l) => l.contains('RUC: 20654321098')), isTrue);
+    expect(preview.any((l) => l.contains('Jr. Lima 100')), isTrue);
+
+    final bytes = await CustomTicketEscPos.build(
+      _printer(PaperWidth.mm58),
+      ticket,
+    );
+    final text = _visible(bytes);
+    expect(text, contains('BODEGA CENTRAL'));
+    expect(text, contains('RUC: 20654321098'));
+    expect(text, contains('Jr. Lima 100'));
+    expect(text, contains('CANT'));
+    expect(text.contains('CANTDESCRIPCION'), isFalse);
   });
 
   test('escpos 58 mm prints item money on same row as columns', () async {

@@ -36,6 +36,9 @@ class CustomTicketEditScreen extends StatefulWidget {
 class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
   final _nameCtrl = TextEditingController();
   final _titleCtrl = TextEditingController();
+  final _companyNameCtrl = TextEditingController();
+  final _rucCtrl = TextEditingController();
+  final _addressCtrl = TextEditingController();
   final _footerCtrl = TextEditingController();
   final _subtotalCtrl = TextEditingController();
   final _taxCtrl = TextEditingController();
@@ -72,6 +75,9 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
   void dispose() {
     _nameCtrl.dispose();
     _titleCtrl.dispose();
+    _companyNameCtrl.dispose();
+    _rucCtrl.dispose();
+    _addressCtrl.dispose();
     _footerCtrl.dispose();
     _subtotalCtrl.dispose();
     _taxCtrl.dispose();
@@ -108,6 +114,9 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
     _id = t.id;
     _nameCtrl.text = t.name;
     _titleCtrl.text = t.title;
+    _companyNameCtrl.text = t.companyName;
+    _rucCtrl.text = t.ruc;
+    _addressCtrl.text = t.address;
     _footerCtrl.text = t.footer;
     _subtotalCtrl.text = t.subtotal;
     _taxCtrl.text = t.tax;
@@ -149,6 +158,9 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
       lines: List.of(_lines),
       showLogo: _showLogo,
       logoBytes: _logo,
+      companyName: _companyNameCtrl.text,
+      ruc: _rucCtrl.text,
+      address: _addressCtrl.text,
       footer: _footerCtrl.text,
       showTotals: _showTotals,
       currencySymbol: _currencyCtrl.text,
@@ -409,6 +421,55 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                           label: Text(l('Quitar logo', 'Remove logo')),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      l('Datos de la tienda', 'Store details'),
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _companyNameCtrl,
+                      maxLength: CustomTicketTemplate.maxCompanyNameLength,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: l('Nombre de la tienda / empresa', 'Store / company name'),
+                        helperText: l(
+                          'Se imprime centrado bajo el logo.',
+                          'Printed centered under the logo.',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _rucCtrl,
+                      maxLength: CustomTicketTemplate.maxRucLength,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: l('RUC', 'Tax ID (RUC)'),
+                        helperText: l(
+                          'Se imprime como RUC: ... centrado.',
+                          'Printed as RUC: ... centered.',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _addressCtrl,
+                      maxLength: CustomTicketTemplate.maxAddressLength,
+                      maxLines: 2,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: l('Dirección / ubicación', 'Address / location'),
+                        alignLabelWithHint: true,
+                        helperText: l(
+                          'Se imprime centrado bajo el RUC.',
+                          'Printed centered under the RUC.',
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 24),
                     TextField(

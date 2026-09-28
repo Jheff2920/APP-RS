@@ -75,6 +75,19 @@ class CustomTicketEscPos {
 
     void sep() => left('-' * usable);
 
+    final company = ticket.companyName.trim();
+    final ruc = ticket.ruc.trim();
+    final addr = ticket.address.trim();
+    if (company.isNotEmpty) {
+      center(company, styles: const PosStyles(bold: true));
+    }
+    if (ruc.isNotEmpty) {
+      center('RUC: $ruc');
+    }
+    if (addr.isNotEmpty) {
+      center(addr);
+    }
+
     final title = ticket.title.trim();
     if (title.isNotEmpty) {
       center(
@@ -84,12 +97,19 @@ class CustomTicketEscPos {
           height: PosTextSize.size2,
         ),
       );
+    }
+    if (company.isNotEmpty ||
+        ruc.isNotEmpty ||
+        addr.isNotEmpty ||
+        title.isNotEmpty ||
+        (logoBytes != null && logoBytes.isNotEmpty)) {
       sep();
     }
 
     // Columnas en 58/80 cuando hay espacio (>= 28). Patrón SUNAT claro.
     final moneyCols = ticket.showTotals && usable >= 28;
-    final qtyW = usable >= 40 ? 5 : 4;
+    // qtyW >= 5 so header "CANT" keeps a trailing space before DESCRIPCION.
+    final qtyW = 5;
     final puW = usable >= 40 ? 8 : 7;
     final impW = usable >= 40 ? 9 : 8;
     final descW =

@@ -187,6 +187,9 @@ class CustomTicketTemplate {
     this.lines = const [],
     this.showLogo = false,
     this.logoBytes,
+    this.companyName = '',
+    this.ruc = '',
+    this.address = '',
     this.footer = '',
     this.showTotals = true,
     this.currencySymbol = 'S/',
@@ -205,6 +208,9 @@ class CustomTicketTemplate {
 
   static const maxNameLength = 80;
   static const maxTitleLength = 120;
+  static const maxCompanyNameLength = 120;
+  static const maxRucLength = 20;
+  static const maxAddressLength = 200;
   static const maxFooterLength = 240;
   static const maxLineTextLength = 200;
   static const maxCodeLength = 200;
@@ -215,6 +221,12 @@ class CustomTicketTemplate {
   final List<CustomTicketLine> lines;
   final bool showLogo;
   final Uint8List? logoBytes;
+  /// Nombre de tienda/empresa bajo el logo (cabecera tipo emisor SUNAT).
+  final String companyName;
+  /// RUC de la tienda/empresa.
+  final String ruc;
+  /// Dirección / ubicación de la tienda.
+  final String address;
   final String footer;
   final bool showTotals;
   final String currencySymbol;
@@ -238,6 +250,9 @@ class CustomTicketTemplate {
     bool? showLogo,
     Uint8List? logoBytes,
     bool clearLogo = false,
+    String? companyName,
+    String? ruc,
+    String? address,
     String? footer,
     bool? showTotals,
     String? currencySymbol,
@@ -260,6 +275,9 @@ class CustomTicketTemplate {
       lines: lines ?? this.lines,
       showLogo: showLogo ?? this.showLogo,
       logoBytes: clearLogo ? null : (logoBytes ?? this.logoBytes),
+      companyName: companyName ?? this.companyName,
+      ruc: ruc ?? this.ruc,
+      address: address ?? this.address,
       footer: footer ?? this.footer,
       showTotals: showTotals ?? this.showTotals,
       currencySymbol: currencySymbol ?? this.currencySymbol,
@@ -285,6 +303,9 @@ class CustomTicketTemplate {
         'showLogo': showLogo,
         if (logoBytes != null && logoBytes!.isNotEmpty)
           'logoB64': base64Encode(logoBytes!),
+        'companyName': companyName,
+        'ruc': ruc,
+        'address': address,
         'footer': footer,
         'showTotals': showTotals,
         'currencySymbol': currencySymbol,
@@ -326,6 +347,9 @@ class CustomTicketTemplate {
       lines: lines,
       showLogo: json['showLogo'] as bool? ?? false,
       logoBytes: logo,
+      companyName: _clip((json['companyName'] as String?) ?? '', maxCompanyNameLength),
+      ruc: _clip((json['ruc'] as String?) ?? '', maxRucLength),
+      address: _clip((json['address'] as String?) ?? '', maxAddressLength),
       footer: _clip((json['footer'] as String?) ?? '', maxFooterLength),
       showTotals: json['showTotals'] as bool? ?? true,
       currencySymbol: ((json['currencySymbol'] as String?) ?? 'S/').trim().isEmpty
@@ -351,15 +375,33 @@ class CustomTicketTemplate {
     if (showLogo && logoBytes != null && logoBytes!.isNotEmpty) {
       out.add('[LOGO]');
     }
+    final company = companyName.trim();
+    final rucTrim = ruc.trim();
+    final addr = address.trim();
+    if (company.isNotEmpty) {
+      out.addAll(_wrapCenter(company, cols));
+    }
+    if (rucTrim.isNotEmpty) {
+      out.addAll(_wrapCenter('RUC: $rucTrim', cols));
+    }
+    if (addr.isNotEmpty) {
+      out.addAll(_wrapCenter(addr, cols));
+    }
     if (title.trim().isNotEmpty) {
       out.addAll(_wrapCenter(title.trim(), cols));
     }
-    if (title.trim().isNotEmpty || (showLogo && logoBytes != null)) {
+    final hasHeader = company.isNotEmpty ||
+        rucTrim.isNotEmpty ||
+        addr.isNotEmpty ||
+        title.trim().isNotEmpty ||
+        (showLogo && logoBytes != null);
+    if (hasHeader) {
       out.add('-' * cols);
     }
 
     final moneyCols = showTotals && cols >= 28;
-    final qtyW = cols >= 40 ? 5 : 4;
+    // qtyW >= 5 so header "CANT" keeps a trailing space before DESCRIPCION.
+    final qtyW = 5;
     final puW = cols >= 40 ? 8 : 7;
     final impW = cols >= 40 ? 9 : 8;
     final descW =

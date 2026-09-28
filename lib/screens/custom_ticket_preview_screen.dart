@@ -241,8 +241,8 @@ class _CustomTicketPreviewScreenState extends State<CustomTicketPreviewScreen> {
                     const SizedBox(height: 12),
                     Text(
                       l(
-                        'El logo se imprime como imagen (arriba del título).',
-                        'The logo prints as an image (above the title).',
+                        'El logo se imprime como imagen; debajo van nombre, RUC y dirección.',
+                        'The logo prints as an image; name, RUC and address follow below.',
                       ),
                       style: theme.textTheme.bodySmall,
                     ),
