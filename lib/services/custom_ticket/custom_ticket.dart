@@ -221,10 +221,13 @@ class CustomTicketTemplate {
   final List<CustomTicketLine> lines;
   final bool showLogo;
   final Uint8List? logoBytes;
+
   /// Nombre de tienda/empresa bajo el logo (cabecera tipo emisor SUNAT).
   final String companyName;
+
   /// RUC de la tienda/empresa.
   final String ruc;
+
   /// Dirección / ubicación de la tienda.
   final String address;
   final String footer;
@@ -347,14 +350,16 @@ class CustomTicketTemplate {
       lines: lines,
       showLogo: json['showLogo'] as bool? ?? false,
       logoBytes: logo,
-      companyName: _clip((json['companyName'] as String?) ?? '', maxCompanyNameLength),
+      companyName:
+          _clip((json['companyName'] as String?) ?? '', maxCompanyNameLength),
       ruc: _clip((json['ruc'] as String?) ?? '', maxRucLength),
       address: _clip((json['address'] as String?) ?? '', maxAddressLength),
       footer: _clip((json['footer'] as String?) ?? '', maxFooterLength),
       showTotals: json['showTotals'] as bool? ?? true,
-      currencySymbol: ((json['currencySymbol'] as String?) ?? 'S/').trim().isEmpty
-          ? 'S/'
-          : (json['currencySymbol'] as String).trim(),
+      currencySymbol:
+          ((json['currencySymbol'] as String?) ?? 'S/').trim().isEmpty
+              ? 'S/'
+              : (json['currencySymbol'] as String).trim(),
       subtotalLabel: (json['subtotalLabel'] as String?) ?? 'Op. Gravada',
       subtotal: (json['subtotal'] as String?) ?? '',
       taxLabel: (json['taxLabel'] as String?) ?? 'IGV 18%',
@@ -387,7 +392,7 @@ class CustomTicketTemplate {
     if (addr.isNotEmpty) {
       out.addAll(_wrapCenter(addr, cols));
     }
-    // Title is form-only; header already shows company / RUC / address.
+    // Title is kept in storage for old templates but is not shown or printed.
     final hasHeader = company.isNotEmpty ||
         rucTrim.isNotEmpty ||
         addr.isNotEmpty ||
@@ -401,8 +406,7 @@ class CustomTicketTemplate {
     final qtyW = 3;
     final puW = cols >= 40 ? 8 : 7;
     final impW = cols >= 40 ? 9 : 8;
-    final descW =
-        moneyCols ? (cols - qtyW - puW - impW).clamp(6, cols) : cols;
+    final descW = moneyCols ? (cols - qtyW - puW - impW).clamp(6, cols) : cols;
     var wroteItemHeader = false;
 
     for (final line in lines) {
@@ -428,7 +432,8 @@ class CustomTicketTemplate {
             : CustomTicketMoney.formatRaw(line.amount);
         if (moneyCols) {
           final descLines = _wrap(desc, descW);
-          out.add(_cols([qty, descLines.first, pu, imp], [qtyW, descW, puW, impW]));
+          out.add(
+              _cols([qty, descLines.first, pu, imp], [qtyW, descW, puW, impW]));
           for (final extra in descLines.skip(1)) {
             out.add(_cols(['', extra, '', ''], [qtyW, descW, puW, impW]));
           }
@@ -466,8 +471,7 @@ class CustomTicketTemplate {
             tax.trim().isNotEmpty ||
             total.trim().isNotEmpty)) {
       out.add('-' * cols);
-      final cur =
-          currencySymbol.trim().isEmpty ? 'S/' : currencySymbol.trim();
+      final cur = currencySymbol.trim().isEmpty ? 'S/' : currencySymbol.trim();
       if (subtotal.trim().isNotEmpty) {
         out.add(_pair(
           cols,
