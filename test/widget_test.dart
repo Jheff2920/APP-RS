@@ -1,4 +1,4 @@
-import 'dart:ui' show FakeViewPadding, Size;
+import 'dart:ui' show FakeViewPadding, Locale, Size;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +14,12 @@ void main() {
 
   testWidgets('Shows empty printers state', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({});
+    tester.platformDispatcher.localeTestValue = const Locale('es');
+    tester.platformDispatcher.localesTestValue = const [Locale('es')];
+    addTearDown(() {
+      tester.platformDispatcher.clearLocaleTestValue();
+      tester.platformDispatcher.clearLocalesTestValue();
+    });
     final store = PrinterStore();
     final printService = PrintService();
     await tester.pumpWidget(
@@ -46,6 +52,12 @@ void main() {
   testWidgets('Empty printers state does not overflow with keyboard',
       (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({});
+    tester.platformDispatcher.localeTestValue = const Locale('es');
+    tester.platformDispatcher.localesTestValue = const [Locale('es')];
+    addTearDown(() {
+      tester.platformDispatcher.clearLocaleTestValue();
+      tester.platformDispatcher.clearLocalesTestValue();
+    });
     tester.view.physicalSize = const Size(1280, 800);
     tester.view.devicePixelRatio = 1;
     tester.view.viewInsets = const FakeViewPadding(bottom: 360);

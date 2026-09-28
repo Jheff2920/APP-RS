@@ -17,8 +17,11 @@ void main() {
       expect(t.customerDocType, '1');
       expect(t.customerDoc, '45678912');
       expect(t.customerName, 'JUAN PEREZ');
+      expect(t.customerAddress, 'AV. CLIENTE 456, LIMA');
+      expect(t.issueTime, '14:05:09');
       expect(t.lines, hasLength(2));
       expect(t.lines.first.description, 'CAFE AMERICANO');
+      expect(t.lines.first.unit, 'NIU');
       expect(t.lines.first.quantity, 2);
       expect(t.igv, 3.24);
       expect(t.total, 21.24);
@@ -147,6 +150,7 @@ const _boletaXml = '''
          xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
   <cbc:ID>B001-00001234</cbc:ID>
   <cbc:IssueDate>2026-09-08</cbc:IssueDate>
+  <cbc:IssueTime>14:05:09</cbc:IssueTime>
   <cbc:InvoiceTypeCode listID="0104">03</cbc:InvoiceTypeCode>
   <cbc:DocumentCurrencyCode>PEN</cbc:DocumentCurrencyCode>
   <cbc:Note languageLocaleID="1000">SON VEINTIUNO CON 24/100 SOLES</cbc:Note>
@@ -171,6 +175,10 @@ const _boletaXml = '''
       </cac:PartyIdentification>
       <cac:PartyLegalEntity>
         <cbc:RegistrationName>JUAN PEREZ</cbc:RegistrationName>
+        <cac:RegistrationAddress>
+          <cbc:StreetName>AV. CLIENTE 456</cbc:StreetName>
+          <cbc:CityName>LIMA</cbc:CityName>
+        </cac:RegistrationAddress>
       </cac:PartyLegalEntity>
     </cac:Party>
   </cac:AccountingCustomerParty>

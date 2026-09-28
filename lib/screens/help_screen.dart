@@ -11,6 +11,7 @@ import '../services/redpos/redpos_config.dart';
 import '../services/redpos/redpos_links.dart';
 import '../widgets/redpos_unlock_actions.dart';
 import 'legal_screen.dart';
+import 'sunat_print_settings_screen.dart';
 
 class HelpScreen extends StatelessWidget {
   const HelpScreen({super.key, required this.store});
@@ -111,6 +112,34 @@ class HelpScreen extends StatelessWidget {
                     style: theme.textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 24),
+                  Text(
+                    l('Ticket SUNAT', 'SUNAT ticket'),
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    l(
+                      'Al compartir un XML o ZIP puedes cambiar la nota de ese '
+                      'trabajo. El formato, el logo y la nota por defecto se guardan aquí.',
+                      'When you share an XML or ZIP you can change the note for '
+                      'that job. Format, logo, and the default note are saved here.',
+                    ),
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.receipt_long),
+                    title: Text(
+                      l('Configurar ticket SUNAT', 'SUNAT ticket settings'),
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const SunatPrintSettingsScreen(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   Text(
                     l(
                       'Código, suscripción y licencia',

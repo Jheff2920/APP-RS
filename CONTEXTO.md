@@ -2,7 +2,7 @@
 
 > **Para Cursor / agente IA:** Lee este archivo al inicio de cada sesión nueva.
 
-**Última actualización:** 2026-09-18 (v1.8.7)  
+**Última actualización:** 2026-09-21 (v1.8.7, ticket SUNAT configurable)  
 **Carpeta:** `C:\Users\RS-Soporte\Documents\app`  
 **Versión:** `1.8.7+48`  
 **Package ID:** `com.redpos.service`  
@@ -47,6 +47,7 @@
 - [x] Play Billing + códigos RedPOS en `main`
 - [x] Panel staff: generador `/` y control `/control.html` (precio global o por código)
 - [x] Compartir imagen: recorte de voucher + umbral 168–200 (gris BCP = papel)
+- [x] Ticket SUNAT configurable: formato (compacto/claro/detallado), logo y nota al pie
 - [ ] Validar `flutter run` en Mac / iPhone
 - [ ] v2 — jobs del POS (HTTP / cola)
 
@@ -56,6 +57,8 @@
 
 ### A) Compartir / Abrir archivo
 `SEND`/`VIEW` (Android) o Abrir en / file picker (iOS) → `SharePrintScreen` → `PrintService.printSharedFile` → PDF/imagen raster **o** XML SUNAT (`SunatUblParser` + ESC/POS) → BT / USB / TCP.
+
+En XML/ZIP, `SharePrintScreen` muestra la nota guardada para editarla en ese trabajo. El formato, el logo y la nota por defecto salen de `SunatPrintStore` (menú **Ticket SUNAT** o Ayuda). El ancho sigue siendo el de la impresora (58/80 mm).
 
 ### B) Sistema (Imprimir) — Android
 1. `BoletaPrintService` recibe el PrintJob y copia el PDF.
@@ -89,6 +92,7 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 | Build diario | `.\scripts\run-phone.ps1 -InstallOnly` |
 | Referencia | `apk-ejemplo/` RawBT (protocolo, no pegar código) |
 | XML SUNAT | ZIP CPE: Invoice/CreditNote/DebitNote/DespatchAdvice/Retention/Perception; ignora CDR `R-`; copia URI a caché |
+| Ticket SUNAT | Formato compacto / claro (default) / detallado, QR y leyenda on/off. Logo PNG/JPG reducido en `SharedPreferences` (`sunat_print_logo_b64_v1`), centrado arriba con `GS v 0`. Nota al pie: default en ajustes; en Compartir se puede cambiar solo para ese trabajo (`sunatNote`). No toca PDF/imagen ni el pie de publicidad. |
 | iOS | WiFi TCP 9100; BT solo BLE/MFi; USB/PrintService/GPIO Android-only; Abrir archivo + document types |
 | Caps | `lib/platform_caps.dart` — no llamar canales USB en iOS |
 | BT Android | Plugin `BluetoothBondPlugin`: scan Classic, `createBond`, `removeBond`, `listBonded`. Sin `neverForLocation`. Location on + permiso para discovery. Desvincular también olvida el bond. iOS no puede unpair por API. |
@@ -136,7 +140,8 @@ Sin overlay → notificación / fallback abriendo `MainActivity` (`SystemPrintUi
 - `android/.../printservice/PrintSettingsActivity.kt`
 - `android/.../PrintEngineBridge.kt` (fallback)
 - `lib/system_print_main.dart`
-- `lib/services/sunat/` (`sunat_ubl_parser`, `sunat_escpos_print`)
+- `lib/services/sunat/` (`sunat_ubl_parser`, `sunat_escpos_print`, `sunat_print_settings`, `sunat_logo`)
+- `lib/screens/sunat_print_settings_screen.dart`
 - `lib/platform_caps.dart`
 - `lib/services/bluetooth_bond_channel.dart`
 - `android/.../BluetoothBondPlugin.kt`
