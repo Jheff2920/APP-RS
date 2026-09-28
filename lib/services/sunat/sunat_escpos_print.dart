@@ -37,6 +37,8 @@ class SunatEscPosPrint {
 
     List<int> bytes = [];
     bytes += generator.reset();
+    // CP1252 (id 16) matches latin1 codec for Spanish accents (n-tilde, a/e/i/o/u acute).
+    bytes += generator.setGlobalCodeTable('CP1252');
 
     if (logoBytes != null && logoBytes.isNotEmpty) {
       final raster = SunatLogo.rasterForPaper(
@@ -230,7 +232,8 @@ class SunatEscPosPrint {
     return bytes;
   }
 
-  /// CP437/latin1 de las térmicas no trae comillas tipográficas del XML SUNAT.
+  /// Keep printable latin1 (0x20-0x7E, 0xA0-0xFF). Printer must use a matching code page (we set CP1252).
+  /// Replaces curly quotes/dashes from SUNAT XML that are outside latin1.
   static String latin1Safe(String text) {
     var t = text
         .replaceAll('\u201c', '"')

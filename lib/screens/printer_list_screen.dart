@@ -22,6 +22,7 @@ import 'print_history_screen.dart';
 import 'printer_form_screen.dart';
 import 'share_print_screen.dart';
 import 'legal_screen.dart';
+import 'custom_tickets_list_screen.dart';
 import 'sunat_print_settings_screen.dart';
 
 const _expandedBreakpoint = 840.0;
@@ -526,8 +527,12 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
           PopupMenuButton<String>(
             tooltip: l('Ayuda y legal', 'Help and legal'),
             onSelected: (value) {
-              final page = switch (value) {
+              final Widget? page = switch (value) {
                 'sunat' => const SunatPrintSettingsScreen(),
+                'custom' => CustomTicketsListScreen(
+                    printerStore: widget.store,
+                    printService: widget.printService,
+                  ),
                 'help' => HelpScreen(store: widget.store),
                 'terms' => const LegalScreen.terms(),
                 'privacy' => const LegalScreen.privacy(),
@@ -544,6 +549,10 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
                 PopupMenuItem(
                   value: 'sunat',
                   child: Text(loc('Ticket SUNAT', 'SUNAT ticket')),
+                ),
+                PopupMenuItem(
+                  value: 'custom',
+                  child: Text(loc('Tickets propios', 'Custom tickets')),
                 ),
                 PopupMenuItem(
                   value: 'help',

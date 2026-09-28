@@ -16,6 +16,8 @@ import 'print_history_store.dart';
 import 'print_timing.dart';
 import 'printer_permissions.dart';
 import 'network_lan_channel.dart';
+import 'custom_ticket/custom_ticket.dart';
+import 'custom_ticket/custom_ticket_escpos.dart';
 import 'sunat/sunat_escpos_print.dart';
 import 'sunat/sunat_print_settings.dart';
 import 'sunat/sunat_ubl_parser.dart';
@@ -53,6 +55,23 @@ class PrintService {
   }
 
   /// Imprime un archivo compartido (PDF, imagen o XML SUNAT).
+
+  /// Imprime una plantilla de ticket propio (ESC/POS).
+  Future<void> printCustomTicket({
+    required SavedPrinter printer,
+    required CustomTicketTemplate template,
+    void Function(PrintPhase phase)? onPhase,
+    bool requestPermissions = true,
+  }) async {
+    await _runJob(
+      printer: printer,
+      title: template.name.isEmpty ? 'Ticket propio' : template.name,
+      source: 'custom_ticket',
+      onPhase: onPhase,
+      requestPermissions: requestPermissions,
+      buildBytes: (_) => CustomTicketEscPos.build(printer, template),
+    );
+  }
   Future<void> printSharedFile({
     required SavedPrinter printer,
     required String filePath,

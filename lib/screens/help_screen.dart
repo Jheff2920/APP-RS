@@ -141,6 +141,23 @@ class HelpScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
+                    l('Tickets propios', 'Custom tickets'),
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    l(
+                      'Desde el menú ⋮ de la pantalla principal puedes crear '
+                      'plantillas con logo, líneas, totales, QR o código de '
+                      'barras, ver la vista previa e imprimirlas.',
+                      'From the ⋮ menu on the home screen you can create '
+                      'templates with logo, lines, totals, QR or barcode, '
+                      'preview them, and print.',
+                    ),
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
                     l(
                       'Código, suscripción y licencia',
                       'Code, subscription, and license',
