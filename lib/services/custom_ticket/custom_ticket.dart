@@ -79,6 +79,98 @@ class CustomTicketLine {
   }
 }
 
+/// Parseo/formato de dinero para tickets propios.
+///
+/// Modelo Peru POS: los montos de ítem son **sin IGV** (base imponible).
+/// Op. Gravada = suma(importes de línea), IGV = Op. Gravada × 18%,
+/// Total = Op. Gravada + IGV. Coincide con etiquetas tipo boleta (Op. Gravada /
+/// IGV 18% / Total).
+class CustomTicketMoney {
+  static const igvRate = 0.18;
+
+  /// Acepta `150`, `150.5`, `150,50`, `S/ 150.00`, miles con punto/espacio.
+  static double? parse(String? raw) {
+    if (raw == null) return null;
+    var t = raw.trim();
+    if (t.isEmpty) return null;
+    t = t.replaceAll(RegExp(r'[Ss]/'), '');
+    t = t.replaceAll(' ', '');
+    t = t.replaceAll(RegExp(r'[^0-9,.-]'), '');
+    if (t.isEmpty || t == '-' || t == '.' || t == ',') return null;
+    if (t.contains(',') && t.contains('.')) {
+      if (t.lastIndexOf(',') > t.lastIndexOf('.')) {
+        t = t.replaceAll('.', '').replaceAll(',', '.');
+      } else {
+        t = t.replaceAll(',', '');
+      }
+    } else if (t.contains(',')) {
+      t = t.replaceAll(',', '.');
+    }
+    return double.tryParse(t);
+  }
+
+  static String format(double n) => n.toStringAsFixed(2);
+
+  static String formatRaw(String raw) {
+    final v = parse(raw);
+    if (v == null) return raw.trim();
+    return format(v);
+  }
+
+  static String withSymbol(String symbol, double n) {
+    final cur = symbol.trim().isEmpty ? 'S/' : symbol.trim();
+    return '$cur ${format(n)}';
+  }
+
+  static String withSymbolRaw(String symbol, String raw) {
+    final v = parse(raw);
+    if (v == null) {
+      final cur = symbol.trim().isEmpty ? 'S/' : symbol.trim();
+      final t = raw.trim();
+      if (t.isEmpty) return '';
+      return '$cur $t';
+    }
+    return withSymbol(symbol, v);
+  }
+}
+
+/// Totales calculados desde ítems (montos sin IGV).
+class CustomTicketTotals {
+  const CustomTicketTotals({
+    required this.subtotal,
+    required this.igv,
+    required this.total,
+  });
+
+  final double subtotal;
+  final double igv;
+  final double total;
+
+  static CustomTicketTotals fromLines(List<CustomTicketLine> lines) {
+    var sum = 0.0;
+    for (final line in lines) {
+      if (!line.isItem) continue;
+      final amt = CustomTicketMoney.parse(line.amount);
+      if (amt != null) {
+        sum += amt;
+        continue;
+      }
+      final q = CustomTicketMoney.parse(line.qty) ?? 1.0;
+      final pu = CustomTicketMoney.parse(line.unitPrice);
+      if (pu != null) sum += q * pu;
+    }
+    final sub = _round2(sum);
+    final igv = _round2(sum * CustomTicketMoney.igvRate);
+    return CustomTicketTotals(
+      subtotal: sub,
+      igv: igv,
+      total: _round2(sub + igv),
+    );
+  }
+
+  static double _round2(double n) => (n * 100).roundToDouble() / 100.0;
+}
+
 /// Plantilla editable de ticket térmico propio.
 class CustomTicketTemplate {
   const CustomTicketTemplate({
@@ -91,9 +183,9 @@ class CustomTicketTemplate {
     this.footer = '',
     this.showTotals = true,
     this.currencySymbol = 'S/',
-    this.subtotalLabel = 'Subtotal',
+    this.subtotalLabel = 'Op. Gravada',
     this.subtotal = '',
-    this.taxLabel = 'IGV',
+    this.taxLabel = 'IGV 18%',
     this.tax = '',
     this.totalLabel = 'TOTAL',
     this.total = '',
@@ -232,9 +324,9 @@ class CustomTicketTemplate {
       currencySymbol: ((json['currencySymbol'] as String?) ?? 'S/').trim().isEmpty
           ? 'S/'
           : (json['currencySymbol'] as String).trim(),
-      subtotalLabel: (json['subtotalLabel'] as String?) ?? 'Subtotal',
+      subtotalLabel: (json['subtotalLabel'] as String?) ?? 'Op. Gravada',
       subtotal: (json['subtotal'] as String?) ?? '',
-      taxLabel: (json['taxLabel'] as String?) ?? 'IGV',
+      taxLabel: (json['taxLabel'] as String?) ?? 'IGV 18%',
       tax: (json['tax'] as String?) ?? '',
       totalLabel: (json['totalLabel'] as String?) ?? 'TOTAL',
       total: (json['total'] as String?) ?? '',
@@ -246,7 +338,7 @@ class CustomTicketTemplate {
     );
   }
 
-  /// Vista previa en pantalla (texto monoespace aproximado).
+  /// Vista previa en pantalla (texto monoespace; columnas tipo boleta/SUNAT).
   List<String> previewLines({int cols = 32}) {
     final out = <String>[];
     if (showLogo && logoBytes != null && logoBytes!.isNotEmpty) {
@@ -258,23 +350,61 @@ class CustomTicketTemplate {
     if (title.trim().isNotEmpty || (showLogo && logoBytes != null)) {
       out.add('-' * cols);
     }
+
+    final moneyCols = showTotals && cols >= 28;
+    final qtyW = cols >= 40 ? 5 : 4;
+    final puW = cols >= 40 ? 8 : 7;
+    final impW = cols >= 40 ? 9 : 8;
+    final descW =
+        moneyCols ? (cols - qtyW - puW - impW).clamp(6, cols) : cols;
+    var wroteItemHeader = false;
+
     for (final line in lines) {
       if (line.isItem) {
+        if (!wroteItemHeader) {
+          if (moneyCols) {
+            out.add(_cols(
+              ['CANT', 'DESCRIPCION', 'P.U.', 'IMP.'],
+              [qtyW, descW, puW, impW],
+            ));
+          } else {
+            out.add('CANT  DESCRIPCION');
+          }
+          wroteItemHeader = true;
+        }
         final qty = line.qty.trim().isEmpty ? '1' : line.qty.trim();
         final desc = line.text.trim().isEmpty ? '-' : line.text.trim();
-        final head = '$qty  $desc';
-        out.addAll(_wrap(head, cols));
-        final right = [
-          if (line.unitPrice.trim().isNotEmpty) line.unitPrice.trim(),
-          if (line.amount.trim().isNotEmpty) line.amount.trim(),
-        ].join('  ');
-        if (right.isNotEmpty) {
-          final padded = right.length >= cols
-              ? right.substring(right.length - cols)
-              : right.padLeft(cols);
-          out.add(padded);
+        final pu = line.unitPrice.trim().isEmpty
+            ? ''
+            : CustomTicketMoney.formatRaw(line.unitPrice);
+        final imp = line.amount.trim().isEmpty
+            ? ''
+            : CustomTicketMoney.formatRaw(line.amount);
+        if (moneyCols) {
+          final descLines = _wrap(desc, descW);
+          out.add(_cols([qty, descLines.first, pu, imp], [qtyW, descW, puW, impW]));
+          for (final extra in descLines.skip(1)) {
+            out.add(_cols(['', extra, '', ''], [qtyW, descW, puW, impW]));
+          }
+        } else {
+          final room = (cols - qty.length - 1).clamp(4, cols);
+          final descLines = _wrap(desc, room);
+          out.add('$qty ${descLines.first}');
+          for (final extra in descLines.skip(1)) {
+            out.add('${' ' * (qty.length + 1)}$extra');
+          }
+          final prices = [
+            if (pu.isNotEmpty) pu,
+            if (imp.isNotEmpty) imp,
+          ].join('  ');
+          if (prices.isNotEmpty) {
+            out.add(prices.length >= cols
+                ? prices.substring(prices.length - cols)
+                : prices.padLeft(cols));
+          }
         }
       } else {
+        wroteItemHeader = false;
         final t = line.text;
         if (t.trim().isEmpty) {
           out.add('');
@@ -293,13 +423,25 @@ class CustomTicketTemplate {
       final cur =
           currencySymbol.trim().isEmpty ? 'S/' : currencySymbol.trim();
       if (subtotal.trim().isNotEmpty) {
-        out.add(_pair(cols, subtotalLabel, '$cur ${subtotal.trim()}'));
+        out.add(_pair(
+          cols,
+          subtotalLabel,
+          CustomTicketMoney.withSymbolRaw(cur, subtotal),
+        ));
       }
       if (tax.trim().isNotEmpty) {
-        out.add(_pair(cols, taxLabel, '$cur ${tax.trim()}'));
+        out.add(_pair(
+          cols,
+          taxLabel,
+          CustomTicketMoney.withSymbolRaw(cur, tax),
+        ));
       }
       if (total.trim().isNotEmpty) {
-        out.add(_pair(cols, totalLabel, '$cur ${total.trim()}'));
+        out.add(_pair(
+          cols,
+          totalLabel,
+          CustomTicketMoney.withSymbolRaw(cur, total),
+        ));
       }
     }
     if (showQr && qrData.trim().isNotEmpty) {
@@ -357,10 +499,22 @@ class CustomTicketTemplate {
     }).toList();
   }
 
+  static String _cols(List<String> cells, List<int> widths) {
+    final buf = StringBuffer();
+    for (var i = 0; i < cells.length; i++) {
+      final w = widths[i];
+      var c = cells[i];
+      if (c.length > w) c = c.substring(0, w);
+      final right = i >= cells.length - 2;
+      buf.write(right ? c.padLeft(w) : c.padRight(w));
+    }
+    return buf.toString();
+  }
+
   static String _pair(int width, String left, String right) {
     final l = left.trim();
     final r = right.trim();
-    if (l.length + 1 + r.length >= width) return ' ';
+    if (l.length + 1 + r.length >= width) return '$l $r';
     return l + (' ' * (width - l.length - r.length)) + r;
   }
 }

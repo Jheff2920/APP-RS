@@ -11,6 +11,10 @@ import '../sunat/sunat_logo.dart';
 import 'custom_ticket.dart';
 
 /// Arma bytes ESC/POS para un ticket propio.
+///
+/// Layout de ítems alineado a boleta/SUNAT claro: columnas
+/// CANT | DESCRIPCION | P.U. | IMP. en 58 mm y 80 mm (anchos adaptativos).
+/// Montos con formato `150.00` y símbolo `S/ 150.00`.
 class CustomTicketEscPos {
   static Future<List<int>> build(
     SavedPrinter printer,
@@ -83,9 +87,14 @@ class CustomTicketEscPos {
       sep();
     }
 
-    final moneyCols = usable >= 36;
-    final qtyW = 5;
-    final descW = moneyCols ? (usable - qtyW - 17).clamp(8, usable) : usable;
+    // Columnas en 58/80 cuando hay espacio (>= 28). Patrón SUNAT claro.
+    final moneyCols = ticket.showTotals && usable >= 28;
+    final qtyW = usable >= 40 ? 5 : 4;
+    final puW = usable >= 40 ? 8 : 7;
+    final impW = usable >= 40 ? 9 : 8;
+    final descW =
+        moneyCols ? (usable - qtyW - puW - impW).clamp(6, usable) : usable;
+    final widths = [qtyW, descW, puW, impW];
     var wroteItemHeader = false;
 
     for (final line in ticket.lines) {
@@ -94,7 +103,7 @@ class CustomTicketEscPos {
           if (moneyCols) {
             left(_cols(
               ['CANT', 'DESCRIPCION', 'P.U.', 'IMP.'],
-              [qtyW, descW, 8, 9],
+              widths,
             ));
           } else {
             left('CANT  DESCRIPCION');
@@ -102,22 +111,19 @@ class CustomTicketEscPos {
           wroteItemHeader = true;
         }
         final qty = line.qty.trim().isEmpty ? '1' : line.qty.trim();
-        final desc = line.text.trim().isEmpty ? '-' : line.text.trim();
+        final descRaw = line.text.trim().isEmpty ? '-' : line.text.trim();
+        final desc = SunatEscPosPrint.latin1Safe(descRaw);
+        final pu = line.unitPrice.trim().isEmpty
+            ? ''
+            : CustomTicketMoney.formatRaw(line.unitPrice);
+        final imp = line.amount.trim().isEmpty
+            ? ''
+            : CustomTicketMoney.formatRaw(line.amount);
         if (moneyCols) {
           final descLines = _wrap(desc, descW);
-          left(
-            _cols(
-              [
-                qty,
-                descLines.first,
-                line.unitPrice.trim(),
-                line.amount.trim(),
-              ],
-              [qtyW, descW, 8, 9],
-            ),
-          );
+          left(_cols([qty, descLines.first, pu, imp], widths));
           for (final extra in descLines.skip(1)) {
-            left(_cols(['', extra, '', ''], [qtyW, descW, 8, 9]));
+            left(_cols(['', extra, '', ''], widths));
           }
         } else {
           final room = (usable - qty.length - 1).clamp(4, usable);
@@ -127,8 +133,8 @@ class CustomTicketEscPos {
             left('${' ' * (qty.length + 1)}$extra');
           }
           final prices = [
-            if (line.unitPrice.trim().isNotEmpty) line.unitPrice.trim(),
-            if (line.amount.trim().isNotEmpty) line.amount.trim(),
+            if (pu.isNotEmpty) pu,
+            if (imp.isNotEmpty) imp,
           ].join('  ');
           if (prices.isNotEmpty) {
             left(_right(usable, prices));
@@ -162,14 +168,14 @@ class CustomTicketEscPos {
         left(_pair(
           usable,
           ticket.subtotalLabel,
-          '$cur ${ticket.subtotal.trim()}',
+          CustomTicketMoney.withSymbolRaw(cur, ticket.subtotal),
         ));
       }
       if (ticket.tax.trim().isNotEmpty) {
         left(_pair(
           usable,
           ticket.taxLabel,
-          '$cur ${ticket.tax.trim()}',
+          CustomTicketMoney.withSymbolRaw(cur, ticket.tax),
         ));
       }
       if (ticket.total.trim().isNotEmpty) {
@@ -177,7 +183,7 @@ class CustomTicketEscPos {
           _pair(
             usable,
             ticket.totalLabel,
-            '$cur ${ticket.total.trim()}',
+            CustomTicketMoney.withSymbolRaw(cur, ticket.total),
           ),
           styles: const PosStyles(bold: true),
         );

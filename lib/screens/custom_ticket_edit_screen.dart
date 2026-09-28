@@ -39,8 +39,8 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
   final _subtotalCtrl = TextEditingController();
   final _taxCtrl = TextEditingController();
   final _totalCtrl = TextEditingController();
-  final _subtotalLabelCtrl = TextEditingController(text: 'Subtotal');
-  final _taxLabelCtrl = TextEditingController(text: 'IGV');
+  final _subtotalLabelCtrl = TextEditingController(text: 'Op. Gravada');
+  final _taxLabelCtrl = TextEditingController(text: 'IGV 18%');
   final _totalLabelCtrl = TextEditingController(text: 'TOTAL');
   final _currencyCtrl = TextEditingController(text: 'S/');
   final _qrCtrl = TextEditingController();
@@ -57,6 +57,8 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
   Uint8List? _logo;
   List<CustomTicketLine> _lines = [];
   String _id = '';
+  /// Si el usuario edita totales a mano, no pisar hasta que cambien líneas o pulse Recalcular.
+  var _totalsManual = false;
 
   @override
   void initState() {
@@ -113,6 +115,18 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
       _lines = List.of(t.lines);
       _loading = false;
     });
+    final hasTotals = t.subtotal.trim().isNotEmpty ||
+        t.tax.trim().isNotEmpty ||
+        t.total.trim().isNotEmpty;
+    if (!hasTotals) {
+      _recalcTotals(force: true);
+    } else {
+      // Valores guardados: formatear dinero y dejar auto hasta que edite a mano.
+      _subtotalCtrl.text = CustomTicketMoney.formatRaw(t.subtotal);
+      _taxCtrl.text = CustomTicketMoney.formatRaw(t.tax);
+      _totalCtrl.text = CustomTicketMoney.formatRaw(t.total);
+      _totalsManual = false;
+    }
   }
 
   CustomTicketTemplate _current() {
@@ -226,6 +240,29 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
     unawaited(_persist());
   }
 
+  void _recalcTotals({bool force = false}) {
+    if (_totalsManual && !force) return;
+    final calc = CustomTicketTotals.fromLines(_lines);
+    _subtotalCtrl.text = CustomTicketMoney.format(calc.subtotal);
+    _taxCtrl.text = CustomTicketMoney.format(calc.igv);
+    _totalCtrl.text = CustomTicketMoney.format(calc.total);
+    _totalsManual = false;
+    if (mounted) setState(() {});
+  }
+
+  void _onTotalsManualEdit() {
+    if (_totalsManual) return;
+    setState(() => _totalsManual = true);
+  }
+
+  CustomTicketLine _withAutoAmount(CustomTicketLine line) {
+    if (!line.isItem) return line;
+    final pu = CustomTicketMoney.parse(line.unitPrice);
+    if (pu == null) return line;
+    final q = CustomTicketMoney.parse(line.qty) ?? 1.0;
+    return line.copyWith(amount: CustomTicketMoney.format(q * pu));
+  }
+
   void _addLine(CustomTicketLineType type) {
     setState(() {
       _lines = [
@@ -236,18 +273,22 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
         ),
       ];
     });
+    _recalcTotals();
   }
 
   void _removeLine(int index) {
     setState(() {
       _lines = List.of(_lines)..removeAt(index);
     });
+    _recalcTotals();
   }
 
-  void _updateLine(int index, CustomTicketLine line) {
+  void _updateLine(int index, CustomTicketLine line, {bool recomputeAmount = false}) {
+    final next = recomputeAmount ? _withAutoAmount(line) : line;
     setState(() {
-      _lines = List.of(_lines)..[index] = line;
+      _lines = List.of(_lines)..[index] = next;
     });
+    _recalcTotals();
   }
 
   @override
@@ -417,7 +458,8 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                       _LineEditor(
                         index: i,
                         line: _lines[i],
-                        onChanged: (line) => _updateLine(i, line),
+                        onChanged: (line, {bool recomputeAmount = false}) =>
+                            _updateLine(i, line, recomputeAmount: recomputeAmount),
                         onRemove: () => _removeLine(i),
                       ),
                     const SizedBox(height: 16),
@@ -432,6 +474,25 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                       onChanged: (v) => setState(() => _showTotals = v),
                     ),
                     if (_showTotals) ...[
+                      Text(
+                        l(
+                          'Montos de ítem sin IGV. Op. Gravada = suma; IGV = 18%; Total = Op. Gravada + IGV. Se recalcula al cambiar líneas (puedes editar a mano).',
+                          'Line amounts exclude IGV. Op. Gravada = sum; IGV = 18%; Total = Op. Gravada + IGV. Recalculates when lines change (you can override).',
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _recalcTotals(force: true),
+                          icon: const Icon(Icons.calculate_outlined, size: 18),
+                          label: Text(l('Recalcular', 'Recalculate')),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
                       Row(
                         children: [
                           Expanded(
@@ -461,9 +522,13 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                       TextField(
                         controller: _subtotalCtrl,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        onChanged: (_) => _onTotalsManualEdit(),
                         decoration: InputDecoration(
                           border: const OutlineInputBorder(),
-                          labelText: l('Subtotal', 'Subtotal'),
+                          labelText: l('Op. Gravada', 'Taxable ops'),
+                          helperText: _totalsManual
+                              ? l('Editado manualmente', 'Manually edited')
+                              : null,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -483,9 +548,10 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                             child: TextField(
                               controller: _taxCtrl,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              onChanged: (_) => _onTotalsManualEdit(),
                               decoration: InputDecoration(
                                 border: const OutlineInputBorder(),
-                                labelText: l('Impuesto', 'Tax'),
+                                labelText: l('IGV 18%', 'VAT 18%'),
                               ),
                             ),
                           ),
@@ -508,6 +574,7 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                             child: TextField(
                               controller: _totalCtrl,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              onChanged: (_) => _onTotalsManualEdit(),
                               decoration: InputDecoration(
                                 border: const OutlineInputBorder(),
                                 labelText: l('Total', 'Total'),
@@ -583,6 +650,11 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
   }
 }
 
+typedef _LineChanged = void Function(
+  CustomTicketLine line, {
+  bool recomputeAmount,
+});
+
 class _LineEditor extends StatelessWidget {
   const _LineEditor({
     required this.index,
@@ -593,7 +665,7 @@ class _LineEditor extends StatelessWidget {
 
   final int index;
   final CustomTicketLine line;
-  final ValueChanged<CustomTicketLine> onChanged;
+  final _LineChanged onChanged;
   final VoidCallback onRemove;
 
   @override
@@ -630,7 +702,7 @@ class _LineEditor extends StatelessWidget {
                     width: 72,
                     child: TextFormField(
                       initialValue: line.qty,
-                      onChanged: (v) => onChanged(line.copyWith(qty: v)),
+                      onChanged: (v) => onChanged(line.copyWith(qty: v), recomputeAmount: true),
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
                         labelText: l('Cant.', 'Qty'),
@@ -657,11 +729,12 @@ class _LineEditor extends StatelessWidget {
                 children: [
                   Expanded(
                     child: TextFormField(
+                      key: ValueKey('pu-$index-${line.unitPrice}'),
                       initialValue: line.unitPrice,
-                      onChanged: (v) => onChanged(line.copyWith(unitPrice: v)),
+                      onChanged: (v) => onChanged(line.copyWith(unitPrice: v), recomputeAmount: true),
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
-                        labelText: l('P.U.', 'Unit'),
+                        labelText: l('P.U. (sin IGV)', 'Unit (ex-IGV)'),
                         isDense: true,
                       ),
                     ),
@@ -669,11 +742,12 @@ class _LineEditor extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: TextFormField(
+                      key: ValueKey('amt-$index-${line.amount}'),
                       initialValue: line.amount,
                       onChanged: (v) => onChanged(line.copyWith(amount: v)),
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
-                        labelText: l('Importe', 'Amount'),
+                        labelText: l('Importe (sin IGV)', 'Amount (ex-IGV)'),
                         isDense: true,
                       ),
                     ),

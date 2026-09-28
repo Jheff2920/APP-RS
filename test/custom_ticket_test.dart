@@ -165,6 +165,105 @@ void main() {
     );
     expect(_visible(bytes), contains('Solo texto'));
   });
+
+
+  test('money parse and format normalize messy inputs', () {
+    expect(CustomTicketMoney.parse('150.00'), 150.0);
+    expect(CustomTicketMoney.parse('S/ 150.50'), 150.5);
+    expect(CustomTicketMoney.parse('150,50'), 150.5);
+    expect(CustomTicketMoney.format(150), '150.00');
+    expect(CustomTicketMoney.withSymbol('S/', 150), 'S/ 150.00');
+  });
+
+  test('totals from lines: amounts without IGV', () {
+    const lines = [
+      CustomTicketLine(
+        type: CustomTicketLineType.item,
+        text: 'Cafe',
+        qty: '2',
+        unitPrice: '5.00',
+        amount: '10.00',
+      ),
+      CustomTicketLine(
+        type: CustomTicketLineType.item,
+        text: 'Te',
+        qty: '1',
+        unitPrice: '3.00',
+        amount: '3.00',
+      ),
+    ];
+    final t = CustomTicketTotals.fromLines(lines);
+    expect(t.subtotal, 13.0);
+    expect(t.igv, closeTo(2.34, 0.001));
+    expect(t.total, closeTo(15.34, 0.001));
+  });
+
+  test('preview uses columns for 32 and 48 cols', () {
+    const ticket = CustomTicketTemplate(
+      id: 't1',
+      name: 'Demo',
+      showTotals: true,
+      lines: [
+        CustomTicketLine(
+          type: CustomTicketLineType.item,
+          text: 'Producto nino',
+          qty: '1',
+          unitPrice: '10',
+          amount: '10',
+        ),
+      ],
+      subtotal: '10.00',
+      tax: '1.80',
+      total: '11.80',
+    );
+    final p32 = ticket.previewLines(cols: 32);
+    expect(p32.any((l) => l.contains('CANT') && l.contains('P.U.')), isTrue);
+    expect(p32.any((l) => l.contains('10.00')), isTrue);
+    final moneyLine = p32.firstWhere((l) => l.contains('Producto'));
+    // P.U. and IMP on same row as qty+desc (not a following-only money row)
+    expect(moneyLine.contains('10.00'), isTrue);
+
+    final p48 = ticket.previewLines(cols: 48);
+    expect(p48.any((l) => l.contains('DESCRIPCION')), isTrue);
+  });
+
+  test('escpos 58 mm prints item money on same row as columns', () async {
+    final ticket = CustomTicketTemplate(
+      id: 't58',
+      name: 'Demo',
+      title: 'TIENDA',
+      lines: const [
+        CustomTicketLine(
+          type: CustomTicketLineType.item,
+          text: 'CAFE NINO',
+          qty: '2',
+          unitPrice: '5.5',
+          amount: '11',
+        ),
+      ],
+      showTotals: true,
+      subtotalLabel: 'Op. Gravada',
+      subtotal: '11',
+      taxLabel: 'IGV 18%',
+      tax: '1.98',
+      total: '12.98',
+    );
+    final bytes = await CustomTicketEscPos.build(
+      _printer(PaperWidth.mm58),
+      ticket,
+    );
+    final text = _visible(bytes);
+    expect(text, contains('CANT'));
+    expect(text, contains('P.U.'));
+    expect(text, contains('5.50'));
+    expect(text, contains('11.00'));
+    expect(text, contains('S/ 11.00'));
+    expect(text, contains('Op. Gravada'));
+    expect(text, contains('IGV 18%'));
+    // latin1-safe keeps printable ASCII product name
+    expect(text, contains('CAFE'));
+  });
+
 }
 
 SavedPrinter _printer(PaperWidth paper) {
