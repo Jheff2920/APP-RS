@@ -4,35 +4,30 @@ Controlador **Android e iOS** de impresoras térmicas ESC/POS (58 y 80 mm).
 Imprime PDF/imagen del POS **o** convierte el **XML/ZIP UBL de SUNAT** (boleta, factura, NC/ND, guía de remisión, retención/percepción) a ticket 58/80 mm.
 
 **Repo:** https://github.com/Jheff2920/APP-RS  
-**Versión:** 1.8.7+48 · Package ID: `com.redpos.service`  
+**Versión:** 1.8.8+49 · Package ID: `com.redpos.service`  
+**Empresa:** Red Soluciones (una d — nunca «Redd»)  
 **Rama estable:** `main`
 
-> Memoria técnica: [CONTEXTO.md](CONTEXTO.md) · Rendimiento: [docs/PRINT_PERFORMANCE.md](docs/PRINT_PERFORMANCE.md) · Play/RedPOS: [docs/DISTRIBUCION.md](docs/DISTRIBUCION.md)
+> **Agentes IA: leer primero [CONTEXTO.md](CONTEXTO.md)** (estado actual + reglas).  
+> Rendimiento: [docs/PRINT_PERFORMANCE.md](docs/PRINT_PERFORMANCE.md) · Play/RedPOS: [docs/DISTRIBUCION.md](docs/DISTRIBUCION.md) · Privacidad: [docs/PRIVACIDAD.md](docs/PRIVACIDAD.md)
 
 ---
 
-## Dónde quedamos (2026-09-18)
+## Dónde quedamos (2026-09-28 / inicios oct 2026 · v1.8.8+49)
 
-- **Compartir imagen (Yape/BCP):** recorta el voucher claro y limita el umbral para que el gris de BCP no salga negro.
-- **LAN 803L:** un solo cliente en `:9100`. App y Chrome/PrintService comparten el socket nativo. A los **3 s** sin otro ticket se suelta el puerto para que otra tablet pueda imprimir.
-- PDF en red (Android): raster nativo fuera de la UI (el `encode_page` en Dart congelaba el spinner).
-- Cierre de ticket en red: `ESC d` + `GS V 0x00` (sin GS v 0 en blanco).
-- Play: la suscripción cobra con la cuenta de Play Store (producto `redpos_ads_free_monthly`).
-- Códigos sin ads: generador para staff y panel de control aparte (listado, usados, precio global o por código). URLs: [docs/DISTRIBUCION.md](docs/DISTRIBUCION.md).
-- Raster nativo (`NativePdfEscPos`): recorte de tinta + umbral promedio + `GS v 0`.
-- **Nitidez x1/x2/x3** imprime al **mismo tamaño** (384/576). x2/x3 solo rasterizan el recorte a más puntos (no aplastan Google/Max).
-- Chrome 58 mm: ancho 3000 mils (~76 mm) para que el ticket no se encoja a la mitad. 80 mm sigue en 3150.
-- Todos los rollos 58/80 (Normal, Max, Google): misma página alta + recorte Chrome, como **80 mm Max**.
-- Gaveta **después** del ticket (espera extra en Bluetooth; en LAN ~0.3 s).
-- USB host (impresora integrada IMIN/Falcon): lista, permiso `vid:pid` y envío bulk ESC/POS.
-- **USB tras apagar:** Android olvida el permiso USB (solo USB, no BT/WiFi). La impresora sigue vinculada. Al abrir la app o al imprimir (también desde Chrome) se pide otra vez el aviso; no hay que volver a vincular.
-- En Falcon la gaveta **no va por USB**: se pulsa el GPIO del equipo (`cashbox_en`), como el plugin IMIN. En BT/LAN se sigue usando `ESC p`.
-- **XML/ZIP SUNAT:** Compartir o Abrir el CPE. En Android 10+ se copia a caché (Descargas no es legible). El CDR (`R-...xml`) no se imprime.
-- **iOS:** misma app. Imprime por **WiFi TCP :9100**. USB, PrintService y GPIO Falcon quedan en Android. Abrir PDF/XML/ZIP desde la app o “Abrir en RedPOS Service”.
-- **Bluetooth Android:** emparejar desde la app (PIN del sistema). La pestaña lista solo equipos ya vinculados; **Agregar dispositivo** busca cercanos. **Desvincular** también olvida el vínculo del teléfono. En Android 10 el scan Classic pide ubicación encendida.
-- **UI:** lista + detalle en tablet (≥840 dp), Guardar/Probar fijos abajo, scan BT sin tirones al ir apareciendo equipos.
+Estado canónico y reglas para AIs: **[CONTEXTO.md](CONTEXTO.md)**. Resumen:
 
----
+- **Ticket SUNAT:** formatos (compacto/claro/detallado), logo, nota al pie, QR más grande (`size6`/`size7`).
+- **Tickets propios:** plantillas 58/80, preview e impresión; IGV opcional; sin campo título en UI/print.
+- **CP1252** en ESC/POS para acentos y ñ (SUNAT + tickets propios).
+- **Paid gate** con `RedPosLicenseStore.isAdsFree()` (código empresa / suscripción Play / lifetime):
+  - SUNAT de pago: logo, nota, toggle QR, monto en letras.
+  - Tickets propios: feature completa de pago.
+  - Imprimir PDF/XML/imagen **nunca** se bloquea; formato SUNAT sigue gratis.
+- **Privacidad Play:** pantalla Datos y privacidad, wipe local, política en Vercel; **sin** generative AI, AdMob ni Firebase analytics.
+- **Branding:** Red Soluciones (una d).
+- **Firma:** upload-keystore solo en PC Windows RS-Soporte; AAB en `inst-apk\RedPOS-Service-*-play.aab`.
+- **Prueba:** Telpo M1K serial `A51M001K03800032`. Build con `--dart-define=REDPOS_API=https://redpos-codigos-prueba.vercel.app`.
 
 ## Flujo de trabajo (no romper `main`)
 
@@ -50,7 +45,7 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 ---
 
-## Estado actual (v1.8.7)
+## Estado actual (v1.8.8+49)
 
 | Hecho | Pendiente |
 |-------|-----------|
@@ -68,6 +63,11 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 | LAN: socket nativo compartido + suelta `:9100` a los 3 s de idle | |
 | Play Billing (suscripción mensual) + códigos RedPOS | |
 | Panel de códigos: generados / usados + precio global o propio | |
+| Ticket SUNAT configurable + QR size6/size7 + CP1252 | |
+| Tickets propios (58/80, preview, IGV opcional, sin título) | |
+| Paid gate `isAdsFree` (SUNAT extras + Tickets propios) | |
+| Privacidad: Datos y privacidad + wipe + política HTTPS | |
+| Branding Red Soluciones (una d) | |
 | Tests GS v0 / EscPosChunker + benchmark local | |
 | Repo limpio en GitHub | |
 
@@ -236,6 +236,7 @@ C:\flutter\bin\cache\dart-sdk\bin\dart.exe run tool\benchmark_escpos.dart
 
 | Equipo | Serial ADB | Notas |
 |--------|------------|--------|
+| Telpo M1K | `A51M001K03800032` | dispositivo de prueba actual |
 | Xiaomi | `863d005830483132385114e3efc08c` | default del script |
 | Lenovo YT-X705F | `HA1KL54R` | Android 10 · overlay + ubicación para scan BT |
 | IMIN Falcon 1 | (ADB del equipo) | 2 GB RAM · USB integrado; tras apagar hay que aceptar el aviso USB |
@@ -255,19 +256,24 @@ C:\flutter\bin\cache\dart-sdk\bin\dart.exe run tool\benchmark_escpos.dart
 ## Estructura relevante
 
 ```
+CONTEXTO.md                 # Leer primero (AIs + estado actual)
 lib/platform_caps.dart
+lib/brand.dart
+lib/legal/                  # Textos legales in-app
 lib/theme.dart
 lib/widgets/boleta_page.dart
-lib/services/     escpos_pdf_print, sunat/, print_timing, transports/, usb_printer_channel
-lib/services/bluetooth_bond_channel.dart
-android/.../BluetoothBondPlugin.kt   createBond / removeBond / listBonded + scan Classic
-android/.../printservice/   BoletaPrintService, EscPosTransport, UsbEscPos, IminCashBox
-android/.../NetworkLanPlugin.kt   TCP :9100 nativo (app + PrintService)
-lib/services/network_lan_channel.dart
-admin-web/   generador `/` y panel `/control.html`
-android/.../SharedIncomingFile.kt   copia URI Compartir/Abrir a caché
-ios/Runner/   Info.plist, IncomingFile.swift, AppDelegate, SceneDelegate
-docs/PRINT_PERFORMANCE.md
+lib/widgets/redpos_paid_gate.dart
+lib/services/sunat/         # UBL + ESC/POS ticket SUNAT (CP1252, paid extras)
+lib/services/custom_ticket/ # Tickets propios (pago)
+lib/services/redpos/        # isAdsFree, códigos, Play
+lib/services/privacy_data_wipe.dart
+lib/services/               # escpos_*, print_service, transports/, usb_...
+lib/screens/                # sunat_*, custom_ticket_*, privacy_data_screen
+android/.../BluetoothBondPlugin.kt
+android/.../printservice/   # BoletaPrintService, NativePdfEscPos, EscPosTransport, USB, overlay
+android/.../NetworkLanPlugin.kt
+admin-web/                  # códigos + privacidad.html / terminos.html
+docs/DISTRIBUCION.md  docs/PRIVACIDAD.md  docs/PRINT_PERFORMANCE.md
 tool/benchmark_escpos.dart
 ```
 
@@ -275,6 +281,7 @@ tool/benchmark_escpos.dart
 
 ## Roadmap
 
+1. **v1.8.8** — Tickets propios, paid gate SUNAT/custom, CP1252, privacidad Play, Red Soluciones
 1. **v1.8.7** — Compartir imagen: recorte de voucher Yape/BCP y umbral tope para el gris claro
 2. **v1.8.5** — LAN idle 3 s, raster PDF nativo en red, panel de códigos (usados + precios)
 2. **v1.7.0** — iOS WiFi + XML/PDF/ZIP; emparejar/olvidar BT en Android; shell tablet
