@@ -4,7 +4,7 @@ App **pública en Play** (Android). Imprimir **nunca se bloquea**.
 Sin publicidad con **código de activación** (equipo o licencia de por vida), o **suscripción mensual** (Google Play).  
 Sin código y sin pago: la app funciona igual, con anuncios en pantalla y pie en el papel.
 
-**Identidad:** `com.redpos.service` · versión en `pubspec.yaml` (hoy `1.8.7+48`).  
+**Identidad:** `com.redpos.service` · versión en `pubspec.yaml` (hoy `1.8.8+49`).  
 **Producto Play:** `redpos_ads_free_monthly` (plan base mensual).  
 **URLs legales (Play Console):**
 
@@ -42,6 +42,21 @@ El HMAC de prueba no es producción; en Vercel el KV marca cada código como usa
 Compila con:
 
 `--dart-define=REDPOS_API=https://redpos-codigos-prueba.vercel.app`
+
+---
+
+## Funciones de pago (mismo pase que sin ads)
+
+`RedPosLicenseStore.isAdsFree()` — código RedPOS (empresa / lifetime) o suscripción Play.
+
+| Sin pase | Con pase |
+|----------|----------|
+| Imprime siempre (PDF/imagen/XML SUNAT) | Igual |
+| Formato ticket SUNAT gratis | + logo, nota al pie, toggle QR, monto en letras |
+| Tickets propios bloqueados | Tickets propios completo (editar / preview / print) |
+| Banner + pie de papel | Sin publicidad |
+
+Detalle y arquitectura: [CONTEXTO.md](../CONTEXTO.md).
 
 ---
 
@@ -92,9 +107,9 @@ Cliente OAuth **web** (va en la app como `serverClientId`; el secreto GOCSPX no 
 
 ## Firma y AAB
 
-- Keystore local: `android/upload-keystore.jks` + `android/key.properties` (gitignored). Plantilla: `android/key.properties.example`.
+- Keystore local (solo PC Windows RS-Soporte): `android/upload-keystore.jks` + `android/key.properties` (gitignored). Plantilla: `android/key.properties.example`. **Nunca commit.**
 - AAB: `flutter build appbundle --release --dart-define=REDPOS_API=https://redpos-codigos-prueba.vercel.app`
-- APK sideload (IMIN): misma firma de upload, carpeta `inst-apk/`.
+- Artefactos locales: `inst-apk\RedPOS-Service-*-play.aab` (y APKs). Carpeta `inst-apk/` no va a git.
 
 Las tablets que ya tienen el APK **debug-firmado** no se actualizan con el AAB de Play: hay que desinstalar e instalar de nuevo.
 
@@ -156,6 +171,7 @@ Sube `versionCode` en cada release (`pubspec.yaml`, el número después de `+`).
 
 ## Relacionado
 
+- Estado / AIs: [CONTEXTO.md](../CONTEXTO.md)
 - App en general: [README.md](../README.md)
 - USB al encender / IMIN: sección USB del README
 - Rendimiento: [PRINT_PERFORMANCE.md](PRINT_PERFORMANCE.md)
