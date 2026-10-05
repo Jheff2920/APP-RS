@@ -24,8 +24,11 @@ class NetworkTransport implements PrinterTransport {
     _printer = printer;
     _key = _makeKey(printer);
     _native = NetworkLanChannel.isSupported;
+    // Siempre limpiar el socket anterior: isClosed/isConnected de Dart no
+    // detectan half-open TCP (la impresora cerró su lado pero el pool lo
+    // considera vivo). Cada job parte con una conexión fresca.
+    await _dropDart(_key!);
     if (_native) {
-      await _dropDart(_key!);
       try {
         await NetworkLanChannel.connect(printer.address.trim(), printer.port);
       } catch (_) {
@@ -102,27 +105,36 @@ class NetworkTransport implements PrinterTransport {
       }
     }
     final key = _key;
-    final socket = await _open();
-    try {
-      socket.add(Uint8List.fromList(bytes));
-      await socket.flush();
-      if (key != null) _armIdle(key);
-    } on SocketException catch (_) {
-      await _dropDart(_key);
-      throw PrinterTransportException(
-        tr(
-          'Se cortó la conexión WiFi. Enciende la impresora y vuelve a intentar.',
-          'The WiFi connection dropped. Turn the printer on and try again.',
-        ),
-      );
-    } on Exception catch (_) {
-      await _dropDart(_key);
-      throw PrinterTransportException(
-        tr(
-          'No se pudo enviar la impresión por WiFi. Inténtalo de nuevo.',
-          'Could not send the print job over WiFi. Try again.',
-        ),
-      );
+    // Reintentar una vez: si el socket del pool estaba semiabierto (half-open),
+    // el primer intento falla, _dropDart limpia el pool y el segundo abre uno fresco.
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final socket = await _open();
+      try {
+        socket.add(Uint8List.fromList(bytes));
+        await socket.flush();
+        if (key != null) _armIdle(key);
+        return;
+      } on SocketException catch (_) {
+        await _dropDart(_key);
+        if (attempt == 1) {
+          throw PrinterTransportException(
+            tr(
+              'Se cortó la conexión WiFi. Enciende la impresora y vuelve a intentar.',
+              'The WiFi connection dropped. Turn the printer on and try again.',
+            ),
+          );
+        }
+      } on Exception catch (_) {
+        await _dropDart(_key);
+        if (attempt == 1) {
+          throw PrinterTransportException(
+            tr(
+              'No se pudo enviar la impresión por WiFi. Inténtalo de nuevo.',
+              'Could not send the print job over WiFi. Try again.',
+            ),
+          );
+        }
+      }
     }
   }
 

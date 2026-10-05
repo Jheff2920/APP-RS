@@ -151,35 +151,44 @@ object EscPosTransport {
     }
 
     fun openHeldNet(host: String, port: Int) {
+        // Cada job Dart empieza con un socket fresco: isClosed/isConnected no
+        // detectan conexiones semiabertas (la impresora cerró su lado pero el
+        // cliente sigue creyendo que la conexión vive).
+        synchronized(netLock) { dropNetLocked() }
         ensureNetwork(host, port, jobId = "dart")
     }
 
     fun writeHeldNet(data: ByteArray) {
+        val host: String
         synchronized(netLock) {
-            cancelNetIdleLocked()
-            val host = lastNetHost
-            val existing = heldNet
-            val socket = if (
-                existing != null &&
-                !existing.isClosed &&
-                existing.isConnected
-            ) {
-                existing
-            } else if (host != null) {
-                ensureNetwork(host, lastNetPort, jobId = "dart")
-            } else {
-                throw IllegalStateException("No hay conexion WiFi/TCP activa.")
-            }
+            host = lastNetHost ?: throw IllegalStateException("No hay conexion WiFi/TCP activa.")
+        }
+        var last: Exception? = null
+        repeat(2) {
             try {
-                val out = socket.getOutputStream()
-                out.write(data)
-                out.flush()
-                scheduleNetIdleLocked()
+                synchronized(netLock) {
+                    cancelNetIdleLocked()
+                    val socket = if (
+                        heldNet != null &&
+                        !heldNet!!.isClosed &&
+                        heldNet!!.isConnected
+                    ) {
+                        heldNet!!
+                    } else {
+                        ensureNetwork(host, lastNetPort, jobId = "dart")
+                    }
+                    val out = socket.getOutputStream()
+                    out.write(data)
+                    out.flush()
+                    scheduleNetIdleLocked()
+                }
+                return
             } catch (e: Exception) {
-                dropNetLocked()
-                throw e
+                last = e
+                synchronized(netLock) { dropNetLocked() }
             }
         }
+        throw last ?: IllegalStateException("No se pudo enviar por WiFi")
     }
 
     fun sendNetwork(
