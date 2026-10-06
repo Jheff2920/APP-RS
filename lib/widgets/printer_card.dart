@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../l10n/app_lang.dart';
 import '../models/saved_printer.dart';
 
-/// Tarjeta de impresora con botón de prueba directo y menú de opciones.
-/// El botón "Imprimir prueba" queda visible siempre — acción principal a un toque.
+/// Tarjeta de impresora con boton de prueba directo y menu de opciones.
+/// El boton "Probar" queda visible siempre — accion principal a un toque.
 class PrinterCard extends StatelessWidget {
   const PrinterCard({
     super.key,
@@ -20,15 +20,16 @@ class PrinterCard extends StatelessWidget {
   final VoidCallback onOptions;
 
   static IconData _typeIcon(PrinterLinkType t) => switch (t) {
-        PrinterLinkType.bluetooth => Icons.bluetooth,
-        PrinterLinkType.usb => Icons.usb,
-        PrinterLinkType.network => Icons.wifi,
+        PrinterLinkType.bluetooth => Icons.bluetooth_rounded,
+        PrinterLinkType.usb => Icons.usb_rounded,
+        PrinterLinkType.network => Icons.wifi_rounded,
       };
 
-  static Color _typeColor(PrinterLinkType t, ColorScheme cs) => switch (t) {
+  // Colores por tipo de conexion — distintivos, no identicos
+  static Color _typeColor(PrinterLinkType t) => switch (t) {
         PrinterLinkType.bluetooth => const Color(0xFF1565C0),
-        PrinterLinkType.usb => const Color(0xFFE65100),
-        PrinterLinkType.network => cs.primary,
+        PrinterLinkType.usb => const Color(0xFFBF360C),
+        PrinterLinkType.network => const Color(0xFF2B0A53),
       };
 
   @override
@@ -36,25 +37,26 @@ class PrinterCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final l = L.of(context);
-    final iconColor = _typeColor(printer.type, cs);
+    final iconColor = _typeColor(printer.type);
 
     return Card(
       child: InkWell(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(16),
         onTap: onOptions,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+          padding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
           child: Row(
             children: [
-              // Ícono de tipo de conexión con fondo tintado
+              // Icono de tipo con fondo tintado
               Container(
-                width: 44,
-                height: 44,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  color: iconColor.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(_typeIcon(printer.type), color: iconColor, size: 22),
+                child: Icon(_typeIcon(printer.type),
+                    color: iconColor, size: 24),
               ),
               const SizedBox(width: 12),
               // Nombre y detalles
@@ -68,7 +70,8 @@ class PrinterCard extends StatelessWidget {
                           child: Text(
                             printer.name,
                             style: tt.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w700,
+                              color: cs.onSurface,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -76,16 +79,39 @@ class PrinterCard extends StatelessWidget {
                         ),
                         if (printer.isDefault) ...[
                           const SizedBox(width: 6),
-                          Icon(Icons.star_rounded,
-                              size: 16, color: cs.primary),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: cs.primaryContainer,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              l('Principal', 'Default'),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: cs.onPrimaryContainer,
+                              ),
+                            ),
+                          ),
                         ],
                       ],
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
-                      '${printer.type.label} · ${printer.paper.label} · ${printer.connectionSummary}',
+                      '${printer.type.label} · ${printer.paper.label}',
                       style: tt.bodySmall?.copyWith(
                         color: cs.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      printer.connectionSummary,
+                      style: tt.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        fontSize: 11,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -94,13 +120,17 @@ class PrinterCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              // Botón de prueba directo
+              // Boton de prueba o spinner
               if (busy)
-                const SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: RepaintBoundary(
-                    child: CircularProgressIndicator(strokeWidth: 2.5),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: RepaintBoundary(
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2.5, color: cs.primary),
+                    ),
                   ),
                 )
               else
@@ -108,11 +138,11 @@ class PrinterCard extends StatelessWidget {
                   onTap: onTestPrint,
                   label: l('Probar', 'Test'),
                 ),
-              // Menú de opciones
+              // Menu de opciones
               if (!busy)
                 IconButton(
                   tooltip: l('Opciones', 'Options'),
-                  icon: const Icon(Icons.more_vert),
+                  icon: Icon(Icons.more_vert, color: cs.onSurfaceVariant),
                   onPressed: onOptions,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -132,30 +162,32 @@ class _TestButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return InkWell(
-      borderRadius: BorderRadius.circular(6),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          border: Border.all(color: cs.primary.withValues(alpha: 0.5)),
-          borderRadius: BorderRadius.circular(6),
-          color: cs.primaryContainer.withValues(alpha: 0.4),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.print_outlined, size: 14, color: cs.primary),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: cs.primary,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: cs.primaryContainer,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.print_rounded, size: 14, color: cs.primary),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: cs.primary,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
