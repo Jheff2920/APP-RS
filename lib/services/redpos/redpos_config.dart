@@ -108,11 +108,4 @@ class RedPosConfig {
     return Uri.parse('https://wa.me/$digits');
   }
 
-  /// Código de demostración en esta rama de prueba.
-  static const allowTestCodes = bool.fromEnvironment(
-    'REDPOS_ALLOW_TEST_CODES',
-    defaultValue: true,
-  );
-
-  static const testCode = 'R100301S';
 }
