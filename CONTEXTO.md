@@ -8,7 +8,7 @@
 **Producto:** RedPOS Service  
 **Carpeta Windows (preferida):** `C:\Users\RS-Soporte\Documents\app`  
 **Repo:** https://github.com/Jheff2920/APP-RS · rama estable `main`  
-**Versión app:** `1.8.8+51` (`pubspec.yaml`) — rediseño fusionado en `main`  
+**Versión app:** `1.8.9+52` (`pubspec.yaml`) — rediseño fusionado en `main`  
 **Package / applicationId:** `com.redpos.service`  
 **iOS bundle:** `com.redpos.service`
 
