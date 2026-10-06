@@ -34,7 +34,9 @@ void main() {
     final uri = RedPosConfig.lifetimeMailtoUri;
     expect(uri.scheme, 'mailto');
     expect(uri.toString(), contains(RedPosConfig.supportEmail));
-    expect(uri.toString(), contains('Licencia'));
+    // El subject varía según el idioma del dispositivo.
+    final s = uri.toString();
+    expect(s.contains('Licencia') || s.contains('Lifetime'), isTrue);
   });
 
   test('Play Console legal URLs are https', () {
