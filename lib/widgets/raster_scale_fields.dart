@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_lang.dart';
 import '../models/raster_scale.dart';
+import 'ui_kit.dart';
 
 class RasterScaleFields extends StatelessWidget {
   const RasterScaleFields({
@@ -19,14 +20,18 @@ class RasterScaleFields extends StatelessWidget {
     final l = L.of(context);
     return ExpansionTile(
       initiallyExpanded: false,
-      tilePadding: EdgeInsets.zero,
-      childrenPadding: const EdgeInsets.only(bottom: 8),
+      shape: const Border(),
+      collapsedShape: const Border(),
+      tilePadding: const EdgeInsets.fromLTRB(14, 4, 16, 4),
+      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+      expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+      leading: const IconTile(icon: Icons.hd_outlined, size: 40),
       title: Text(
         l('Nitidez', 'Sharpness'),
-        style: theme.textTheme.titleMedium,
+        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
       ),
       subtitle: Text(
-        '${value.label} · ${value.hint}',
+        '${value.label}, ${value.hint}',
         style: theme.textTheme.bodySmall,
       ),
       children: [
@@ -41,6 +46,8 @@ class RasterScaleFields extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         SegmentedButton<RasterScale>(
+          expandedInsets: EdgeInsets.zero,
+          showSelectedIcon: false,
           segments: [
             for (final s in RasterScale.values)
               ButtonSegment(value: s, label: Text(s.label)),

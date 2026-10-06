@@ -15,6 +15,8 @@ class PaperWidthSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SegmentedButton<PaperWidth>(
+      expandedInsets: EdgeInsets.zero,
+      showSelectedIcon: false,
       segments: const [
         ButtonSegment(value: PaperWidth.mm58, label: Text('58 mm')),
         ButtonSegment(value: PaperWidth.mm80, label: Text('80 mm')),

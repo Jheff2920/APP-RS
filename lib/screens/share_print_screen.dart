@@ -10,10 +10,11 @@ import '../services/printer_store.dart';
 import '../services/redpos/redpos_license.dart';
 import '../services/sunat/sunat_print_settings.dart';
 import '../services/transports/printer_transport.dart';
-import '../widgets/boleta_page.dart';
+import '../theme.dart';
 import '../widgets/print_status_dialog.dart';
 import '../widgets/redpos_ad_banner.dart';
 import '../widgets/redpos_paid_gate.dart';
+import '../widgets/ui_kit.dart';
 import 'sunat_print_settings_screen.dart';
 
 class SharePrintScreen extends StatefulWidget {
@@ -172,164 +173,191 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
   Widget build(BuildContext context) {
     final name = p.basename(widget.filePath);
     final l = L.of(context);
+    final tt = Theme.of(context).textTheme;
+    final kind = _fileKind(name);
 
     return Scaffold(
       appBar: AppBar(title: Text(l('Imprimir archivo', 'Print file'))),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : BoletaPage(
-              bottomBar: SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
+      bottomNavigationBar: _loading
+          ? null
+          : BottomActions(
+              children: [
+                FilledButton.icon(
                   onPressed: _printing || _selected == null ? null : _print,
                   icon: _printing
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.print),
-                  label: Text(l('Imprimir', 'Print')),
+                      ? const ButtonSpinner(color: Colors.white)
+                      : const Icon(Icons.print_rounded),
+                  label: Text(
+                    _selected == null
+                        ? l('Imprimir', 'Print')
+                        : l(
+                            'Imprimir en ${_selected!.name}',
+                            'Print on ${_selected!.name}',
+                          ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
+              ],
+            ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : PageList(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              children: [
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        IconTile(icon: kind.icon, color: kind.color, size: 52),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: tt.bodyLarge?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.25,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                kind.label(l),
+                                style: tt.bodySmall
+                                    ?.copyWith(color: AppColors.inkSoft),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (!_adsFree) ...[
+                  const SizedBox(height: 12),
                   RedPosAdBanner(
                     adsFree: _adsFree,
                     store: widget.printerStore,
                     onActivated: _load,
                   ),
-                  if (!_adsFree) const SizedBox(height: 8),
-                  Card(
-                    child: ListTile(
-                      leading: Icon(
-                        _isXmlLike(name)
-                            ? Icons.description
-                            : Icons.picture_as_pdf,
-                      ),
-                      title: Text(name),
-                      subtitle: Text(
-                        _isXmlLike(name)
-                            ? l(
-                                'XML SUNAT → ticket ${(_selected?.paper.label ?? '')}',
-                                'SUNAT XML → ${(_selected?.paper.label ?? '')} ticket',
-                              )
-                            : widget.filePath,
-                        maxLines: 2,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    l('Impresora vinculada', 'Paired printer'),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  if (_printers.isEmpty)
-                    Text(
-                      l(
-                        'No hay impresoras vinculadas. Abre ${AppBrand.name}, '
-                        'agrega una impresora y vuelve a abrir el archivo.',
-                        'No printers are paired. Open ${AppBrand.name}, add a '
-                        'printer, then open the file again.',
-                      ),
-                    )
-                  else
-                    DropdownButtonFormField<String>(
-                      initialValue: _selected?.id,
-                      decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        labelText: l('Impresora', 'Printer'),
-                      ),
-                      items: _printers
-                          .map(
-                            (pr) => DropdownMenuItem(
-                              value: pr.id,
-                              child: Text('${pr.name} (${pr.paper.label})'),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: _printing
-                          ? null
-                          : (id) {
-                              setState(() {
-                                _selected =
-                                    _printers.firstWhere((p) => p.id == id);
-                              });
-                            },
-                    ),
-                  if (_sunatFile) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      l('Ticket SUNAT', 'SUNAT ticket'),
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      l(
-                        'Formato: ${_format.label(false)}. '
-                        'El ancho es el de la impresora (58 u 80 mm).',
-                        'Format: ${_format.label(true)}. '
-                        'Width follows the printer (58 or 80 mm).',
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        onPressed: _printing ? null : _openSunatSettings,
-                        icon: const Icon(Icons.tune),
-                        label: Text(
-                          l(
-                            'Configurar ticket SUNAT',
-                            'SUNAT ticket settings',
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (_adsFree)
-                      TextField(
-                        controller: _noteController,
-                        enabled: !_printing,
-                        maxLength: SunatPrintSettings.maxNoteLength,
-                        maxLines: 3,
-                        textCapitalization: TextCapitalization.sentences,
-                        onChanged: (value) {
-                          _noteDirty = value != _loadedNote;
-                        },
-                        decoration: InputDecoration(
-                          border: const OutlineInputBorder(),
-                          labelText: l('Nota del ticket', 'Ticket note'),
-                          helperText: l(
-                            'Se imprime al pie. El cambio vale solo para este trabajo.',
-                            'Printed at the bottom. The change applies only to this job.',
-                          ),
-                          alignLabelWithHint: true,
-                        ),
-                      )
-                    else ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        l(
-                          'La nota al pie es una función de pago.',
-                          'The footer note is a paid feature.',
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      RedPosPaidGateBanner(
-                        store: widget.printerStore,
-                        onUnlocked: _load,
-                        compact: true,
-                      ),
-                    ],
-                  ],
                 ],
-              ),
+                SectionLabel(l('Imprimir en', 'Print on')),
+                if (_printers.isEmpty)
+                  InfoNote(
+                    tone: InfoTone.warn,
+                    icon: Icons.print_disabled_outlined,
+                    text: l(
+                      'No hay impresoras vinculadas. Abre ${AppBrand.name}, '
+                          'vincula una impresora y vuelve a abrir el archivo.',
+                      'No printers are paired. Open ${AppBrand.name}, pair a '
+                          'printer, then open the file again.',
+                    ),
+                  )
+                else
+                  PrinterPicker(
+                    printers: _printers,
+                    selectedId: _selected?.id,
+                    enabled: !_printing,
+                    onSelected: (pr) => setState(() => _selected = pr),
+                  ),
+                if (_sunatFile) ...[
+                  SectionLabel(l('Ticket SUNAT', 'SUNAT ticket')),
+                  SectionGroup(
+                    children: [
+                      NavRow(
+                        icon: Icons.tune_rounded,
+                        title: l(
+                          'Configurar ticket SUNAT',
+                          'SUNAT ticket settings',
+                        ),
+                        subtitle: l(
+                          'Formato ${_format.label(false).toLowerCase()}. '
+                              'El ancho sigue a la impresora.',
+                          '${_format.label(true)} format. '
+                              'Width follows the printer.',
+                        ),
+                        onTap: _printing ? null : _openSunatSettings,
+                      ),
+                      if (_adsFree)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                          child: TextField(
+                            controller: _noteController,
+                            enabled: !_printing,
+                            maxLength: SunatPrintSettings.maxNoteLength,
+                            maxLines: 3,
+                            textCapitalization: TextCapitalization.sentences,
+                            onChanged: (value) {
+                              _noteDirty = value != _loadedNote;
+                            },
+                            decoration: InputDecoration(
+                              labelText: l('Nota del ticket', 'Ticket note'),
+                              helperText: l(
+                                'Se imprime al pie. Solo cambia este ticket.',
+                                'Printed at the bottom. Only for this ticket.',
+                              ),
+                              alignLabelWithHint: true,
+                            ),
+                          ),
+                        )
+                      else
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: RedPosPaidGateBanner(
+                            store: widget.printerStore,
+                            onUnlocked: _load,
+                            compact: true,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
             ),
     );
   }
+}
 
-  bool _isXmlLike(String name) => _isSunatPath(name);
+class _FileKind {
+  const _FileKind(this.icon, this.color, this.es, this.en);
+
+  final IconData icon;
+  final Color color;
+  final String es;
+  final String en;
+
+  String label(L l) => l(es, en);
+}
+
+_FileKind _fileKind(String name) {
+  final lower = name.toLowerCase();
+  if (lower.endsWith('.xml') || lower.endsWith('.zip')) {
+    return const _FileKind(
+      Icons.receipt_long_outlined,
+      AppColors.brand,
+      'Comprobante SUNAT, se arma como ticket',
+      'SUNAT receipt, printed as a ticket',
+    );
+  }
+  if (lower.endsWith('.pdf')) {
+    return const _FileKind(
+      Icons.picture_as_pdf_outlined,
+      Color(0xFFB3261E),
+      'Documento PDF',
+      'PDF document',
+    );
+  }
+  return const _FileKind(
+    Icons.image_outlined,
+    AppColors.bluetooth,
+    'Imagen',
+    'Image',
+  );
 }
 
 bool _isSunatPath(String path) {

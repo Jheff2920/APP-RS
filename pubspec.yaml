@@ -1,7 +1,7 @@
 name: hello_world_app
 description: Controlador Android e iOS de impresoras termicas (Bluetooth, WiFi y USB) para boletas.
 publish_to: "none"
-version: 1.8.8+50
+version: 1.8.8+51
 
 environment:
   sdk: ^3.5.0
@@ -46,3 +46,5 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/brand/rs_mark.png

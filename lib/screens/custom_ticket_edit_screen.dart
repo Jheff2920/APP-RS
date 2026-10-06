@@ -12,7 +12,9 @@ import '../services/custom_ticket/custom_ticket_store.dart';
 import '../services/print_service.dart';
 import '../services/printer_store.dart';
 import '../services/sunat/sunat_logo.dart';
+import '../theme.dart';
 import '../widgets/boleta_page.dart';
+import '../widgets/ui_kit.dart';
 import 'custom_ticket_preview_screen.dart';
 
 class CustomTicketEditScreen extends StatefulWidget {
@@ -360,106 +362,134 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
         appBar: AppBar(
           title: Text(l('Editar ticket', 'Edit ticket')),
           actions: [
-            TextButton(
+            TextButton.icon(
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
               onPressed: _loading || _saving ? null : _preview,
-              child: Text(l('Vista previa', 'Preview')),
+              icon: const Icon(Icons.visibility_outlined, size: 20),
+              label: Text(l('Vista previa', 'Preview')),
             ),
+            const SizedBox(width: 4),
           ],
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : BoletaPage(
+                maxContentWidth: 640,
                 bottomBar: SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
                     onPressed: _saving ? null : _saveAndClose,
-                    icon: const Icon(Icons.save_outlined),
+                    icon: const Icon(Icons.check_rounded),
                     label: Text(l('Guardar', 'Save')),
                   ),
                 ),
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
                   children: [
-                    TextField(
-                      key: const ValueKey('template-name'),
-                      controller: _nameCtrl,
-                      maxLength: CustomTicketTemplate.maxNameLength,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        labelText: l('Nombre de la plantilla', 'Template name'),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      l('Logo', 'Logo'),
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(l('Mostrar logo', 'Show logo')),
-                      value: _showLogo && _logo != null,
-                      onChanged: _logo == null
-                          ? null
-                          : (v) {
-                              setState(() => _showLogo = v);
-                              unawaited(_persist());
-                            },
-                    ),
-                    if (_logo != null) ...[
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Image.memory(
-                            _logo!,
-                            height: 96,
-                            fit: BoxFit.contain,
+                    SectionLabel(l('Plantilla', 'Template')),
+                    Card(
+                      child: SectionBody(
+                        children: [
+                          TextField(
+                            key: const ValueKey('template-name'),
+                            controller: _nameCtrl,
+                            maxLength: CustomTicketTemplate.maxNameLength,
+                            textCapitalization: TextCapitalization.sentences,
+                            decoration: InputDecoration(
+                              labelText:
+                                  l('Nombre de la plantilla', 'Template name'),
+                              helperText: l(
+                                'Solo para ti, no se imprime.',
+                                'Only for you, not printed.',
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                    ],
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        FilledButton.tonalIcon(
-                          onPressed: _savingLogo ? null : _pickLogo,
-                          icon: _savingLogo
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.image_outlined),
-                          label: Text(l('Elegir imagen', 'Choose image')),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed:
-                              _logo == null || _savingLogo ? null : _clearLogo,
-                          icon: const Icon(Icons.hide_image_outlined),
-                          label: Text(l('Quitar logo', 'Remove logo')),
-                        ),
-                      ],
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      l('Datos de la tienda', 'Store details'),
-                      style: theme.textTheme.titleMedium,
+                    SectionLabel(l('Logo', 'Logo')),
+                    Card(
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SwitchRow(
+                            title: l('Mostrar logo', 'Show logo'),
+                            subtitle: _logo == null
+                                ? l('Primero elige una imagen.', 'Pick an image first.')
+                                : null,
+                            value: _showLogo && _logo != null,
+                            onChanged: _logo == null
+                                ? null
+                                : (v) {
+                                    setState(() => _showLogo = v);
+                                    unawaited(_persist());
+                                  },
+                          ),
+                          const Divider(height: 1),
+                          SectionBody(
+                            children: [
+                              if (_logo != null) ...[
+                                Container(
+                                  height: 110,
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.background,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: AppColors.line),
+                                  ),
+                                  child: Image.memory(
+                                    _logo!,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                              ],
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: FilledButton.tonalIcon(
+                                      onPressed:
+                                          _savingLogo ? null : _pickLogo,
+                                      icon: _savingLogo
+                                          ? const ButtonSpinner()
+                                          : const Icon(Icons.image_outlined),
+                                      label: Text(
+                                        l('Elegir imagen', 'Choose image'),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: _logo == null || _savingLogo
+                                          ? null
+                                          : _clearLogo,
+                                      icon: const Icon(
+                                        Icons.hide_image_outlined,
+                                      ),
+                                      label: Text(l('Quitar', 'Remove')),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 8),
+                    SectionLabel(l('Datos de la tienda', 'Store details')),
+                    Card(
+                      child: SectionBody(
+                        children: [
                     TextField(
                       key: const ValueKey('company-name'),
                       controller: _companyNameCtrl,
                       maxLength: CustomTicketTemplate.maxCompanyNameLength,
                       textCapitalization: TextCapitalization.characters,
                       decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
                         labelText: l('Nombre de la tienda / empresa',
                             'Store / company name'),
                         helperText: l(
@@ -474,7 +504,6 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                       maxLength: CustomTicketTemplate.maxRucLength,
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
                         labelText: l('RUC', 'Tax ID (RUC)'),
                         helperText: l(
                           'Se imprime como RUC: ... centrado.',
@@ -489,7 +518,6 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                       maxLines: 2,
                       textCapitalization: TextCapitalization.sentences,
                       decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
                         labelText:
                             l('Dirección / ubicación', 'Address / location'),
                         alignLabelWithHint: true,
@@ -499,49 +527,78 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            l('Líneas', 'Lines'),
-                            style: theme.textTheme.titleMedium,
-                          ),
-                        ),
-                        PopupMenuButton<CustomTicketLineType>(
-                          tooltip: l('Agregar línea', 'Add line'),
-                          onSelected: _addLine,
-                          itemBuilder: (ctx) {
-                            final loc = L.of(ctx);
-                            return [
-                              PopupMenuItem(
-                                value: CustomTicketLineType.text,
-                                child: Text(loc('Línea libre', 'Free line')),
-                              ),
-                              PopupMenuItem(
-                                value: CustomTicketLineType.item,
-                                child: Text(loc('Ítem', 'Item')),
-                              ),
-                            ];
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.add, size: 20),
-                                const SizedBox(width: 6),
-                                Text(l('Agregar', 'Add')),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 8),
+                    SectionLabel(
+                      l('Contenido', 'Content'),
+                      padding: const EdgeInsets.fromLTRB(4, 14, 0, 4),
+                      trailing: PopupMenuButton<CustomTicketLineType>(
+                        tooltip: l('Agregar línea', 'Add line'),
+                        onSelected: _addLine,
+                        itemBuilder: (ctx) {
+                          final loc = L.of(ctx);
+                          return [
+                            PopupMenuItem(
+                              value: CustomTicketLineType.item,
+                              child: ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: const Icon(Icons.shopping_bag_outlined),
+                                title: Text(loc('Producto', 'Product')),
+                                subtitle: Text(
+                                  loc('Cantidad, precio e importe', 'Qty, price and amount'),
+                                ),
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: CustomTicketLineType.text,
+                              child: ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: const Icon(Icons.short_text_rounded),
+                                title: Text(loc('Texto libre', 'Free text')),
+                                subtitle: Text(
+                                  loc('Un mensaje o separador', 'A message or divider'),
+                                ),
+                              ),
+                            ),
+                          ];
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.add_rounded,
+                                size: 20,
+                                color: theme.colorScheme.primary,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                l('Agregar línea', 'Add line'),
+                                style: TextStyle(
+                                  color: theme.colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (_lines.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: InfoNote(
+                          text: l(
+                            'Agrega productos o texto con "Agregar línea".',
+                            'Add products or text with "Add line".',
+                          ),
+                        ),
+                      ),
                     for (var i = 0; i < _lines.length; i++)
                       _LineEditor(
                         key: ValueKey(_lines[i].id),
@@ -553,31 +610,31 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                                 recomputeAmount: recomputeAmount),
                         onRemove: () => _removeLine(i),
                       ),
-                    const SizedBox(height: 16),
-                    Text(
-                      l('Totales', 'Totals'),
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(l('Mostrar totales', 'Show totals')),
+                    SectionLabel(l('Totales', 'Totals')),
+                    Card(
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                    SwitchRow(
+                      title: l('Mostrar totales', 'Show totals'),
                       value: _showTotals,
                       onChanged: (v) => setState(() => _showTotals = v),
                     ),
                     if (_showTotals) ...[
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(l('Incluir IGV', 'Include IGV')),
-                        subtitle: Text(
-                          l(
-                            'Desactiva si tu negocio no cobra IGV.',
-                            'Turn off if your business does not charge IGV.',
-                          ),
-                          style: theme.textTheme.bodySmall,
+                      const Divider(height: 1),
+                      SwitchRow(
+                        title: l('Incluir IGV', 'Include IGV'),
+                        subtitle: l(
+                          'Desactiva si tu negocio no cobra IGV.',
+                          'Turn off if your business does not charge IGV.',
                         ),
                         value: _includeIgv,
                         onChanged: _setIncludeIgv,
                       ),
+                      const Divider(height: 1),
+                      SectionBody(
+                        children: [
                       Text(
                         _includeIgv
                             ? l(
@@ -610,7 +667,6 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                               child: TextField(
                                 controller: _currencyCtrl,
                                 decoration: InputDecoration(
-                                  border: const OutlineInputBorder(),
                                   labelText: l('Moneda', 'Currency'),
                                 ),
                               ),
@@ -621,7 +677,6 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                               child: TextField(
                                 controller: _subtotalLabelCtrl,
                                 decoration: InputDecoration(
-                                  border: const OutlineInputBorder(),
                                   labelText:
                                       l('Etiqueta subtotal', 'Subtotal label'),
                                 ),
@@ -636,7 +691,6 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                               decimal: true),
                           onChanged: (_) => _onTotalsManualEdit(),
                           decoration: InputDecoration(
-                            border: const OutlineInputBorder(),
                             labelText: l('Op. Gravada', 'Taxable ops'),
                             helperText: _totalsManual
                                 ? l('Editado manualmente', 'Manually edited')
@@ -650,7 +704,6 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                               child: TextField(
                                 controller: _taxLabelCtrl,
                                 decoration: InputDecoration(
-                                  border: const OutlineInputBorder(),
                                   labelText:
                                       l('Etiqueta impuesto', 'Tax label'),
                                 ),
@@ -665,7 +718,6 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                                         decimal: true),
                                 onChanged: (_) => _onTotalsManualEdit(),
                                 decoration: InputDecoration(
-                                  border: const OutlineInputBorder(),
                                   labelText: l('IGV 18%', 'VAT 18%'),
                                 ),
                               ),
@@ -677,7 +729,6 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                         TextField(
                           controller: _currencyCtrl,
                           decoration: InputDecoration(
-                            border: const OutlineInputBorder(),
                             labelText: l('Moneda', 'Currency'),
                           ),
                         ),
@@ -689,7 +740,6 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                             child: TextField(
                               controller: _totalLabelCtrl,
                               decoration: InputDecoration(
-                                border: const OutlineInputBorder(),
                                 labelText: l('Etiqueta total', 'Total label'),
                               ),
                             ),
@@ -703,7 +753,6 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                                       decimal: true),
                               onChanged: (_) => _onTotalsManualEdit(),
                               decoration: InputDecoration(
-                                border: const OutlineInputBorder(),
                                 labelText: l('Total', 'Total'),
                                 helperText: !_includeIgv && _totalsManual
                                     ? l('Editado manualmente',
@@ -714,63 +763,82 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                           ),
                         ],
                       ),
+                        ],
+                      ),
                     ],
-                    const SizedBox(height: 24),
-                    Text(
-                      l('Códigos', 'Codes'),
-                      style: theme.textTheme.titleMedium,
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(l('Código QR', 'QR code')),
-                      value: _showQr,
-                      onChanged: (v) => setState(() => _showQr = v),
-                    ),
-                    if (_showQr)
-                      TextField(
-                        controller: _qrCtrl,
-                        maxLength: CustomTicketTemplate.maxCodeLength,
-                        decoration: InputDecoration(
-                          border: const OutlineInputBorder(),
-                          labelText: l('Datos del QR', 'QR payload'),
-                        ),
+                        ],
                       ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(l('Código de barras', 'Barcode')),
-                      subtitle: Text(
-                        l(
-                          'Code 128. Usa letras y números.',
-                          'Code 128. Use letters and numbers.',
-                        ),
-                      ),
-                      value: _showBarcode,
-                      onChanged: (v) => setState(() => _showBarcode = v),
                     ),
-                    if (_showBarcode)
-                      TextField(
-                        controller: _barcodeCtrl,
-                        maxLength: CustomTicketTemplate.maxCodeLength,
-                        decoration: InputDecoration(
-                          border: const OutlineInputBorder(),
-                          labelText: l('Datos del código', 'Barcode payload'),
-                        ),
+                    SectionLabel(l('Códigos', 'Codes')),
+                    Card(
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SwitchRow(
+                            title: l('Código QR', 'QR code'),
+                            value: _showQr,
+                            onChanged: (v) => setState(() => _showQr = v),
+                          ),
+                          if (_showQr)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                              child: TextField(
+                                controller: _qrCtrl,
+                                maxLength: CustomTicketTemplate.maxCodeLength,
+                                decoration: InputDecoration(
+                                  labelText: l('Datos del QR', 'QR payload'),
+                                  hintText: l(
+                                    'Ej.: un enlace o tu número de Yape',
+                                    'E.g. a link or a phone number',
+                                  ),
+                                ),
+                              ),
+                            ),
+                          const Divider(height: 1),
+                          SwitchRow(
+                            title: l('Código de barras', 'Barcode'),
+                            subtitle: l(
+                              'Code 128. Usa letras y números.',
+                              'Code 128. Use letters and numbers.',
+                            ),
+                            value: _showBarcode,
+                            onChanged: (v) => setState(() => _showBarcode = v),
+                          ),
+                          if (_showBarcode)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                              child: TextField(
+                                controller: _barcodeCtrl,
+                                maxLength: CustomTicketTemplate.maxCodeLength,
+                                decoration: InputDecoration(
+                                  labelText:
+                                      l('Datos del código', 'Barcode payload'),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                    const SizedBox(height: 16),
-                    Text(
-                      l('Pie de ticket', 'Footer'),
-                      style: theme.textTheme.titleMedium,
                     ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _footerCtrl,
-                      maxLength: CustomTicketTemplate.maxFooterLength,
-                      maxLines: 3,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        labelText: l('Nota al pie', 'Footer note'),
-                        alignLabelWithHint: true,
+                    SectionLabel(l('Pie de ticket', 'Footer')),
+                    Card(
+                      child: SectionBody(
+                        children: [
+                          TextField(
+                            controller: _footerCtrl,
+                            maxLength: CustomTicketTemplate.maxFooterLength,
+                            maxLines: 3,
+                            textCapitalization: TextCapitalization.sentences,
+                            decoration: InputDecoration(
+                              labelText: l('Nota al pie', 'Footer note'),
+                              hintText: l(
+                                'Ej.: Gracias por su compra',
+                                'E.g. Thank you for your purchase',
+                              ),
+                              alignLabelWithHint: true,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -901,31 +969,44 @@ class _LineEditorState extends State<_LineEditor> {
     final l = L.of(context);
     final id = line.id;
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 4, 12),
+        padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
+                Icon(
+                  line.isItem
+                      ? Icons.shopping_bag_outlined
+                      : Icons.short_text_rounded,
+                  size: 18,
+                  color: AppColors.inkSoft,
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     line.isItem
-                        ? l('Ítem ${widget.index + 1}',
-                            'Item ${widget.index + 1}')
-                        : l('Línea ${widget.index + 1}',
-                            'Line ${widget.index + 1}'),
-                    style: Theme.of(context).textTheme.titleSmall,
+                        ? l('Producto ${widget.index + 1}',
+                            'Product ${widget.index + 1}')
+                        : l('Texto ${widget.index + 1}',
+                            'Text ${widget.index + 1}'),
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(color: AppColors.inkSoft),
                   ),
                 ),
                 IconButton(
                   tooltip: l('Eliminar', 'Delete'),
                   onPressed: widget.onRemove,
-                  icon: const Icon(Icons.delete_outline),
+                  color: AppColors.inkSoft,
+                  icon: const Icon(Icons.delete_outline_rounded),
                 ),
               ],
             ),
+            const SizedBox(height: 4),
             if (line.isItem) ...[
               Row(
                 children: [
@@ -939,7 +1020,6 @@ class _LineEditorState extends State<_LineEditor> {
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
                         labelText: l('Cant.', 'Qty'),
                         isDense: true,
                       ),
@@ -953,7 +1033,6 @@ class _LineEditorState extends State<_LineEditor> {
                       focusNode: _textFocus,
                       onChanged: (_) => _emit(),
                       decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
                         labelText: l('Descripción', 'Description'),
                         isDense: true,
                       ),
@@ -973,7 +1052,6 @@ class _LineEditorState extends State<_LineEditor> {
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
                         labelText: widget.includeIgv
                             ? l('P.U. (sin IGV)', 'Unit (ex-IGV)')
                             : l('P.U.', 'Unit'),
@@ -991,7 +1069,6 @@ class _LineEditorState extends State<_LineEditor> {
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
                         labelText: widget.includeIgv
                             ? l('Importe (sin IGV)', 'Amount (ex-IGV)')
                             : l('Importe', 'Amount'),
@@ -1009,11 +1086,11 @@ class _LineEditorState extends State<_LineEditor> {
                 maxLines: 2,
                 onChanged: (_) => _emit(),
                 decoration: InputDecoration(
-                  border: const OutlineInputBorder(),
                   labelText: l('Texto', 'Text'),
                   isDense: true,
                 ),
               ),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   FilterChip(

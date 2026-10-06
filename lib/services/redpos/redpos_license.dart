@@ -109,9 +109,6 @@ class RedPosLicenseStore {
     if (raw == null || raw.isEmpty) return null;
     final token = RedPosLicenseToken.tryDecode(raw);
     if (token == null || token.nonce.isEmpty) return null;
-    if (token.nonce == 'TESTALIAS') {
-      return RedPosConfig.allowTestCodes ? token : null;
-    }
     // El nonce fue firmado al canjear; no confiamos en un bool suelto.
     if (token.nonce.length != 8) return null;
     return token;
@@ -152,7 +149,7 @@ class RedPosLicenseStore {
     }
 
     final api = RedPosConfig.apiBase.trim();
-    if (api.isNotEmpty && !verified.testAlias) {
+    if (api.isNotEmpty) {
       try {
         final accepted = await _activateOnServer(
           api,
@@ -184,7 +181,7 @@ class RedPosLicenseStore {
     } else {
       final prefs = await _ensurePrefs();
       final used = prefs.getStringList(_usedKey) ?? [];
-      if (!verified.testAlias && used.contains(verified.nonce)) {
+      if (used.contains(verified.nonce)) {
         return RedPosRedeemResult(
           ok: false,
           adsFree: false,
@@ -194,9 +191,7 @@ class RedPosLicenseStore {
           ),
         );
       }
-      if (!verified.testAlias) {
-        await prefs.setStringList(_usedKey, [...used, verified.nonce!]);
-      }
+      await prefs.setStringList(_usedKey, [...used, verified.nonce!]);
     }
 
     await _saveToken(

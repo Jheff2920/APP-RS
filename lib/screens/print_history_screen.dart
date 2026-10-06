@@ -1,11 +1,13 @@
+import 'dart:ui' show FontFeature;
+
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 
 import '../l10n/app_lang.dart';
 import '../models/print_job_record.dart';
 import '../models/saved_printer.dart';
 import '../services/print_history_store.dart';
-import '../widgets/boleta_page.dart';
+import '../theme.dart';
+import '../widgets/ui_kit.dart';
 
 class PrintHistoryScreen extends StatefulWidget {
   const PrintHistoryScreen({
@@ -66,6 +68,7 @@ class _PrintHistoryScreenState extends State<PrintHistoryScreen> {
               child: Text(loc('Cancelar', 'Cancel')),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
               onPressed: () => Navigator.pop(ctx, true),
               child: Text(loc('Borrar', 'Clear')),
             ),
@@ -95,56 +98,135 @@ class _PrintHistoryScreenState extends State<PrintHistoryScreen> {
           IconButton(
             tooltip: l('Borrar historial', 'Clear history'),
             onPressed: _jobs.isEmpty ? null : _clear,
-            icon: const Icon(Icons.delete_outline),
+            icon: const Icon(Icons.delete_sweep_outlined),
           ),
         ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : BoletaPage(
-              child: _jobs.isEmpty
-                  ? Center(
+          : _jobs.isEmpty
+              ? Center(
+                  child: SingleChildScrollView(
+                    child: EmptyMessage(
+                      icon: Icons.history_rounded,
+                      title: l('Aún no hay impresiones', 'No prints yet'),
+                      body: l(
+                        'Aquí aparecerá cada ticket que imprimas, con la hora '
+                            'y si salió bien.',
+                        'Every ticket you print will show up here, with the '
+                            'time and whether it worked.',
+                      ),
+                    ),
+                  ),
+                )
+              : _groupedList(context),
+    );
+  }
+
+  Widget _groupedList(BuildContext context) {
+    final days = <String, List<PrintJobRecord>>{};
+    for (final j in _jobs) {
+      days.putIfAbsent(dayHeading(context, j.createdAt), () => []).add(j);
+    }
+    return PageList(
+      children: [
+        for (final entry in days.entries) ...[
+          SectionLabel(entry.key),
+          SectionGroup(
+            dividerIndent: 68,
+            children: [
+              for (final j in entry.value)
+                RepaintBoundary(child: _JobRow(job: j)),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _JobRow extends StatelessWidget {
+  const _JobRow({required this.job});
+
+  final PrintJobRecord job;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = L.of(context);
+    final tt = Theme.of(context).textTheme;
+    final (icon, color) = switch (job.status) {
+      PrintJobStatus.success => (Icons.check_rounded, AppColors.ok),
+      PrintJobStatus.failed => (Icons.close_rounded, const Color(0xFFB3261E)),
+      PrintJobStatus.queued => (Icons.schedule_rounded, AppColors.warn),
+    };
+    final source = switch (job.source) {
+      'share' => l('Archivo', 'File'),
+      'test' => l('Prueba', 'Test'),
+      'custom_ticket' => l('Ticket propio', 'Custom ticket'),
+      'system' || 'system-headless' => l('Imprimir de Android', 'Android print'),
+      _ => l('App', 'App'),
+    };
+    final error = job.error?.trim();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 16, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          IconTile(icon: icon, color: color, size: 40),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
                       child: Text(
-                        l(
-                          'Sin trabajos de impresión todavía.',
-                          'No print jobs yet.',
+                        job.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: tt.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          height: 1.25,
                         ),
                       ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(16),
-                      scrollCacheExtent: const ScrollCacheExtent.pixels(280),
-                      itemCount: _jobs.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        final j = _jobs[index];
-                        final icon = switch (j.status) {
-                          PrintJobStatus.success => Icons.check_circle,
-                          PrintJobStatus.failed => Icons.error,
-                          PrintJobStatus.queued => Icons.hourglass_bottom,
-                        };
-                        final color = switch (j.status) {
-                          PrintJobStatus.success => Colors.green,
-                          PrintJobStatus.failed => Colors.red,
-                          PrintJobStatus.queued => Colors.orange,
-                        };
-                        return Card(
-                          child: RepaintBoundary(
-                            child: ListTile(
-                              leading: Icon(icon, color: color),
-                              title: Text(j.title),
-                              subtitle: Text(
-                                '${j.printerName}\n'
-                                '${j.status.label} · ${j.source} · '
-                                '${j.createdAt.toLocal()}',
-                              ),
-                              isThreeLine: true,
-                            ),
-                          ),
-                        );
-                      },
                     ),
+                    const SizedBox(width: 10),
+                    Text(
+                      shortTime(context, job.createdAt),
+                      style: tt.bodySmall?.copyWith(
+                        color: AppColors.inkSoft,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  job.printerName.isEmpty
+                      ? '${job.status.label}, $source'
+                      : '${job.printerName}, $source',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: tt.bodySmall?.copyWith(color: AppColors.inkSoft),
+                ),
+                if (job.status == PrintJobStatus.failed &&
+                    error != null &&
+                    error.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    error,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: tt.bodySmall?.copyWith(color: color),
+                  ),
+                ],
+              ],
             ),
+          ),
+        ],
+      ),
     );
   }
 }

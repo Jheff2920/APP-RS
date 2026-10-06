@@ -1,14 +1,13 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
 import '../l10n/app_lang.dart';
 import '../services/printer_store.dart';
 import '../services/redpos/redpos_license.dart';
 import '../services/redpos/redpos_play_billing.dart';
+import '../theme.dart';
 import '../widgets/redpos_unlock_actions.dart';
+import '../widgets/ui_kit.dart';
 
 class RedPosSubscribeScreen extends StatefulWidget {
   const RedPosSubscribeScreen({super.key, required this.store});
@@ -141,119 +140,112 @@ class _RedPosSubscribeScreenState extends State<RedPosSubscribeScreen> {
     final theme = Theme.of(context);
     final l = L.of(context);
     final price = _product?.price;
+    Widget perk(String text) => Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.check_rounded, size: 20, color: AppColors.ok),
+              const SizedBox(width: 10),
+              Expanded(child: Text(text, style: theme.textTheme.bodyMedium)),
+            ],
+          ),
+        );
+
     return Scaffold(
       appBar: AppBar(
         title: Text(l('Suscripción mensual', 'Monthly subscription')),
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return Align(
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              width: math.min(600, constraints.maxWidth),
-              height: constraints.maxHeight,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                scrollCacheExtent: const ScrollCacheExtent.pixels(280),
+      body: PageList(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: IconTile(icon: Icons.verified_outlined, size: 52),
+                  ),
+                  const SizedBox(height: 14),
                   Text(
-                    l(
-                      'Google Play cobra con la cuenta que ya está en este aparato '
-                      '(la misma con la que instalaste la prueba). '
-                      'Para restaurar en otro teléfono, entra a Play Store con ese Gmail y pulsa Restaurar.',
-                      'Google Play charges the account already on this device '
-                      '(the same one you used to install the test). '
-                      'To restore on another phone, open Play Store with that Gmail and tap Restore.',
-                    ),
-                    style: theme.textTheme.bodyMedium,
+                    l('RedPOS Service sin publicidad', 'RedPOS Service ad-free'),
+                    style: theme.textTheme.headlineSmall,
                   ),
-                  const SizedBox(height: 16),
-                  Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.verified_outlined),
-                      title: Text(
-                        l(
-                          'RedPOS Service sin publicidad',
-                          'RedPOS Service ad-free',
-                        ),
-                      ),
-                      subtitle: Text(
-                        price == null
-                            ? l(
-                                'Precio mensual (se muestra al publicar el producto en Play)',
-                                'Monthly price (shown when the Play product is live)',
-                              )
-                            : l(
-                                '$price al mes, cobrado por Google Play',
-                                '$price per month, billed by Google Play',
-                              ),
-                      ),
+                  const SizedBox(height: 4),
+                  Text(
+                    price == null
+                        ? l(
+                            'El precio aparece cuando el producto está publicado en Play.',
+                            'The price shows once the product is live in Play.',
+                          )
+                        : l(
+                            '$price al mes, cobrado por Google Play',
+                            '$price per month, billed by Google Play',
+                          ),
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: price == null ? AppColors.inkSoft : AppColors.ink,
+                      fontWeight: price == null ? null : FontWeight.w700,
                     ),
                   ),
-                  if (_email != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      l('Cuenta: $_email', 'Account: $_email'),
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ],
-                  if (_message != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      _message!,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.error,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  if (_loading)
-                    const Center(child: CircularProgressIndicator())
-                  else ...[
-                    FilledButton.icon(
-                      onPressed: _busy || _product == null ? null : _subscribe,
-                      icon: _busy
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.shopping_bag_outlined),
-                      label: Text(
-                        l(
-                          'Suscribirme con Google Play',
-                          'Subscribe with Google Play',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    OutlinedButton(
-                      onPressed: _busy ? null : _restore,
-                      child: Text(
-                        l(
-                          'Ya pagué: restaurar compra',
-                          'I already paid: restore purchase',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: _busy
-                          ? null
-                          : () => openLifetimeLicenseMail(context),
-                      child: Text(
-                        l(
-                          'Prefiero licencia de por vida',
-                          'I prefer a lifetime license',
-                        ),
-                      ),
-                    ),
-                  ],
+                  const SizedBox(height: 6),
+                  perk(l('Tickets sin pie de publicidad', 'Tickets without an ad footer')),
+                  perk(l('Logo y nota al pie en tickets SUNAT', 'Logo and footer note on SUNAT tickets')),
+                  perk(l('Tickets propios', 'Custom tickets')),
+                  perk(l('Cancelas cuando quieras desde Play Store', 'Cancel anytime from Play Store')),
                 ],
               ),
             ),
-          );
-        },
+          ),
+          if (_message != null) ...[
+            const SizedBox(height: 12),
+            InfoNote(text: _message!, tone: InfoTone.warn),
+          ],
+          const SizedBox(height: 20),
+          if (_loading)
+            const Center(child: CircularProgressIndicator())
+          else ...[
+            FilledButton.icon(
+              onPressed: _busy || _product == null ? null : _subscribe,
+              icon: _busy
+                  ? const ButtonSpinner(color: Colors.white)
+                  : const Icon(Icons.shopping_bag_outlined),
+              label: Text(
+                l('Suscribirme con Google Play', 'Subscribe with Google Play'),
+              ),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton(
+              onPressed: _busy ? null : _restore,
+              child: Text(
+                l('Ya pagué: restaurar compra', 'I already paid: restore purchase'),
+              ),
+            ),
+            const SizedBox(height: 4),
+            TextButton(
+              onPressed: _busy ? null : () => openLifetimeLicenseMail(context),
+              child: Text(
+                l('Prefiero licencia de por vida', 'I prefer a lifetime license'),
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Text(
+            [
+              if (_email != null) l('Cuenta: $_email.', 'Account: $_email.'),
+              l(
+                'Google Play cobra con la cuenta de este aparato. En otro '
+                    'teléfono, entra a Play Store con ese Gmail y pulsa Restaurar.',
+                'Google Play charges the account on this device. On another '
+                    'phone, sign in to Play Store with that Gmail and tap Restore.',
+              ),
+            ].join(' '),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(color: AppColors.inkSoft),
+          ),
+        ],
       ),
     );
   }

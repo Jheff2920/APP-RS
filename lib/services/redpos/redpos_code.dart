@@ -11,21 +11,19 @@ class RedPosCodeResult {
     required this.ok,
     this.nonce,
     this.message,
-    this.testAlias = false,
   });
 
   final bool ok;
   final String? nonce;
   final String? message;
-  final bool testAlias;
 
   static RedPosCodeResult get invalid => RedPosCodeResult._(
         ok: false,
         message: tr('Código no válido', 'Invalid code'),
       );
 
-  static RedPosCodeResult valid(String nonce, {bool testAlias = false}) {
-    return RedPosCodeResult._(ok: true, nonce: nonce, testAlias: testAlias);
+  static RedPosCodeResult valid(String nonce) {
+    return RedPosCodeResult._(ok: true, nonce: nonce);
   }
 }
 
@@ -57,11 +55,6 @@ class RedPosCode {
     return input.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
   }
 
-  static bool isTestAlias(String input) {
-    if (!RedPosConfig.allowTestCodes) return false;
-    return normalize(input) == normalize(RedPosConfig.testCode);
-  }
-
   static RedPosCodeResult verify(String input, {String? secret}) {
     final trimmed = input.trim();
     if (trimmed.isEmpty) {
@@ -72,9 +65,6 @@ class RedPosCode {
           'Enter a code or continue with ads',
         ),
       );
-    }
-    if (isTestAlias(trimmed)) {
-      return RedPosCodeResult.valid('TESTALIAS', testAlias: true);
     }
 
     var body = normalize(trimmed);
