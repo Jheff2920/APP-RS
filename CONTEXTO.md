@@ -306,6 +306,11 @@ Se quitó y se añadió `tools:node="remove"` para `READ_MEDIA_IMAGES` y `READ_M
 Ningún plugin los declara. **No volver a agregar permisos de fotos/videos.**
 Versión subida a `1.8.8+51` para el nuevo AAB.
 
+**Capturas de pago (Yape/BCP) compartidas:** `SharedIncomingFile.kt` añade la extensión según el MIME
+cuando el nombre no la trae (antes se guardaban como `sunat_*.xml` y fallaban). En Dart,
+`sniffFileKind()` (`print_service.dart`) detecta PNG/JPG/WebP/GIF/PDF/ZIP por cabecera antes del
+chequeo SUNAT. Pendiente: probar compartir desde Yape y BCP con la build +51.
+
 Gradle desde la sesión del agente falla por WinNAT (`Unable to establish loopback connection`);
 compilar desde la terminal del usuario.
 

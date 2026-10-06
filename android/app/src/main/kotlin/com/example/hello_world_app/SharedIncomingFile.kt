@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
 import android.util.Log
+import android.webkit.MimeTypeMap
 import java.io.File
 import java.io.FileOutputStream
 
@@ -24,7 +25,7 @@ object SharedIncomingFile {
             return null
         }
         val uri = uriFrom(intent) ?: return null
-        return copyUri(activity, uri)
+        return copyUri(activity, uri, intent.type)
     }
 
     private fun uriFrom(intent: Intent): Uri? {
@@ -62,9 +63,17 @@ object SharedIncomingFile {
         return clip.getItemAt(0)?.uri
     }
 
-    private fun copyUri(activity: Activity, uri: Uri): String? {
+    private fun copyUri(activity: Activity, uri: Uri, intentType: String?): String? {
         val dir = File(activity.cacheDir, DIR).apply { mkdirs() }
-        val name = displayName(activity, uri) ?: "sunat_${System.currentTimeMillis()}.xml"
+        val mime = try {
+            activity.contentResolver.getType(uri)
+        } catch (_: Exception) {
+            null
+        } ?: intentType
+        val name = withExtension(
+            displayName(activity, uri) ?: "compartido_${System.currentTimeMillis()}",
+            mime,
+        )
         val target = uniqueFile(dir, name)
         return try {
             activity.contentResolver.openInputStream(uri)?.use { input ->
@@ -105,6 +114,25 @@ object SharedIncomingFile {
             }
         }
         return if (fromPath.isNullOrBlank()) null else sanitizeName(fromPath)
+    }
+
+    private val knownExtensions = setOf(
+        "pdf", "xml", "zip", "png", "jpg", "jpeg", "webp", "gif",
+    )
+
+    // Yape, BCP y otras apps comparten capturas sin extensión en el nombre;
+    // sin esto la imagen se guardaba como .xml y no se podía imprimir.
+    private fun withExtension(name: String, mime: String?): String {
+        val current = name.substringAfterLast('.', "").lowercase()
+        if (current in knownExtensions) return name
+        val ext = when (mime?.lowercase()) {
+            null, "", "*/*", "application/octet-stream" -> null
+            "image/jpeg", "image/jpg" -> "jpg"
+            "text/xml", "application/xml" -> "xml"
+            "application/x-zip-compressed" -> "zip"
+            else -> MimeTypeMap.getSingleton().getExtensionFromMimeType(mime)
+        }
+        return if (ext.isNullOrBlank()) name else "$name.$ext"
     }
 
     private fun sanitizeName(raw: String): String {

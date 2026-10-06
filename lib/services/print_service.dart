@@ -104,7 +104,7 @@ class PrintService {
       onPhase: onPhase,
       requestPermissions: requestPermissions,
       buildBytes: (timing) async {
-        if (lower.endsWith('.pdf')) {
+        Future<List<int>> pdf() {
           if (printer.type == PrinterLinkType.network &&
               NetworkLanChannel.isSupported) {
             return timing.measure(
@@ -125,12 +125,25 @@ class PrintService {
             timing: timing,
           );
         }
-        if (_isImage(lower)) {
-          return EscPosPdfPrint.buildImageFile(
-            printer,
-            filePath: filePath,
-            timing: timing,
-          );
+
+        Future<List<int>> image() => EscPosPdfPrint.buildImageFile(
+              printer,
+              filePath: filePath,
+              timing: timing,
+            );
+
+        if (lower.endsWith('.pdf')) return pdf();
+        if (_isImage(lower)) return image();
+        // Capturas compartidas desde Yape/BCP pueden llegar sin extensión o
+        // con una equivocada: se decide por los primeros bytes.
+        switch (await sniffFileKind(filePath)) {
+          case SniffedKind.pdf:
+            return pdf();
+          case SniffedKind.image:
+            return image();
+          case SniffedKind.zip:
+          case null:
+            break;
         }
         if (await _isSunatXml(filePath) || lower.endsWith('.zip')) {
           return _buildSunatTicket(printer, filePath, noteOverride: sunatNote);
@@ -388,5 +401,39 @@ class PrintService {
         path.endsWith('.jpeg') ||
         path.endsWith('.webp') ||
         path.endsWith('.gif');
+  }
+}
+
+enum SniffedKind { pdf, image, zip }
+
+/// Tipo real del archivo según su cabecera (no según el nombre).
+Future<SniffedKind?> sniffFileKind(String path) async {
+  try {
+    final raf = await File(path).open();
+    try {
+      final h = await raf.read(12);
+      bool at(int i, List<int> sig) {
+        if (h.length < i + sig.length) return false;
+        for (var k = 0; k < sig.length; k++) {
+          if (h[i + k] != sig[k]) return false;
+        }
+        return true;
+      }
+
+      if (at(0, const [0x25, 0x50, 0x44, 0x46])) return SniffedKind.pdf;
+      if (at(0, const [0x89, 0x50, 0x4E, 0x47]) ||
+          at(0, const [0xFF, 0xD8, 0xFF]) ||
+          at(0, const [0x47, 0x49, 0x46, 0x38]) ||
+          (at(0, const [0x52, 0x49, 0x46, 0x46]) &&
+              at(8, const [0x57, 0x45, 0x42, 0x50]))) {
+        return SniffedKind.image;
+      }
+      if (at(0, const [0x50, 0x4B, 0x03, 0x04])) return SniffedKind.zip;
+      return null;
+    } finally {
+      await raf.close();
+    }
+  } catch (_) {
+    return null;
   }
 }

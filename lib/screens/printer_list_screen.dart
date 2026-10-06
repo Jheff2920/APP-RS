@@ -159,7 +159,15 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
     try {
       final picked = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: const ['pdf', 'xml', 'zip', 'png', 'jpg', 'jpeg'],
+        allowedExtensions: const [
+          'pdf',
+          'xml',
+          'zip',
+          'png',
+          'jpg',
+          'jpeg',
+          'webp',
+        ],
       );
       final path = picked?.files.single.path;
       if (path == null || path.isEmpty || !mounted) return;
