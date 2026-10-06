@@ -16,6 +16,7 @@ import '../services/redpos/redpos_license.dart';
 import '../services/transports/printer_transport.dart';
 import '../widgets/boleta_page.dart';
 import '../widgets/print_status_dialog.dart';
+import '../widgets/printer_card.dart';
 import '../widgets/redpos_ad_banner.dart';
 import 'help_screen.dart';
 import 'print_history_screen.dart';
@@ -443,43 +444,12 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
             separatorBuilder: (_, __) => const SizedBox(height: 8),
             itemBuilder: (context, index) {
               final p = _printers[index];
-              final busy = _busyId == p.id;
-              return Card(
-                child: RepaintBoundary(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      child: Icon(
-                        p.type == PrinterLinkType.bluetooth
-                            ? Icons.bluetooth
-                            : p.type == PrinterLinkType.usb
-                                ? Icons.usb
-                                : Icons.wifi,
-                      ),
-                    ),
-                    title: Text(p.name),
-                    subtitle: Text(
-                      [
-                        if (p.isDefault) L.of(context)('Predeterminada', 'Default'),
-                        p.type.label,
-                        p.paper.label,
-                        if (!_adsFree) L.of(context)('con publicidad', 'with ads'),
-                      ].join(' · '),
-                    ),
-                    trailing: busy
-                        ? const SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: RepaintBoundary(
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          )
-                        : IconButton(
-                            tooltip: L.of(context)('Opciones', 'Options'),
-                            icon: const Icon(Icons.more_vert),
-                            onPressed: () => _showPrinterActions(p),
-                          ),
-                    onTap: () => _showPrinterActions(p),
-                  ),
+              return RepaintBoundary(
+                child: PrinterCard(
+                  printer: p,
+                  busy: _busyId == p.id,
+                  onTestPrint: () => _testPrint(p),
+                  onOptions: () => _showPrinterActions(p),
                 ),
               );
             },
@@ -513,17 +483,12 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
           IconButton(
             tooltip: l('Abrir archivo', 'Open file'),
             onPressed: _openSharedFile,
-            icon: const Icon(Icons.folder_open),
+            icon: const Icon(Icons.folder_open_outlined),
           ),
           IconButton(
             tooltip: l('Historial', 'History'),
             onPressed: () => _openHistory(),
             icon: const Icon(Icons.history),
-          ),
-          IconButton(
-            tooltip: l('Actualizar', 'Refresh'),
-            onPressed: _loading ? null : _reload,
-            icon: const Icon(Icons.refresh),
           ),
           PopupMenuButton<String>(
             tooltip: l('Ayuda y legal', 'Help and legal'),
@@ -636,35 +601,42 @@ class _EmptyState extends StatelessWidget {
     return BoletaPage(
       child: LayoutBuilder(
         builder: (context, constraints) {
+          final cs = Theme.of(context).colorScheme;
+          final tt = Theme.of(context).textTheme;
           final body = Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+            padding: const EdgeInsets.fromLTRB(32, 40, 32, 32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.print_disabled,
-                  size: 64,
-                  color: Theme.of(context).colorScheme.outline,
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: cs.primaryContainer,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Icon(Icons.print_outlined,
+                      size: 40, color: cs.primary),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 Text(
-                  l('Sin impresoras vinculadas', 'No printers paired'),
-                  style: Theme.of(context).textTheme.titleLarge,
+                  l(
+                    "Agrega tu primera impresora",
+                    "Add your first printer",
+                  ),
+                  style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   l(
-                    'Vincula una impresora térmica ($types). '
-                    'El historial de trabajos se ve en el icono de reloj o en las opciones de cada impresora.\n\n'
-                    '${showUsb ? 'También puedes compartir un PDF hacia esta app desde otras apps.' : 'En iPhone/iPad imprime por WiFi (TCP 9100). Abre un PDF, XML o ZIP SUNAT con el botón de carpeta.'}',
-                    'Pair a thermal printer ($types). '
-                    'Job history is in the clock icon or each printer’s options.\n\n'
-                    '${showUsb ? 'You can also share a PDF to this app from other apps.' : 'On iPhone/iPad print over WiFi (TCP 9100). Open a PDF, XML, or SUNAT ZIP with the folder button.'}',
+                    "Conecta una impresora termica por $types.\nLuego podras imprimir boletas, facturas y tickets con un solo toque.",
+                    "Connect a thermal printer via $types.\nThen print receipts and tickets with a single tap.",
                   ),
+                  style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
                 FilledButton.icon(
                   onPressed: onAdd,
                   icon: const Icon(Icons.add_link),
