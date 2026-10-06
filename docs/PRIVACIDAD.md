@@ -26,7 +26,10 @@ Contacto: jcefe.2920@gmail.com
 **Hacia RedPOS:** solo canje de código de activación cuando la API está configurada  
 (código + identificador opcional de impresora). **No** se sube PDF/imagen/XML de la boleta.
 
-**No usamos:** Firebase, Crashlytics, Google Analytics, AdMob ni tracking publicitario.  
+**No incluimos** SDK de Firebase, Crashlytics, Google Analytics ni AdMob, ni tracking publicitario.  
+Los servicios de Google que sí usa la app (Google Play Billing y Google Sign-In) pueden enviar a Google
+telemetría técnica propia de esos servicios (p. ej. diagnóstico de la librería de facturación), regida por
+la política de privacidad de Google.  
 La publicidad en pantalla y pie de papel es de primera parte (RedPOS).
 
 ## 3. Inteligencia artificial

@@ -150,8 +150,12 @@ class LegalCopy {
           'Hacia RedPOS: solo el canje de un código de activación cuando hay API '
           'configurada (código + dato opcional de impresora). No subimos el PDF, la '
           'imagen ni el XML/ZIP de la boleta a un servidor de RedPOS para imprimir.\n\n'
-          'No usamos Firebase, Crashlytics, Google Analytics, AdMob ni kits de '
-          'seguimiento publicitario. No hay cuenta RedPOS obligatoria para imprimir.',
+          'La app no incluye SDK de Firebase, Crashlytics, Google Analytics ni AdMob, '
+          'ni kits de seguimiento publicitario. Los servicios de Google que sí usa '
+          '(Google Play Billing y Google Sign-In) pueden enviar a Google telemetría '
+          'técnica propia de esos servicios (p. ej. diagnóstico de la librería de '
+          'facturación), regida por la política de privacidad de Google. '
+          'No hay cuenta RedPOS obligatoria para imprimir.',
           'On device (local): paired printers (name, type, Bluetooth/MAC, IP, USB), '
           'margins and cut, local job history, custom ticket templates (incl. logos), '
           'SUNAT ticket settings and logo, license/code pass, Play subscription status, '
@@ -159,8 +163,11 @@ class LegalCopy {
           'To RedPOS: only activation-code redemption when an API is configured '
           '(code + optional printer id). We do not upload the receipt PDF, image, or '
           'XML/ZIP to a RedPOS server to print.\n\n'
-          'We do not use Firebase, Crashlytics, Google Analytics, AdMob, or ad-tracking '
-          'SDKs. No RedPOS account is required to print.',
+          'The app does not include Firebase, Crashlytics, Google Analytics, AdMob, or '
+          'ad-tracking SDKs. The Google services it does use (Google Play Billing and '
+          'Google Sign-In) may send Google technical telemetry of their own (e.g. '
+          'billing library diagnostics), governed by Google’s privacy policy. '
+          'No RedPOS account is required to print.',
         ),
       ),
       LegalSection(
@@ -190,7 +197,9 @@ class LegalCopy {
           '• Plugins locales de impresión: Bluetooth, USB, red TCP :9100, PDF/imagen '
           '(esc_pos_utils_plus, print_bluetooth_thermal, pdfx, image, etc.).\n'
           '• SharedPreferences — almacenamiento local.\n'
-          'No hay AdMob, Firebase ni analítica de terceros.',
+          'No hay AdMob ni SDK de Firebase ni analítica de terceros propia de la app. '
+          'Google Play Billing y Google Sign-In pueden enviar telemetría técnica a '
+          'Google (ver sección 2).',
           'Services and SDKs that may be involved depending on use:\n'
           '• Google Play Billing (in_app_purchase) — monthly subscription '
           '${RedPosConfig.playMonthlyProductId}.\n'
@@ -202,7 +211,9 @@ class LegalCopy {
           '• Local print plugins: Bluetooth, USB, TCP :9100, PDF/image '
           '(esc_pos_utils_plus, print_bluetooth_thermal, pdfx, image, etc.).\n'
           '• SharedPreferences — local storage.\n'
-          'No AdMob, Firebase, or third-party analytics.',
+          'No AdMob, Firebase SDK, or app-level third-party analytics. '
+          'Google Play Billing and Google Sign-In may send technical telemetry to '
+          'Google (see section 2).',
         ),
       ),
       LegalSection(
@@ -275,11 +286,13 @@ class LegalCopy {
           'Local: impresoras, historial, plantillas, logos, ajustes SUNAT, licencia. '
           'RedPOS: solo canje de código (si hay API). Google: solo si te suscribes. '
           'Tickets PDF/XML/imagen no se suben a RedPOS para imprimir. '
-          'Sin AdMob, Firebase ni analítica de terceros.',
+          'Sin AdMob, SDK de Firebase ni analítica de terceros propia; los servicios '
+          'de Google (Play Billing, Sign-In) pueden enviar telemetría técnica a Google.',
           'Local: printers, history, templates, logos, SUNAT settings, license. '
           'RedPOS: code redemption only (if API enabled). Google: only if you subscribe. '
           'PDF/XML/image tickets are not uploaded to RedPOS to print. '
-          'No AdMob, Firebase, or third-party analytics.',
+          'No AdMob, Firebase SDK, or app-level third-party analytics; Google services '
+          '(Play Billing, Sign-In) may send technical telemetry to Google.',
         ),
       ),
       LegalSection(

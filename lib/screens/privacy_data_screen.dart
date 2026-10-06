@@ -163,11 +163,15 @@ class _PrivacyDataScreenState extends State<PrivacyDataScreen> {
                   'Google Play Billing, Google Sign-In (solo al suscribirte), '
                       'API de códigos RedPOS (canje), url_launcher, plugins '
                       'locales de impresión y SharedPreferences. '
-                      'Sin AdMob, Firebase, Crashlytics ni Analytics.',
+                      'Sin SDK de AdMob, Firebase, Crashlytics ni Analytics; '
+                      'Play Billing y Sign-In pueden enviar telemetría técnica '
+                      'propia a Google.',
                   'Google Play Billing, Google Sign-In (subscribe only), '
                       'RedPOS codes API (redemption), url_launcher, local print '
                       'plugins, and SharedPreferences. '
-                      'No AdMob, Firebase, Crashlytics, or Analytics.',
+                      'No AdMob, Firebase, Crashlytics, or Analytics SDKs; '
+                      'Play Billing and Sign-In may send their own technical '
+                      'telemetry to Google.',
                 ),
               ),
             ],

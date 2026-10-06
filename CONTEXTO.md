@@ -72,6 +72,7 @@
 - Copia markdown: `docs/PRIVACIDAD.md` · HTML: `admin-web/public/privacidad.html`  
 - In-app: `lib/screens/privacy_data_screen.dart`, `lib/legal/legal_copy.dart`, wipe: `lib/services/privacy_data_wipe.dart`
 - **No** generative AI; **no** AdMob / Firebase Analytics / Crashlytics.
+- Nota: Play Billing 8.x trae transitivamente `datatransport` (`transport-backend-cct`) y envía telemetría propia a `firebaselogging.googleapis.com`; no es un SDK Firebase de la app. Los textos de privacidad lo declaran; no lo borres de ellos.
 - Terceros: Play Billing (`in_app_purchase`), Google Sign-In (solo al suscribirse), API códigos RedPOS (Vercel), plugins de impresión local, SharedPreferences.
 
 ### Firma y builds
