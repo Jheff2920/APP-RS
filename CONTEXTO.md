@@ -8,7 +8,7 @@
 **Producto:** RedPOS Service  
 **Carpeta Windows (preferida):** `C:\Users\RS-Soporte\Documents\app`  
 **Repo:** https://github.com/Jheff2920/APP-RS · rama estable `main`  
-**Versión app:** `1.8.9+52` (`pubspec.yaml`) — rediseño fusionado en `main`  
+**Versión app:** `1.8.9+53` (`pubspec.yaml`) — rediseño fusionado en `main`  
 **Package / applicationId:** `com.redpos.service`  
 **iOS bundle:** `com.redpos.service`
 
@@ -40,7 +40,7 @@
 
 ---
 
-## Estado actual (v1.8.9+52 · oct 2026)
+## Estado actual (v1.8.9+53 · oct 2026)
 
 ### Rama activa: `redesign/ui-simplificada` (4 commits adelante de `main`)
 
@@ -317,7 +317,7 @@ compilar desde la terminal del usuario.
 
 ### Próximos pasos (en orden)
 
-1. Compilar AAB `1.8.9+52` con `--dart-define=REDPOS_API=...` y copiarlo a `inst-apk\`
+1. Compilar AAB `1.8.9+53` con `--dart-define=REDPOS_API=...` y copiarlo a `inst-apk\`
 2. Subirlo a Play Console y en "Problemas detectados" usar "Actualizar paquetes afectados"
 3. Confirmar en el merged manifest que no aparece `READ_MEDIA_*`
 4. Revisar en teléfono real (Telpo M1K) el inicio en ancho angosto
@@ -336,7 +336,7 @@ compilar desde la terminal del usuario.
 
 ## Cómo retomar (changelog corto)
 
-- **1.8.9+52:** Privacidad exacta: la app no incluye SDK Firebase/AdMob/Analytics, pero Play Billing y Google Sign-In pueden enviar telemetría técnica a Google (textos in-app, PRIVACIDAD.md, privacidad.html y privacy.html actualizados). Margen superior 3 mm en imágenes compartidas.
+- **1.8.9+53 (+52 ya usado en Play):** Privacidad exacta: la app no incluye SDK Firebase/AdMob/Analytics, pero Play Billing y Google Sign-In pueden enviar telemetría técnica a Google (textos in-app, PRIVACIDAD.md, privacidad.html y privacy.html actualizados). Margen superior 3 mm en imágenes compartidas.
 - **1.8.8+50 (rama redesign/ui-simplificada):** Rediseño UI morado marca, PrinterCard nuevo, eliminado código maestro R100301S, fix TCP half-open socket.
 - **1.8.8+49 → +50 (main):** Bump versionCode, fix TCP half-open socket.
 - **1.8.8+49:** Tickets propios (IGV opcional, sin título), paid gate SUNAT+custom, CP1252, QR más grande, privacidad Play, branding Red Soluciones.
