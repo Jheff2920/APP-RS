@@ -1,13 +1,12 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 
 import '../brand.dart';
 import '../l10n/app_lang.dart';
 import '../legal/legal_copy.dart';
 import '../services/redpos/redpos_config.dart';
 import '../services/redpos/redpos_links.dart';
+import '../theme.dart';
+import '../widgets/ui_kit.dart';
 
 class LegalScreen extends StatelessWidget {
   const LegalScreen.terms({super.key}) : privacy = false;
@@ -26,23 +25,16 @@ class LegalScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(title: Text(title)),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return Align(
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              width: math.min(600, constraints.maxWidth),
-              height: constraints.maxHeight,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                scrollCacheExtent: const ScrollCacheExtent.pixels(280),
+      body: PageList(
+        maxWidth: 680,
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    l('Última actualización: ${LegalCopy.lastUpdated(l)}',
-                        'Last updated: ${LegalCopy.lastUpdated(l)}'),
-                    style: theme.textTheme.labelMedium,
-                  ),
-                  const SizedBox(height: 8),
                   Text(
                     privacy
                         ? l(
@@ -53,50 +45,67 @@ class LegalScreen extends StatelessWidget {
                             'Uso de ${AppBrand.name}. Imprimir no se bloquea sin cuenta.',
                             'Using ${AppBrand.name}. Printing is not blocked without an account.',
                           ),
-                    style: theme.textTheme.bodySmall,
+                    style: theme.textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    l('Última actualización: ${LegalCopy.lastUpdated(l)}',
+                        'Last updated: ${LegalCopy.lastUpdated(l)}'),
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: AppColors.inkSoft),
                   ),
                   if (privacy) ...[
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        final url = l.english
-                            ? RedPosConfig.privacyUrlEn
-                            : RedPosConfig.privacyUrl;
-                        openRedPosLink(context, Uri.parse(url));
-                      },
-                      icon: const Icon(Icons.open_in_browser),
-                      label: Text(
-                        l(
-                          'Abrir política en el navegador (Play)',
-                          'Open policy in browser (Play)',
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(0, 44),
+                          ),
+                          onPressed: () {
+                            final url = l.english
+                                ? RedPosConfig.privacyUrlEn
+                                : RedPosConfig.privacyUrl;
+                            openRedPosLink(context, Uri.parse(url));
+                          },
+                          icon: const Icon(Icons.open_in_browser_rounded),
+                          label: Text(
+                            l('Abrir en el navegador', 'Open in browser'),
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () {
-                        final url = l.english
-                            ? RedPosConfig.deleteAccountUrlEn
-                            : RedPosConfig.deleteAccountUrl;
-                        openRedPosLink(context, Uri.parse(url));
-                      },
-                      child: Text(
-                        l('Eliminar cuenta / datos', 'Delete account / data'),
-                      ),
+                        TextButton(
+                          onPressed: () {
+                            final url = l.english
+                                ? RedPosConfig.deleteAccountUrlEn
+                                : RedPosConfig.deleteAccountUrl;
+                            openRedPosLink(context, Uri.parse(url));
+                          },
+                          child: Text(
+                            l('Eliminar cuenta o datos', 'Delete account or data'),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
+                  const SizedBox(height: 12),
+                  const Divider(),
                   const SizedBox(height: 16),
                   for (final section in sections) ...[
                     Text(section.title, style: theme.textTheme.titleMedium),
                     const SizedBox(height: 6),
-                    Text(section.body, style: theme.textTheme.bodyMedium),
+                    Text(
+                      section.body,
+                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.55),
+                    ),
                     const SizedBox(height: 20),
                   ],
                 ],
               ),
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }

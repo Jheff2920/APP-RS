@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../l10n/app_lang.dart';
 import '../models/print_margins.dart';
+import 'ui_kit.dart';
 
 class MarginFields extends StatefulWidget {
   const MarginFields({
@@ -36,7 +37,7 @@ class _MarginFieldsState extends State<MarginFields> {
   }
 
   void _set(PrintMargins next) {
-    _value = next;
+    setState(() => _value = next);
     widget.onChanged(next);
   }
 
@@ -45,11 +46,21 @@ class _MarginFieldsState extends State<MarginFields> {
     final theme = Theme.of(context);
     return ExpansionTile(
       initiallyExpanded: false,
-      tilePadding: EdgeInsets.zero,
-      childrenPadding: const EdgeInsets.only(bottom: 8),
+      shape: const Border(),
+      collapsedShape: const Border(),
+      tilePadding: const EdgeInsets.fromLTRB(14, 4, 16, 4),
+      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      leading: const IconTile(icon: Icons.straighten_rounded, size: 40),
       title: Text(
-        L.of(context)('Márgenes (mm)', 'Margins (mm)'),
-        style: theme.textTheme.titleMedium,
+        L.of(context)('Márgenes', 'Margins'),
+        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(
+        L.of(context)(
+          'Izq. ${_value.leftMm.toStringAsFixed(1)}, der. ${_value.rightMm.toStringAsFixed(1)}, abajo ${_value.bottomMm.toStringAsFixed(1)} mm',
+          'Left ${_value.leftMm.toStringAsFixed(1)}, right ${_value.rightMm.toStringAsFixed(1)}, bottom ${_value.bottomMm.toStringAsFixed(1)} mm',
+        ),
+        style: theme.textTheme.bodySmall,
       ),
       children: [
         _MmField(
@@ -153,39 +164,46 @@ class _MmFieldState extends State<_MmField> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(width: 88, child: Text(widget.label)),
-        Expanded(
-          child: RepaintBoundary(
-            child: Slider(
-              value: _mm.clamp(0.0, widget.max),
-              min: 0,
-              max: widget.max,
-              divisions: (widget.max * 2).round(),
-              label: '${_mm.toStringAsFixed(1)} mm',
-              onChanged: _setMm,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          SizedBox(width: 84, child: Text(widget.label)),
+          Expanded(
+            child: RepaintBoundary(
+              child: Slider(
+                value: _mm.clamp(0.0, widget.max),
+                min: 0,
+                max: widget.max,
+                divisions: (widget.max * 2).round(),
+                label: '${_mm.toStringAsFixed(1)} mm',
+                onChanged: _setMm,
+              ),
             ),
           ),
-        ),
-        SizedBox(
-          width: 56,
-          child: TextFormField(
-            controller: _ctrl,
-            focusNode: _focus,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-            ],
-            decoration: const InputDecoration(
-              isDense: true,
-              suffixText: 'mm',
+          SizedBox(
+            width: 104,
+            child: TextFormField(
+              controller: _ctrl,
+              focusNode: _focus,
+              textAlign: TextAlign.end,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+              ],
+              decoration: const InputDecoration(
+                isDense: true,
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                suffixText: ' mm',
+              ),
+              onChanged: _applyRaw,
+              onFieldSubmitted: _applyRaw,
             ),
-            onChanged: _applyRaw,
-            onFieldSubmitted: _applyRaw,
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

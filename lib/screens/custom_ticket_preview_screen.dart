@@ -8,8 +8,9 @@ import '../services/print_service.dart';
 import '../services/printer_permissions.dart';
 import '../services/printer_store.dart';
 import '../services/transports/printer_transport.dart';
-import '../widgets/boleta_page.dart';
+import '../theme.dart';
 import '../widgets/print_status_dialog.dart';
+import '../widgets/ui_kit.dart';
 
 /// Vista previa en pantalla e impresión del ticket propio.
 class CustomTicketPreviewScreen extends StatefulWidget {
@@ -129,132 +130,105 @@ class _CustomTicketPreviewScreenState extends State<CustomTicketPreviewScreen> {
     final lines = widget.template.previewLines(cols: _previewCols);
     final paperLabel = _selected?.paper.label ?? '58 mm';
 
+    final showLogo =
+        widget.template.showLogo && widget.template.logoBytes != null;
+    final paperWidth =
+        (_selected?.paper ?? PaperWidth.mm58) == PaperWidth.mm80 ? 360.0 : 280.0;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(l('Vista previa', 'Preview')),
+        title: Text(widget.template.name),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : BoletaPage(
-              bottomBar: SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
+      bottomNavigationBar: _loading
+          ? null
+          : BottomActions(
+              children: [
+                FilledButton.icon(
                   onPressed: _printing || _selected == null ? null : _print,
                   icon: _printing
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.print),
+                      ? const ButtonSpinner(color: Colors.white)
+                      : const Icon(Icons.print_rounded),
                   label: Text(l('Imprimir', 'Print')),
                 ),
-              ),
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Text(
-                    widget.template.name,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    l(
-                      'Ancho según la impresora ($paperLabel).',
-                      'Width follows the printer ($paperLabel).',
-                    ),
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    l('Impresora vinculada', 'Paired printer'),
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  if (_printers.isEmpty)
-                    Text(
-                      l(
-                        'No hay impresoras vinculadas. Agrega una en la pantalla principal.',
-                        'No printers are paired. Add one on the home screen.',
-                      ),
-                    )
-                  else
-                    DropdownButtonFormField<String>(
-                      initialValue: _selected?.id,
-                      decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        labelText: l('Impresora', 'Printer'),
-                      ),
-                      items: _printers
-                          .map(
-                            (pr) => DropdownMenuItem(
-                              value: pr.id,
-                              child: Text('${pr.name} (${pr.paper.label})'),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: _printing
-                          ? null
-                          : (id) {
-                              setState(() {
-                                _selected =
-                                    _printers.firstWhere((p) => p.id == id);
-                              });
-                            },
-                    ),
-                  const SizedBox(height: 16),
-                  Text(
-                    l('Vista previa', 'Preview'),
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
+              ],
+            ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : PageList(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+              children: [
+                Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: paperWidth),
+                    child: PhysicalShape(
+                      clipper: const TornPaperClipper(tooth: 9, depth: 6),
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: theme.colorScheme.outlineVariant),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
-                      child: SelectableText(
-                        lines.isEmpty
-                            ? l('(vacío)', '(empty)')
-                            : lines.join('\n'),
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 12.5,
-                          height: 1.35,
-                          color: Colors.black87,
+                      elevation: 2,
+                      shadowColor: Colors.black.withValues(alpha: 0.4),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 18, 14, 26),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (showLogo) ...[
+                              SizedBox(
+                                height: 64,
+                                child: Image.memory(
+                                  widget.template.logoBytes!,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.topLeft,
+                              child: SelectableText(
+                                lines.isEmpty
+                                    ? l('(vacío)', '(empty)')
+                                    : lines.join('\n'),
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 12.5,
+                                  height: 1.35,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ),
-                  if (widget.template.showLogo &&
-                      widget.template.logoBytes != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      l(
-                        'El logo se imprime como imagen; debajo van nombre, RUC y dirección.',
-                        'The logo prints as an image; name, RUC and address follow below.',
-                      ),
-                      style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  l(
+                    'Ancho de $paperLabel, según la impresora elegida.',
+                    '$paperLabel wide, based on the chosen printer.',
+                  ),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: AppColors.inkSoft),
+                ),
+                SectionLabel(l('Imprimir en', 'Print on')),
+                if (_printers.isEmpty)
+                  InfoNote(
+                    tone: InfoTone.warn,
+                    icon: Icons.print_disabled_outlined,
+                    text: l(
+                      'No hay impresoras vinculadas. Vincula una en el inicio.',
+                      'No printers are paired. Pair one on the home screen.',
                     ),
-                    const SizedBox(height: 8),
-                    Image.memory(
-                      widget.template.logoBytes!,
-                      height: 72,
-                      fit: BoxFit.contain,
-                    ),
-                  ],
-                ],
-              ),
+                  )
+                else
+                  PrinterPicker(
+                    printers: _printers,
+                    selectedId: _selected?.id,
+                    enabled: !_printing,
+                    onSelected: (pr) => setState(() => _selected = pr),
+                  ),
+              ],
             ),
     );
   }

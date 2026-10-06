@@ -79,6 +79,7 @@ void main() {
     await _licensePrefs({
       RedPosLicenseStore.playEntitlementKey: true,
     });
+    _tallView(tester);
     await tester.pumpWidget(
       const MaterialApp(
         locale: Locale('es'),
@@ -123,8 +124,6 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    await tester.tap(find.byTooltip('Ayuda y legal'));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('Ticket SUNAT'));
     await tester.pumpAndSettle();
 
@@ -189,6 +188,7 @@ void main() {
 
   testWidgets('locked settings hide paid SUNAT extras', (tester) async {
     await _licensePrefs({});
+    _tallView(tester);
     await tester.pumpWidget(
       const MaterialApp(
         locale: Locale('es'),
@@ -214,6 +214,7 @@ void main() {
     await _licensePrefs({
       RedPosLicenseStore.playEntitlementKey: true,
     });
+    _tallView(tester);
     await tester.pumpWidget(
       const MaterialApp(
         locale: Locale('es'),
@@ -238,6 +239,13 @@ void main() {
     expect(find.text('Monto en letras'), findsOneWidget);
     expect(find.textContaining('Función de pago'), findsNothing);
   });
+}
+
+void _tallView(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 1600);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
 }
 
 Widget _esApp(Widget home) {

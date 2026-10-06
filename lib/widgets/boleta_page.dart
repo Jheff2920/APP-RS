@@ -41,12 +41,15 @@ class BoletaPage extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Divider(height: 1),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
+                Center(
+                  heightFactor: 1,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxContentWidth),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                      child: bottomBar,
+                    ),
                   ),
-                  child: bottomBar,
                 ),
               ],
             ),

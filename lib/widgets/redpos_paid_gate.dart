@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_lang.dart';
 import '../services/printer_store.dart';
+import '../theme.dart';
 import 'redpos_ad_banner.dart';
 import 'redpos_unlock_actions.dart';
+import 'ui_kit.dart';
 
 /// Mensaje y acciones para desbloquear funciones de pago (mismo pase que
 /// quita publicidad: código RedPOS, suscripción Play o licencia de por vida).
@@ -20,71 +22,69 @@ class RedPosPaidGateBanner extends StatelessWidget {
   final bool compact;
 
   static String message(L l) => l(
-        'Función de pago. Necesitas un código RedPOS (código empresa), '
-        'una suscripción mensual o una licencia de por vida.',
-        'Paid feature. You need a RedPOS code (company code), '
-        'a monthly subscription, or a lifetime license.',
+        'Función de pago. Se desbloquea con un código RedPOS, la suscripción '
+            'mensual o la licencia de por vida.',
+        'Paid feature. Unlock it with a RedPOS code, the monthly '
+            'subscription, or the lifetime license.',
       );
 
   @override
   Widget build(BuildContext context) {
     final l = L.of(context);
-    final scheme = Theme.of(context).colorScheme;
-    return ColoredBox(
-      color: scheme.secondaryContainer,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(16, compact ? 8 : 10, 16, compact ? 8 : 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.lock_outline,
-                  size: 20,
-                  color: scheme.onSecondaryContainer,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    message(l),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSecondaryContainer,
-                        ),
+    final tt = Theme.of(context).textTheme;
+    return Container(
+      padding: EdgeInsets.fromLTRB(14, compact ? 12 : 14, 14, compact ? 6 : 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.lock_outline, size: 20, color: AppColors.brand),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  message(l),
+                  style: tt.bodySmall?.copyWith(
+                    color: AppColors.ink,
+                    fontSize: 13,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 8,
-              children: [
-                TextButton(
-                  onPressed: () async {
-                    final ok = await showRedPosActivateDialog(
-                      context: context,
-                      store: store,
-                    );
-                    if (ok) onUnlocked?.call();
-                  },
-                  child: Text(l('Tengo un código', 'I have a code')),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    final ok = await openMonthlySubscription(context, store);
-                    if (ok) onUnlocked?.call();
-                  },
-                  child: Text(l('Suscripción mensual', 'Monthly subscription')),
-                ),
-                TextButton(
-                  onPressed: () => openLifetimeLicenseMail(context),
-                  child: Text(l('Licencia de por vida', 'Lifetime license')),
-                ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 4,
+            children: [
+              TextButton(
+                onPressed: () async {
+                  final ok = await showRedPosActivateDialog(
+                    context: context,
+                    store: store,
+                  );
+                  if (ok) onUnlocked?.call();
+                },
+                child: Text(l('Tengo un código', 'I have a code')),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final ok = await openMonthlySubscription(context, store);
+                  if (ok) onUnlocked?.call();
+                },
+                child: Text(l('Suscripción mensual', 'Monthly subscription')),
+              ),
+              TextButton(
+                onPressed: () => openLifetimeLicenseMail(context),
+                child: Text(l('Licencia de por vida', 'Lifetime license')),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -106,28 +106,48 @@ class RedPosPaidGatePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = L.of(context);
-    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: Text(title)),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          const SizedBox(height: 32),
-          Icon(Icons.lock_outline, size: 56, color: scheme.outline),
-          const SizedBox(height: 16),
-          Text(
-            l('Contenido bloqueado', 'Content locked'),
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleMedium,
+      body: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: EmptyMessage(
+                icon: Icons.lock_outline,
+                title: l('Contenido bloqueado', 'Content locked'),
+                body: RedPosPaidGateBanner.message(l),
+                actions: [
+                  FilledButton.icon(
+                    onPressed: () async {
+                      final ok = await showRedPosActivateDialog(
+                        context: context,
+                        store: store,
+                      );
+                      if (ok) onUnlocked?.call();
+                    },
+                    icon: const Icon(Icons.vpn_key_outlined),
+                    label: Text(l('Tengo un código', 'I have a code')),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final ok = await openMonthlySubscription(context, store);
+                      if (ok) onUnlocked?.call();
+                    },
+                    icon: const Icon(Icons.autorenew_rounded),
+                    label: Text(
+                      l('Suscripción mensual', 'Monthly subscription'),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => openLifetimeLicenseMail(context),
+                    child: Text(l('Licencia de por vida', 'Lifetime license')),
+                  ),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            RedPosPaidGateBanner.message(l),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          RedPosPaidGateBanner(store: store, onUnlocked: onUnlocked),
-        ],
+        ),
       ),
     );
   }

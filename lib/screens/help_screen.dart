@@ -1,7 +1,4 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import '../brand.dart';
@@ -9,7 +6,9 @@ import '../l10n/app_lang.dart';
 import '../services/printer_store.dart';
 import '../services/redpos/redpos_config.dart';
 import '../services/redpos/redpos_links.dart';
+import '../theme.dart';
 import '../widgets/redpos_unlock_actions.dart';
+import '../widgets/ui_kit.dart';
 import 'legal_screen.dart';
 import 'privacy_data_screen.dart';
 import 'sunat_print_settings_screen.dart';
@@ -21,218 +20,185 @@ class HelpScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final tt = Theme.of(context).textTheme;
     final whatsapp = RedPosConfig.whatsappUri;
     final l = L.of(context);
 
+    void push(Widget page) => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => page),
+        );
+
     return Scaffold(
       appBar: AppBar(title: Text(l('Ayuda y soporte', 'Help & support'))),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return Align(
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              width: math.min(600, constraints.maxWidth),
-              height: constraints.maxHeight,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                scrollCacheExtent: const ScrollCacheExtent.pixels(280),
-                children: [
-                  Text(AppBrand.name, style: theme.textTheme.titleLarge),
-                  const SizedBox(height: 6),
-                  Text(
-                    l(
-                      'Si no imprime o tienes dudas del código o la suscripción, '
-                      'escríbenos. Imprimir no se bloquea sin código ni cuenta.',
-                      'If it does not print, or you have questions about the code '
-                      'or subscription, write us. Printing is not blocked without '
-                      'a code or account.',
-                    ),
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  Card(
-                    child: Column(
-                      children: [
-                        ListTile(
-                          leading: const Icon(Icons.email_outlined),
-                          title: Text(l('Correo', 'Email')),
-                          subtitle: Text(RedPosConfig.supportEmail),
-                          onTap: () =>
-                              openRedPosLink(context, RedPosConfig.mailtoUri),
-                          onLongPress: () => _copy(
-                            context,
-                            RedPosConfig.supportEmail,
-                            l('Correo copiado', 'Email copied'),
-                          ),
-                        ),
-                        const Divider(height: 1),
-                        ListTile(
-                          leading: const Icon(Icons.language),
-                          title: Text(l('Web', 'Website')),
-                          subtitle: Text(RedPosConfig.siteUrl),
-                          onTap: () => openRedPosLink(
-                            context,
-                            Uri.parse(RedPosConfig.siteUrlWithScheme),
-                          ),
-                        ),
-                        if (whatsapp != null) ...[
-                          const Divider(height: 1),
-                          ListTile(
-                            leading: const Icon(Icons.chat_outlined),
-                            title: const Text('WhatsApp'),
-                            subtitle: Text(RedPosConfig.whatsappDigits),
-                            onTap: () => openRedPosLink(context, whatsapp),
-                          ),
-                        ],
-                        const Divider(height: 1),
-                        ListTile(
-                          leading: const Icon(Icons.schedule),
-                          title: Text(l('Horario', 'Hours')),
-                          subtitle: Text(
-                            l.english
-                                ? RedPosConfig.supportHoursEn
-                                : RedPosConfig.supportHours,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(l('Si no imprime', 'If it does not print'), style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  Text(
-                    l(
-                      'Bluetooth, WiFi o USB bien vinculados. En Android, permiso '
-                      '«Mostrar sobre otras apps» y ${AppBrand.name} activo en Ajustes → Impresión. '
-                      'Tras apagar un equipo USB, vuelve a aceptar el permiso.',
-                      'Pair Bluetooth, WiFi, or USB correctly. On Android, allow '
-                      '“Display over other apps” and keep ${AppBrand.name} on in Settings → Printing. '
-                      'After powering off a USB device, accept the USB prompt again.',
-                    ),
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    l('Ticket SUNAT', 'SUNAT ticket'),
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l(
-                      'Al compartir un XML o ZIP puedes cambiar la nota de ese '
-                      'trabajo. El formato, el logo y la nota por defecto se guardan aquí.',
-                      'When you share an XML or ZIP you can change the note for '
-                      'that job. Format, logo, and the default note are saved here.',
-                    ),
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.receipt_long),
-                    title: Text(
-                      l('Configurar ticket SUNAT', 'SUNAT ticket settings'),
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => SunatPrintSettingsScreen(printerStore: store),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    l('Tickets propios', 'Custom tickets'),
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l(
-                      'Desde el menú ⋮ de la pantalla principal puedes crear '
-                      'plantillas con logo, líneas, totales, QR o código de '
-                      'barras, ver la vista previa e imprimirlas.',
-                      'From the ⋮ menu on the home screen you can create '
-                      'templates with logo, lines, totals, QR or barcode, '
-                      'preview them, and print.',
-                    ),
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    l(
-                      'Código, suscripción y licencia',
-                      'Code, subscription, and license',
-                    ),
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l(
-                      'El código RedPOS (con el equipo o por una licencia de por vida) '
-                      'quita la publicidad sin iniciar sesión. La suscripción mensual '
-                      'se paga en Google Play con tu cuenta Google. Si dejas de pagar '
-                      'el mensual, vuelven los avisos; imprimir sigue disponible.',
-                      'The RedPOS code (with the hardware or a lifetime license) '
-                      'removes ads without signing in. The monthly subscription is '
-                      'paid in Google Play with your Google account. If you stop the '
-                      'monthly plan, ads return; printing still works.',
-                    ),
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.workspace_premium_outlined),
-                    title: Text(l('Suscripción mensual', 'Monthly subscription')),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => openMonthlySubscription(context, store),
-                  ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.mail_outline),
-                    title: Text(l('Licencia de por vida', 'Lifetime license')),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => openLifetimeLicenseMail(context),
-                  ),
-                  const SizedBox(height: 16),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.shield_outlined),
-                    title: Text(l('Datos y privacidad', 'Data & privacy')),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => PrivacyDataScreen(store: store),
-                      ),
-                    ),
-                  ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.article_outlined),
-                    title: Text(l('Términos y condiciones', 'Terms and conditions')),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const LegalScreen.terms(),
-                      ),
-                    ),
-                  ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.privacy_tip_outlined),
-                    title: Text(l('Política de privacidad', 'Privacy policy')),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const LegalScreen.privacy(),
-                      ),
-                    ),
-                  ),
-                ],
+      body: PageList(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 12, 4, 0),
+            child: Text(
+              l(
+                'Si no imprime o tienes dudas del código o la suscripción, '
+                    'escríbenos. Imprimir nunca se bloquea.',
+                'If it does not print, or you have questions about the code '
+                    'or subscription, write us. Printing is never blocked.',
               ),
+              style: tt.bodyMedium?.copyWith(color: AppColors.inkSoft),
             ),
-          );
-        },
+          ),
+          SectionLabel(l('Contacto', 'Contact')),
+          SectionGroup(
+            dividerIndent: 68,
+            children: [
+              NavRow(
+                icon: Icons.mail_outline_rounded,
+                title: l('Correo', 'Email'),
+                subtitle: RedPosConfig.supportEmail,
+                onTap: () => openRedPosLink(context, RedPosConfig.mailtoUri),
+                onLongPress: () => _copy(
+                  context,
+                  RedPosConfig.supportEmail,
+                  l('Correo copiado', 'Email copied'),
+                ),
+              ),
+              if (whatsapp != null)
+                NavRow(
+                  icon: Icons.chat_outlined,
+                  color: AppColors.ok,
+                  title: 'WhatsApp',
+                  subtitle: RedPosConfig.whatsappDigits,
+                  onTap: () => openRedPosLink(context, whatsapp),
+                ),
+              NavRow(
+                icon: Icons.language_rounded,
+                title: l('Web', 'Website'),
+                subtitle: RedPosConfig.siteUrl,
+                onTap: () => openRedPosLink(
+                  context,
+                  Uri.parse(RedPosConfig.siteUrlWithScheme),
+                ),
+              ),
+              NavRow(
+                icon: Icons.schedule_rounded,
+                color: AppColors.inkSoft,
+                title: l('Horario', 'Hours'),
+                subtitle: l.english
+                    ? RedPosConfig.supportHoursEn
+                    : RedPosConfig.supportHours,
+              ),
+            ],
+          ),
+          SectionLabel(l('Si no imprime', 'If it does not print')),
+          Card(
+            child: SectionBody(
+              children: [
+                _Tip(
+                  l(
+                    'Revisa que la impresora esté encendida, con papel y '
+                        'vinculada por Bluetooth, WiFi o USB.',
+                    'Check the printer is on, has paper, and is paired over '
+                        'Bluetooth, WiFi or USB.',
+                  ),
+                ),
+                _Tip(
+                  l(
+                    'En Android, permite «Mostrar sobre otras apps» y deja '
+                        '${AppBrand.name} activo en Ajustes, Impresión.',
+                    'On Android, allow “Display over other apps” and keep '
+                        '${AppBrand.name} on in Settings, Printing.',
+                  ),
+                ),
+                _Tip(
+                  l(
+                    'Si apagaste un equipo USB, vuelve a aceptar el permiso USB.',
+                    'After powering off a USB device, accept the USB prompt again.',
+                  ),
+                  last: true,
+                ),
+              ],
+            ),
+          ),
+          SectionLabel(l('Funciones', 'Features')),
+          SectionGroup(
+            dividerIndent: 68,
+            children: [
+              NavRow(
+                icon: Icons.receipt_long_outlined,
+                title: l('Configurar ticket SUNAT', 'SUNAT ticket settings'),
+                subtitle: l(
+                  'Formato, logo y nota por defecto. Al compartir un XML '
+                      'puedes cambiar la nota de ese ticket.',
+                  'Format, logo and default note. When sharing an XML you can '
+                      'change the note for that ticket.',
+                ),
+                onTap: () => push(SunatPrintSettingsScreen(printerStore: store)),
+              ),
+              NavRow(
+                icon: Icons.edit_note_rounded,
+                title: l('Tickets propios', 'Custom tickets'),
+                subtitle: l(
+                  'En el inicio, Herramientas: arma tickets con logo, '
+                      'productos, totales, QR o código de barras.',
+                  'On the home screen, Tools: build tickets with logo, '
+                      'products, totals, QR or barcode.',
+                ),
+                showChevron: false,
+              ),
+            ],
+          ),
+          SectionLabel(
+            l('Código, suscripción y licencia', 'Code, subscription, and license'),
+          ),
+          SectionGroup(
+            dividerIndent: 68,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                child: Text(
+                  l(
+                    'El código RedPOS quita la publicidad sin iniciar sesión. '
+                        'La suscripción mensual se paga en Google Play; si la '
+                        'cancelas vuelven los avisos, pero imprimir sigue '
+                        'disponible.',
+                    'The RedPOS code removes ads without signing in. The '
+                        'monthly subscription is paid in Google Play; if you '
+                        'cancel it, ads return but printing still works.',
+                  ),
+                  style: tt.bodyMedium?.copyWith(color: AppColors.inkSoft),
+                ),
+              ),
+              NavRow(
+                icon: Icons.autorenew_rounded,
+                title: l('Suscripción mensual', 'Monthly subscription'),
+                onTap: () => openMonthlySubscription(context, store),
+              ),
+              NavRow(
+                icon: Icons.all_inclusive_rounded,
+                title: l('Licencia de por vida', 'Lifetime license'),
+                onTap: () => openLifetimeLicenseMail(context),
+              ),
+            ],
+          ),
+          SectionLabel(l('Legal', 'Legal')),
+          SectionGroup(
+            dividerIndent: 68,
+            children: [
+              NavRow(
+                icon: Icons.shield_outlined,
+                title: l('Datos y privacidad', 'Data & privacy'),
+                onTap: () => push(PrivacyDataScreen(store: store)),
+              ),
+              NavRow(
+                icon: Icons.article_outlined,
+                title: l('Términos y condiciones', 'Terms and conditions'),
+                onTap: () => push(const LegalScreen.terms()),
+              ),
+              NavRow(
+                icon: Icons.privacy_tip_outlined,
+                title: l('Política de privacidad', 'Privacy policy'),
+                onTap: () => push(const LegalScreen.privacy()),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -246,5 +212,36 @@ class HelpScreen extends StatelessWidget {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _Tip extends StatelessWidget {
+  const _Tip(this.text, {this.last = false});
+
+  final String text;
+  final bool last;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: last ? 0 : 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Icon(
+              Icons.check_circle_outline_rounded,
+              size: 20,
+              color: AppColors.ok,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
+          ),
+        ],
+      ),
+    );
   }
 }

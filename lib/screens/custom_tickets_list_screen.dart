@@ -6,8 +6,9 @@ import '../services/custom_ticket/custom_ticket_store.dart';
 import '../services/print_service.dart';
 import '../services/redpos/redpos_license.dart';
 import '../services/printer_store.dart';
-import '../widgets/boleta_page.dart';
+import '../theme.dart';
 import '../widgets/redpos_paid_gate.dart';
+import '../widgets/ui_kit.dart';
 import 'custom_ticket_edit_screen.dart';
 import 'custom_ticket_preview_screen.dart';
 
@@ -120,6 +121,7 @@ class _CustomTicketsListScreenState extends State<CustomTicketsListScreen> {
             child: Text(l('Cancelar', 'Cancel')),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(l('Eliminar', 'Delete')),
           ),
@@ -165,122 +167,169 @@ class _CustomTicketsListScreenState extends State<CustomTicketsListScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _creating || _loading ? null : _create,
         icon: _creating
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.add),
-        label: Text(l('Nueva', 'New')),
+            ? const ButtonSpinner(color: Colors.white)
+            : const Icon(Icons.add_rounded),
+        label: Text(l('Nuevo ticket', 'New ticket')),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : BoletaPage(
-              child: _items.isEmpty
-                  ? ListView(
-                      padding: const EdgeInsets.all(24),
-                      children: [
-                        const SizedBox(height: 48),
-                        Icon(
-                          Icons.receipt_long_outlined,
-                          size: 56,
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          l(
-                            'Aún no hay tickets propios.',
-                            'No custom tickets yet.',
-                          ),
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          l(
-                            'Crea una plantilla con logo, líneas, '
-                                'totales, QR o código de barras, y previsualízala '
-                                'antes de imprimir.',
-                            'Create a template with logo, lines, '
-                                'totals, QR or barcode, and preview it before '
-                                'printing.',
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
-                      itemCount: _items.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        final t = _items[index];
-                        final subtitle = [
-                          if (t.companyName.trim().isNotEmpty)
-                            t.companyName.trim(),
-                          '${t.lines.length} ${l('líneas', 'lines')}',
-                          if (t.showQr) 'QR',
-                          if (t.showBarcode) l('Barras', 'Barcode'),
-                        ].join(' · ');
-                        return Card(
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              child: Icon(
-                                t.showLogo && t.logoBytes != null
-                                    ? Icons.image
-                                    : Icons.receipt_long,
-                              ),
-                            ),
-                            title: Text(t.name),
-                            subtitle: Text(
-                              subtitle,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            onTap: () => _openEdit(t),
-                            trailing: PopupMenuButton<String>(
-                              onSelected: (value) {
-                                switch (value) {
-                                  case 'preview':
-                                    _openPreview(t);
-                                  case 'edit':
-                                    _openEdit(t);
-                                  case 'dup':
-                                    _duplicate(t);
-                                  case 'delete':
-                                    _confirmDelete(t);
-                                }
-                              },
-                              itemBuilder: (ctx) {
-                                final loc = L.of(ctx);
-                                return [
-                                  PopupMenuItem(
-                                    value: 'preview',
-                                    child: Text(
-                                      loc('Vista previa / Imprimir',
-                                          'Preview / Print'),
-                                    ),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'edit',
-                                    child: Text(loc('Editar', 'Edit')),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'dup',
-                                    child: Text(loc('Duplicar', 'Duplicate')),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'delete',
-                                    child: Text(loc('Eliminar', 'Delete')),
-                                  ),
-                                ];
-                              },
-                            ),
-                          ),
-                        );
-                      },
+          : _items.isEmpty
+              ? Center(
+                  child: SingleChildScrollView(
+                    child: EmptyMessage(
+                      icon: Icons.edit_note_rounded,
+                      title: l('Aún no hay tickets propios.', 'No custom tickets yet.'),
+                      body: l(
+                        'Arma tu propio ticket con logo, productos, totales, '
+                            'QR o código de barras. Lo ves antes de imprimir.',
+                        'Build your own ticket with logo, products, totals, '
+                            'QR or barcode. Preview it before printing.',
+                      ),
                     ),
-            ),
+                  ),
+                )
+              : PageList(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                  children: [
+                    for (final t in _items) ...[
+                      _TemplateCard(
+                        template: t,
+                        onOpen: () => _openEdit(t),
+                        onPrint: () => _openPreview(t),
+                        onMenu: (value) {
+                          switch (value) {
+                            case 'edit':
+                              _openEdit(t);
+                            case 'dup':
+                              _duplicate(t);
+                            case 'delete':
+                              _confirmDelete(t);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  ],
+                ),
+    );
+  }
+}
+
+class _TemplateCard extends StatelessWidget {
+  const _TemplateCard({
+    required this.template,
+    required this.onOpen,
+    required this.onPrint,
+    required this.onMenu,
+  });
+
+  final CustomTicketTemplate template;
+  final VoidCallback onOpen;
+  final VoidCallback onPrint;
+  final ValueChanged<String> onMenu;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = L.of(context);
+    final tt = Theme.of(context).textTheme;
+    final t = template;
+    final items = t.lines.length;
+    final details = [
+      items == 1 ? l('1 línea', '1 line') : l('$items líneas', '$items lines'),
+      if (t.showQr) 'QR',
+      if (t.showBarcode) l('código de barras', 'barcode'),
+    ].join(', ');
+    final hasLogo = t.showLogo && t.logoBytes != null;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 4, 14),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: hasLogo
+                    ? Container(
+                        width: 48,
+                        height: 48,
+                        color: AppColors.background,
+                        padding: const EdgeInsets.all(6),
+                        child: Image.memory(t.logoBytes!, fit: BoxFit.contain),
+                      )
+                    : const IconTile(icon: Icons.receipt_outlined, size: 48),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      t.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: tt.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                    if (t.companyName.trim().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        t.companyName.trim(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: tt.bodySmall?.copyWith(color: AppColors.ink),
+                      ),
+                    ],
+                    const SizedBox(height: 2),
+                    Text(
+                      details,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: tt.bodySmall?.copyWith(color: AppColors.inkSoft),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton.filledTonal(
+                tooltip: l('Vista previa e imprimir', 'Preview and print'),
+                onPressed: onPrint,
+                icon: const Icon(Icons.print_outlined),
+              ),
+              PopupMenuButton<String>(
+                tooltip: l('Opciones', 'Options'),
+                icon: const Icon(Icons.more_vert_rounded),
+                onSelected: onMenu,
+                itemBuilder: (ctx) {
+                  final loc = L.of(ctx);
+                  return [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Text(loc('Editar', 'Edit')),
+                    ),
+                    PopupMenuItem(
+                      value: 'dup',
+                      child: Text(loc('Duplicar', 'Duplicate')),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Text(
+                        loc('Eliminar', 'Delete'),
+                        style: TextStyle(
+                          color: Theme.of(ctx).colorScheme.error,
+                        ),
+                      ),
+                    ),
+                  ];
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

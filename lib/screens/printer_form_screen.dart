@@ -21,7 +21,9 @@ import '../services/printer_store.dart';
 import '../services/redpos/redpos_license.dart';
 import '../services/usb_printer_channel.dart';
 import '../services/transports/printer_transport.dart';
+import '../theme.dart';
 import '../widgets/boleta_page.dart';
+import '../widgets/ui_kit.dart';
 import '../widgets/margin_fields.dart';
 import '../widgets/paper_width_selector.dart';
 import '../widgets/print_status_dialog.dart';
@@ -350,6 +352,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
               child: Text(loc('Cancelar', 'Cancel')),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
               onPressed: () => Navigator.pop(ctx, true),
               child: Text(loc('Desvincular', 'Unlink')),
             ),
@@ -491,6 +494,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
               child: Text(loc('Cancelar', 'Cancel')),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
               onPressed: () => Navigator.pop(ctx, true),
               child: Text(loc('Desvincular', 'Unlink')),
             ),
@@ -767,43 +771,41 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     return false;
   }
 
-  Future<void> _save({bool pop = true, bool withAds = false}) async {
+  Future<void> _save({bool pop = true}) async {
     if (!_requireConnection()) return;
     _ensureName();
     if (!_formKey.currentState!.validate()) return;
     if (!await _ensureBluetoothBonded()) return;
     setState(() => _saving = true);
     try {
-      if (!withAds) {
-        final code = _codeCtrl.text.trim();
-        if (code.isNotEmpty && !_adsFree) {
-          setState(() => _activating = true);
-          final result = await RedPosLicenseStore.instance.redeem(
-            code,
-            store: widget.store,
-            address: _addressCtrl.text.trim(),
-          );
+      final code = _codeCtrl.text.trim();
+      if (code.isNotEmpty && !_adsFree) {
+        setState(() => _activating = true);
+        final result = await RedPosLicenseStore.instance.redeem(
+          code,
+          store: widget.store,
+          address: _addressCtrl.text.trim(),
+        );
+        if (!mounted) return;
+        if (!result.ok) {
+          await _rollbackUncommitted(unpair: true);
           if (!mounted) return;
-          if (!result.ok) {
-            await _rollbackUncommitted(unpair: true);
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  result.message ??
-                      tr(
-                        'No se pudo activar. Revisa el código e inténtalo de nuevo.',
-                        'Could not activate. Check the code and try again.',
-                      ),
-                ),
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                result.message ??
+                    tr(
+                      'No se pudo activar. Revisa el código o bórralo para '
+                          'guardar con publicidad.',
+                      'Could not activate. Check the code, or clear it to '
+                          'save with ads.',
+                    ),
               ),
-            );
-            return;
-          }
-          _adsFree = true;
-        } else {
-          _adsFree = await RedPosLicenseStore.instance.isAdsFree();
+            ),
+          );
+          return;
         }
+        _adsFree = true;
       } else {
         _adsFree = await RedPosLicenseStore.instance.isAdsFree();
       }
@@ -905,17 +907,6 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     return const [PrinterLinkType.bluetooth, PrinterLinkType.network];
   }
 
-  IconData _iconFor(PrinterLinkType type) {
-    switch (type) {
-      case PrinterLinkType.bluetooth:
-        return Icons.bluetooth;
-      case PrinterLinkType.network:
-        return Icons.wifi;
-      case PrinterLinkType.usb:
-        return Icons.usb;
-    }
-  }
-
   List<UsbDeviceInfo> get _usbNotSaved {
     final saved = {
       for (final p in _savedOf(PrinterLinkType.usb))
@@ -927,517 +918,621 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     ];
   }
 
-  Widget _savedPrinterTiles(ThemeData theme, PrinterLinkType type) {
-    final list = _savedOf(type);
-    if (list.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          type == PrinterLinkType.network
-              ? tr('Impresoras WiFi', 'WiFi printers')
-              : tr('Impresoras USB', 'USB printers'),
-          style: theme.textTheme.titleSmall,
-        ),
-        const SizedBox(height: 4),
-        for (final p in list)
-          ListTile(
-            dense: true,
-            leading: Icon(_iconFor(type)),
-            title: Text(p.name),
-            subtitle: Text(p.connectionSummary),
-            selected: p.id == _id,
-            trailing: IconButton(
-              tooltip: tr('Desvincular', 'Unlink'),
-              icon: const Icon(Icons.link_off),
-              onPressed: () => _unlinkSaved(p),
-            ),
-            onTap: () => _applyPrinter(p),
+  /// Fila de dispositivo elegible dentro del bloque de conexión.
+  Widget _deviceRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool selected,
+    required VoidCallback onTap,
+    VoidCallback? onUnlink,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Material(
+      color: selected ? cs.primaryContainer : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 6, 10),
+          child: Row(
+            children: [
+              IconTile(
+                icon: icon,
+                color: selected ? cs.primary : AppColors.inkSoft,
+                size: 38,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: tt.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: tt.bodySmall?.copyWith(color: AppColors.inkSoft),
+                    ),
+                  ],
+                ),
+              ),
+              if (selected)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Icon(Icons.check_circle_rounded, color: cs.primary),
+                ),
+              if (onUnlink != null)
+                IconButton(
+                  tooltip: tr('Desvincular', 'Unlink'),
+                  icon: const Icon(Icons.link_off_rounded),
+                  color: AppColors.inkSoft,
+                  onPressed: onUnlink,
+                ),
+              if (onUnlink == null && !selected) const SizedBox(width: 10),
+            ],
           ),
-        const SizedBox(height: 8),
-      ],
+        ),
+      ),
     );
   }
 
-  Widget _activationCard(ThemeData theme) {
+  Widget _listHeader(String title, {required bool loading, required VoidCallback onRefresh}) {
+    final tt = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 4, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: tt.bodySmall?.copyWith(
+                color: AppColors.inkSoft,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: tr('Actualizar lista', 'Refresh list'),
+            onPressed: loading ? null : onRefresh,
+            icon: loading
+                ? const ButtonSpinner()
+                : const Icon(Icons.refresh_rounded, size: 20),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyListNote(String text) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Text(
+        text,
+        style: Theme.of(context)
+            .textTheme
+            .bodySmall
+            ?.copyWith(color: AppColors.inkSoft),
+      ),
+    );
+  }
+
+  List<Widget> _connectionChildren() {
+    final l = L.of(context);
+    final addPad = const EdgeInsets.fromLTRB(16, 8, 16, 16);
+    switch (_type) {
+      case PrinterLinkType.bluetooth:
+        return [
+          _listHeader(
+            l('Emparejados en este teléfono', 'Paired on this phone'),
+            loading: _loadingPaired,
+            onRefresh: _loadPaired,
+          ),
+          if (_paired.isEmpty && !_loadingPaired)
+            _emptyListNote(
+              l(
+                'Ninguno todavía. Enciende la impresora y toca Buscar impresora.',
+                'None yet. Turn the printer on and tap Find printer.',
+              ),
+            ),
+          for (final d in _paired)
+            _deviceRow(
+              icon: Icons.bluetooth_rounded,
+              title: d.name,
+              subtitle: d.macAdress,
+              selected:
+                  _addressCtrl.text.toUpperCase() == d.macAdress.toUpperCase(),
+              onTap: () => _pickPaired(d),
+              onUnlink: PlatformCaps.isAndroid ? () => _forgetPaired(d) : null,
+            ),
+          Padding(
+            padding: addPad,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _loadingPaired ? null : _addNewBtDevice,
+                  icon: const Icon(Icons.bluetooth_searching_rounded),
+                  label: Text(l('Buscar impresora', 'Find printer')),
+                ),
+                if (_showAddress) ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _addressCtrl,
+                    decoration: InputDecoration(
+                      labelText: l('Dirección MAC', 'MAC address'),
+                      hintText: 'AA:BB:CC:DD:EE:FF',
+                    ),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) {
+                        return l(
+                          'Selecciona o escribe la MAC',
+                          'Select or enter the MAC',
+                        );
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ];
+      case PrinterLinkType.usb:
+        final saved = _savedOf(PrinterLinkType.usb);
+        final found = _usbNotSaved;
+        return [
+          if (saved.isNotEmpty) ...[
+            _listHeader(
+              l('Ya guardadas', 'Already saved'),
+              loading: _loadingSaved,
+              onRefresh: _loadSaved,
+            ),
+            for (final p in saved)
+              _deviceRow(
+                icon: Icons.usb_rounded,
+                title: p.name,
+                subtitle: p.connectionSummary,
+                selected: p.id == _id,
+                onTap: () => _applyPrinter(p),
+                onUnlink: () => _unlinkSaved(p),
+              ),
+          ],
+          _listHeader(
+            l('Conectadas por cable', 'Connected by cable'),
+            loading: _loadingUsb,
+            onRefresh: _loadUsb,
+          ),
+          if (found.isEmpty && !_loadingUsb)
+            _emptyListNote(
+              l(
+                'No se detecta ninguna. Conecta el cable y toca actualizar.',
+                'None detected. Plug in the cable and tap refresh.',
+              ),
+            ),
+          for (final d in found)
+            _deviceRow(
+              icon: Icons.usb_rounded,
+              title: d.name,
+              subtitle: d.hasPermission
+                  ? d.address
+                  : l('${d.address}, falta permiso', '${d.address}, needs permission'),
+              selected: _addressCtrl.text == d.address,
+              onTap: () => _pickUsb(d),
+            ),
+          Padding(
+            padding: addPad,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () =>
+                      _startNew(PrinterLinkType.usb, showAddress: true),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: Text(l('Escribir manualmente', 'Enter manually')),
+                ),
+                if (_showAddress) ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _addressCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'USB vid:pid',
+                      hintText: '1137:85',
+                    ),
+                    onChanged: (v) => _syncAutoName(PrinterLinkType.usb, v),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) {
+                        return l(
+                          'Selecciona un dispositivo USB',
+                          'Select a USB device',
+                        );
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ];
+      case PrinterLinkType.network:
+        final saved = _savedOf(PrinterLinkType.network);
+        return [
+          if (saved.isNotEmpty) ...[
+            _listHeader(
+              l('Ya guardadas', 'Already saved'),
+              loading: _loadingSaved,
+              onRefresh: _loadSaved,
+            ),
+            for (final p in saved)
+              _deviceRow(
+                icon: Icons.wifi_rounded,
+                title: p.name,
+                subtitle: p.connectionSummary,
+                selected: p.id == _id,
+                onTap: () => _applyPrinter(p),
+                onUnlink: () => _unlinkSaved(p),
+              ),
+          ],
+          Padding(
+            padding: saved.isEmpty
+                ? const EdgeInsets.fromLTRB(16, 16, 16, 16)
+                : addPad,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (!_showAddress && saved.isNotEmpty)
+                  OutlinedButton.icon(
+                    onPressed: () =>
+                        _startNew(PrinterLinkType.network, showAddress: true),
+                    icon: const Icon(Icons.add_rounded),
+                    label: Text(
+                      l('Agregar impresora de red', 'Add network printer'),
+                    ),
+                  )
+                else
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: TextFormField(
+                          controller: _addressCtrl,
+                          decoration: InputDecoration(
+                            labelText: l('IP de la impresora', 'Printer IP'),
+                            hintText: '192.168.1.50',
+                          ),
+                          keyboardType: TextInputType.url,
+                          onChanged: (v) =>
+                              _syncAutoName(PrinterLinkType.network, v),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) {
+                              return l('Escribe la IP', 'Enter the IP');
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 2,
+                        child: TextFormField(
+                          controller: _portCtrl,
+                          decoration: InputDecoration(
+                            labelText: l('Puerto', 'Port'),
+                            hintText: '9100',
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (v) {
+                            final n = int.tryParse(v?.trim() ?? '');
+                            if (n == null || n < 1 || n > 65535) {
+                              return l('Puerto inválido', 'Invalid port');
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ];
+    }
+  }
+
+  Widget _activationSection() {
     final l = L.of(context);
     if (_adsFree) {
-      return Card(
-        child: ListTile(
-          leading: Icon(Icons.verified, color: theme.colorScheme.primary),
-          title: Text(
-            l(
-              'Esta instalación no muestra publicidad',
-              'This install does not show ads',
-            ),
-          ),
-          subtitle: Text(
-            l(
-              'Código RedPOS, suscripción de Play o licencia de por vida. '
-              'El ticket sale sin pie de anuncio.',
-              'RedPOS code, Play subscription, or lifetime license. '
-              'The ticket prints without an ad footer.',
-            ),
-          ),
+      return InfoNote(
+        tone: InfoTone.ok,
+        icon: Icons.verified_outlined,
+        text: l(
+          'Sin publicidad: el ticket sale sin pie de anuncio.',
+          'Ad-free: tickets print without an ad footer.',
         ),
       );
     }
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              l(
-                'Código de activación (opcional)',
-                'Activation code (optional)',
+      child: SectionBody(
+        children: [
+          Text(
+            l(
+              'Sin código, los tickets salen con un pie de publicidad. '
+                  'Si tienes un código RedPOS, escríbelo y se activa al guardar.',
+              'Without a code, tickets print with an ad footer. If you have '
+                  'a RedPOS code, enter it and it activates when you save.',
+            ),
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: AppColors.inkSoft, fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _codeCtrl,
+            textCapitalization: TextCapitalization.characters,
+            decoration: InputDecoration(
+              labelText: l('Código RedPOS (opcional)', 'RedPOS code (optional)'),
+              hintText: 'RP-XXXX-XXXX-XXXX',
+            ),
+          ),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 4,
+            children: [
+              TextButton(
+                onPressed: () async {
+                  final ok = await openMonthlySubscription(context, widget.store);
+                  if (!mounted) return;
+                  if (ok) setState(() => _adsFree = true);
+                },
+                child: Text(l('Suscripción mensual', 'Monthly subscription')),
               ),
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _codeCtrl,
-              textCapitalization: TextCapitalization.characters,
-              decoration: InputDecoration(
-                labelText: l('Código RedPOS', 'RedPOS code'),
-                border: const OutlineInputBorder(),
+              TextButton(
+                onPressed: () => openLifetimeLicenseMail(context),
+                child: Text(l('Licencia de por vida', 'Lifetime license')),
               ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                TextButton(
-                  onPressed: () async {
-                    final ok =
-                        await openMonthlySubscription(context, widget.store);
-                    if (!mounted) return;
-                    if (ok) setState(() => _adsFree = true);
-                  },
-                  child: Text(l('Suscripción mensual', 'Monthly subscription')),
-                ),
-                TextButton(
-                  onPressed: () => openLifetimeLicenseMail(context),
-                  child: Text(l('Licencia de por vida', 'Lifetime license')),
-                ),
-              ],
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final tt = Theme.of(context).textTheme;
     final l = L.of(context);
+    final busy = _saving || _testing || _activating;
+    Widget hint(String text) => Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            text,
+            style: tt.bodySmall?.copyWith(color: AppColors.inkSoft),
+          ),
+        );
+    Widget fieldTitle(String text) => Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            text,
+            style: tt.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        );
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
           _isEdit
-              ? l('Editar impresora', 'Edit printer')
-              : l('Agregar impresora', 'Add printer'),
+              ? l('Ajustes de impresora', 'Printer settings')
+              : l('Vincular impresora', 'Pair printer'),
         ),
       ),
       body: Form(
         key: _formKey,
         child: BoletaPage(
-          bottomBar: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          maxContentWidth: 640,
+          bottomBar: Row(
             children: [
-              FilledButton.icon(
-                onPressed: (_saving || _testing || _activating)
-                    ? null
-                    : () => _save(),
-                icon: (_saving || _activating)
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.save),
-                label: Text(
-                  _adsFree
-                      ? l('Guardar', 'Save')
-                      : l('Guardar / activar', 'Save / activate'),
+              Expanded(
+                flex: 2,
+                child: OutlinedButton.icon(
+                  onPressed: busy ? null : _test,
+                  icon: _testing
+                      ? const ButtonSpinner()
+                      : const Icon(Icons.print_outlined),
+                  label: Text(l('Probar', 'Test')),
                 ),
               ),
-              if (!_adsFree) ...[
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: (_saving || _testing || _activating)
-                      ? null
-                      : () => _save(withAds: true),
-                  icon: const Icon(Icons.campaign_outlined),
-                  label: Text(l('Continuar con publicidad', 'Continue with ads')),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 3,
+                child: FilledButton.icon(
+                  onPressed: busy ? null : () => _save(),
+                  icon: (_saving || _activating)
+                      ? const ButtonSpinner(color: Colors.white)
+                      : const Icon(Icons.check_rounded),
+                  label: Text(l('Guardar', 'Save')),
                 ),
-              ],
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: (_saving || _testing || _activating) ? null : _test,
-                icon: _testing
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.print),
-                label: Text(l('Probar impresión', 'Test print')),
               ),
             ],
           ),
           child: ListView(
-          padding: const EdgeInsets.all(16),
-          scrollCacheExtent: const ScrollCacheExtent.pixels(280),
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          children: [
-            _activationCard(theme),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _nameCtrl,
-              decoration: InputDecoration(
-                labelText: l('Nombre', 'Name'),
-                border: const OutlineInputBorder(),
-              ),
-              textCapitalization: TextCapitalization.words,
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) {
-                  return l('Escribe un nombre', 'Enter a name');
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            Text(l('Conexión', 'Connection'), style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            SegmentedButton<PrinterLinkType>(
-              showSelectedIcon: false,
-              segments: [
-                for (final t in _linkTypes)
-                  ButtonSegment(
-                    value: t,
-                    label: Text(t.label),
-                    icon: Icon(_iconFor(t)),
-                  ),
-              ],
-              selected: {_type},
-              onSelectionChanged: (set) => _onTypeChanged(set.first),
-            ),
-            const SizedBox(height: 16),
-            if (_type == PrinterLinkType.bluetooth) ...[
-              Row(
-                children: [
-                  Text(
-                    l('Dispositivos emparejados', 'Paired devices'),
-                    style: theme.textTheme.titleSmall,
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    tooltip: l('Actualizar emparejados', 'Refresh paired'),
-                    onPressed: _loadingPaired ? null : _loadPaired,
-                    icon: _loadingPaired
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.refresh),
-                  ),
-                ],
-              ),
-              ..._paired.map(
-                (d) => ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.print),
-                  title: Text(d.name),
-                  subtitle: Text(d.macAdress),
-                  selected: _addressCtrl.text.toUpperCase() ==
-                      d.macAdress.toUpperCase(),
-                  trailing: PlatformCaps.isAndroid
-                      ? IconButton(
-                          tooltip: tr('Desvincular', 'Unlink'),
-                          icon: const Icon(Icons.link_off),
-                          onPressed: () => _forgetPaired(d),
-                        )
-                      : null,
-                  onTap: () => _pickPaired(d),
-                ),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: _loadingPaired ? null : _addNewBtDevice,
-                icon: const Icon(Icons.add),
-                label: Text(l('Agregar dispositivo', 'Add device')),
-              ),
-              if (_showAddress) ...[
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _addressCtrl,
-                  decoration: InputDecoration(
-                    labelText: l('Direccion MAC', 'MAC address'),
-                    hintText: 'AA:BB:CC:DD:EE:FF',
-                    border: const OutlineInputBorder(),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return l(
-                        'Selecciona o escribe la MAC',
-                        'Select or enter the MAC',
-                      );
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ] else if (_type == PrinterLinkType.usb) ...[
-              _savedPrinterTiles(theme, PrinterLinkType.usb),
-              Row(
-                children: [
-                  Text(
-                    l('Dispositivos USB', 'USB devices'),
-                    style: theme.textTheme.titleSmall,
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    tooltip: l('Actualizar USB', 'Refresh USB'),
-                    onPressed: _loadingUsb ? null : _loadUsb,
-                    icon: _loadingUsb
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.refresh),
-                  ),
-                ],
-              ),
-              ..._usbNotSaved.map(
-                (d) => ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.usb),
-                  title: Text(d.name),
-                  subtitle: Text(
-                    '${d.address}${d.hasPermission ? '' : l(' · sin permiso', ' · no permission')}',
-                  ),
-                  selected: _addressCtrl.text == d.address,
-                  onTap: () => _pickUsb(d),
-                ),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () =>
-                    _startNew(PrinterLinkType.usb, showAddress: true),
-                icon: const Icon(Icons.add),
-                label: Text(l('Agregar impresora', 'Add printer')),
-              ),
-              if (_showAddress) ...[
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _addressCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'USB vid:pid',
-                    hintText: '1137:85',
-                    border: const OutlineInputBorder(),
-                  ),
-                  onChanged: (v) => _syncAutoName(PrinterLinkType.usb, v),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return l(
-                        'Selecciona un dispositivo USB',
-                        'Select a USB device',
-                      );
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ] else ...[
-              Row(
-                children: [
-                  Text(
-                    l('Dispositivos WiFi / Red', 'WiFi / Network devices'),
-                    style: theme.textTheme.titleSmall,
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    tooltip: l('Actualizar', 'Refresh'),
-                    onPressed: _loadingSaved ? null : _loadSaved,
-                    icon: _loadingSaved
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.refresh),
-                  ),
-                ],
-              ),
-              ..._savedOf(PrinterLinkType.network).map(
-                (p) => ListTile(
-                  dense: true,
-                  leading: Icon(_iconFor(PrinterLinkType.network)),
-                  title: Text(p.name),
-                  subtitle: Text(p.connectionSummary),
-                  selected: p.id == _id,
-                  trailing: IconButton(
-                    tooltip: tr('Desvincular', 'Unlink'),
-                    icon: const Icon(Icons.link_off),
-                    onPressed: () => _unlinkSaved(p),
-                  ),
-                  onTap: () => _applyPrinter(p),
-                ),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () =>
-                    _startNew(PrinterLinkType.network, showAddress: true),
-                icon: const Icon(Icons.add),
-                label: Text(l('Agregar impresora', 'Add printer')),
-              ),
-              if (_showAddress) ...[
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _addressCtrl,
-                  decoration: InputDecoration(
-                    labelText: l('IP de la impresora', 'Printer IP'),
-                    hintText: '192.168.1.50',
-                    border: const OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.url,
-                  onChanged: (v) => _syncAutoName(PrinterLinkType.network, v),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return l('Escribe la IP', 'Enter the IP');
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _portCtrl,
-                  decoration: InputDecoration(
-                    labelText: l('Puerto TCP', 'TCP port'),
-                    hintText: '9100',
-                    border: const OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                  validator: (v) {
-                    final n = int.tryParse(v?.trim() ?? '');
-                    if (n == null || n < 1 || n > 65535) {
-                      return l('Puerto invalido', 'Invalid port');
-                    }
-                    return null;
-                  },
-                ),
-              ],
-            ],
-            const SizedBox(height: 24),
-            Text(l('Ancho del rollo', 'Paper width'), style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            PaperWidthSelector(
-              value: _paper,
-              onChanged: (v) => setState(() => _paper = v),
-            ),
-            const SizedBox(height: 20),
-            Text(l('DPI del cabezal', 'Print head DPI'), style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            SegmentedButton<PrinterDpi>(
-              segments: [
-                for (final d in PrinterDpi.values)
-                  ButtonSegment(value: d, label: Text(d.label)),
-              ],
-              selected: {_dpi},
-              onSelectionChanged: (set) {
-                if (set.isEmpty) return;
-                setState(() => _dpi = set.first);
-                _persistSettings();
-              },
-            ),
-            const SizedBox(height: 6),
-            Text(_dpi.hint, style: theme.textTheme.labelMedium),
-            const SizedBox(height: 20),
-            MarginFields(
-              key: ValueKey('margins-$_id'),
-              value: _margins,
-              onChanged: (v) => _margins = v,
-            ),
-            const SizedBox(height: 20),
-            Text(l('Corte automático', 'Auto cut'), style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            DropdownMenu<CutMode>(
-              key: ValueKey('cut-$_id'),
-              initialSelection: _cut,
-              expandedInsets: EdgeInsets.zero,
-              label: Text(l('Comando de corte', 'Cut command')),
-              dropdownMenuEntries: [
-                for (final m in CutMode.uiOrder)
-                  DropdownMenuEntry(value: m, label: m.label),
-              ],
-              onSelected: (v) {
-                if (v == null) return;
-                setState(() => _cut = v);
-                _persistSettings();
-              },
-            ),
-            const SizedBox(height: 6),
-            Text(_cut.hint, style: theme.textTheme.labelMedium),
-            const SizedBox(height: 20),
-            Text(l('Gaveta de dinero', 'Cash drawer'), style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            DropdownMenu<CashDrawer>(
-              key: ValueKey('drawer-$_id'),
-              initialSelection: _cashDrawer,
-              expandedInsets: EdgeInsets.zero,
-              label: Text(l('Comando de gaveta', 'Drawer command')),
-              dropdownMenuEntries: CashDrawer.values
-                  .map(
-                    (m) => DropdownMenuEntry(
-                      value: m,
-                      label: m.label,
-                    ),
-                  )
-                  .toList(),
-              onSelected: (v) {
-                if (v != null) setState(() => _cashDrawer = v);
-              },
-            ),
-            if (_cashDrawer != CashDrawer.none) ...[
-              const SizedBox(height: 6),
-              Text(_cashDrawer.hint, style: theme.textTheme.labelMedium),
-            ],
-            const SizedBox(height: 20),
-            RasterScaleFields(
-              key: ValueKey('raster-$_id'),
-              value: _rasterScale,
-              onChanged: (v) {
-                setState(() => _rasterScale = v);
-                _persistSettings();
-              },
-            ),
-            const SizedBox(height: 8),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(l('Usar como predeterminada', 'Use as default')),
-              subtitle: Text(
-                _firstPrinter
-                    ? l(
-                        'Primera impresora: será la predeterminada',
-                        'First printer: it will be the default',
-                      )
-                    : l(
-                        'Se usará por defecto al imprimir',
-                        'Used by default when printing',
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+            scrollCacheExtent: const ScrollCacheExtent.pixels(280),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            children: [
+              SectionLabel(l('¿Cómo se conecta?', 'How does it connect?')),
+              Card(
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+                      child: SegmentedButton<PrinterLinkType>(
+                        expandedInsets: EdgeInsets.zero,
+                        showSelectedIcon: false,
+                        segments: [
+                          for (final t in _linkTypes)
+                            ButtonSegment(
+                              value: t,
+                              label: Text(
+                                t == PrinterLinkType.network ? 'WiFi' : t.label,
+                              ),
+                              icon: Icon(printerTypeIcon(t), size: 18),
+                            ),
+                        ],
+                        selected: {_type},
+                        onSelectionChanged: (set) => _onTypeChanged(set.first),
                       ),
+                    ),
+                    ..._connectionChildren(),
+                  ],
+                ),
               ),
-              value: _isDefault || _firstPrinter,
-              onChanged: _firstPrinter
-                  ? null
-                  : (v) => setState(() => _isDefault = v),
-            ),
-          ],
-        ),
+              SectionLabel(l('Nombre', 'Name')),
+              Card(
+                child: SectionBody(
+                  children: [
+                    TextFormField(
+                      controller: _nameCtrl,
+                      decoration: InputDecoration(
+                        hintText: l('Ej.: Caja 1', 'E.g. Front desk'),
+                        helperText: l(
+                          'Así la verás en la lista.',
+                          'This is how it shows in the list.',
+                        ),
+                      ),
+                      textCapitalization: TextCapitalization.words,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return l('Escribe un nombre', 'Enter a name');
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              SectionLabel(l('Papel', 'Paper')),
+              Card(
+                child: SectionBody(
+                  children: [
+                    fieldTitle(l('Ancho del rollo', 'Paper width')),
+                    PaperWidthSelector(
+                      value: _paper,
+                      onChanged: (v) => setState(() => _paper = v),
+                    ),
+                    const SizedBox(height: 18),
+                    fieldTitle(l('Resolución del cabezal', 'Print head resolution')),
+                    SegmentedButton<PrinterDpi>(
+                      expandedInsets: EdgeInsets.zero,
+                      showSelectedIcon: false,
+                      segments: [
+                        for (final d in PrinterDpi.values)
+                          ButtonSegment(value: d, label: Text(d.label)),
+                      ],
+                      selected: {_dpi},
+                      onSelectionChanged: (set) {
+                        if (set.isEmpty) return;
+                        setState(() => _dpi = set.first);
+                        _persistSettings();
+                      },
+                    ),
+                    hint(_dpi.hint),
+                  ],
+                ),
+              ),
+              SectionLabel(l('Corte y gaveta', 'Cut and drawer')),
+              Card(
+                child: SectionBody(
+                  children: [
+                    DropdownMenu<CutMode>(
+                      key: ValueKey('cut-$_id'),
+                      initialSelection: _cut,
+                      expandedInsets: EdgeInsets.zero,
+                      label: Text(l('Corte automático', 'Auto cut')),
+                      dropdownMenuEntries: [
+                        for (final m in CutMode.uiOrder)
+                          DropdownMenuEntry(value: m, label: m.label),
+                      ],
+                      onSelected: (v) {
+                        if (v == null) return;
+                        setState(() => _cut = v);
+                        _persistSettings();
+                      },
+                    ),
+                    hint(_cut.hint),
+                    const SizedBox(height: 18),
+                    DropdownMenu<CashDrawer>(
+                      key: ValueKey('drawer-$_id'),
+                      initialSelection: _cashDrawer,
+                      expandedInsets: EdgeInsets.zero,
+                      label: Text(l('Gaveta de dinero', 'Cash drawer')),
+                      dropdownMenuEntries: [
+                        for (final m in CashDrawer.values)
+                          DropdownMenuEntry(value: m, label: m.label),
+                      ],
+                      onSelected: (v) {
+                        if (v != null) setState(() => _cashDrawer = v);
+                      },
+                    ),
+                    if (_cashDrawer != CashDrawer.none) hint(_cashDrawer.hint),
+                  ],
+                ),
+              ),
+              SectionLabel(l('Ajuste fino', 'Fine tuning')),
+              SectionGroup(
+                dividerIndent: 68,
+                children: [
+                  MarginFields(
+                    key: ValueKey('margins-$_id'),
+                    value: _margins,
+                    onChanged: (v) => _margins = v,
+                  ),
+                  RasterScaleFields(
+                    key: ValueKey('raster-$_id'),
+                    value: _rasterScale,
+                    onChanged: (v) {
+                      setState(() => _rasterScale = v);
+                      _persistSettings();
+                    },
+                  ),
+                  if (_firstPrinter)
+                    NavRow(
+                      icon: Icons.star_rounded,
+                      title: l('Impresora principal', 'Default printer'),
+                      subtitle: l(
+                        'Es la primera, así que será la principal.',
+                        'It is the first one, so it will be the default.',
+                      ),
+                    )
+                  else
+                    SwitchRow(
+                      icon: Icons.star_outline_rounded,
+                      title: l('Impresora principal', 'Default printer'),
+                      subtitle: l(
+                        'Se elige primero al imprimir.',
+                        'Picked first when printing.',
+                      ),
+                      value: _isDefault,
+                      onChanged: (v) => setState(() => _isDefault = v),
+                    ),
+                ],
+              ),
+              SectionLabel(l('Publicidad', 'Ads')),
+              _activationSection(),
+            ],
+          ),
         ),
       ),
     );
@@ -1698,10 +1793,10 @@ class _AddBtDeviceSheetState extends State<_AddBtDeviceSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              l('Agregar dispositivo', 'Add device'),
-              style: Theme.of(context).textTheme.titleMedium,
+              l('Buscar impresora', 'Find printer'),
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               PlatformCaps.isIOS
                   ? l(
@@ -1712,98 +1807,104 @@ class _AddBtDeviceSheetState extends State<_AddBtDeviceSheet> {
                       'Enciende la impresora. Toca una para emparejarla. Si pide PIN suele ser 0000 o 1234. En POS (Telpo y similares) a menudo se vincula sola, sin PIN.',
                       'Turn the printer on. Tap one to pair. If it asks for a PIN, try 0000 or 1234. On POS devices (Telpo and similar) it often pairs by itself, with no PIN.',
                     ),
-              style: Theme.of(context).textTheme.bodySmall,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: AppColors.inkSoft),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             if (_scanning)
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.only(bottom: 10),
                 child: Row(
                   children: [
-                    const RepaintBoundary(
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
+                    const RepaintBoundary(child: ButtonSpinner()),
                     const SizedBox(width: 12),
-                    Text(l('Buscando cercanos…', 'Scanning nearby…')),
+                    Text(l('Buscando cerca…', 'Scanning nearby…')),
                   ],
                 ),
               ),
             if (_error != null)
               Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
+                padding: const EdgeInsets.only(bottom: 10),
+                child: InfoNote(text: _error!, tone: InfoTone.error),
               ),
             ValueListenableBuilder<List<NearbyBtDevice>>(
               valueListenable: _found,
               builder: (context, found, _) {
-                return SizedBox(
-                  height: 280,
-                  child: found.isEmpty
-                      ? (!_scanning && _error == null
-                          ? Center(
-                              child: Text(
-                                l(
-                                  'No hay impresoras con nombre. Enciende la térmica y busca de nuevo (se ocultan las que solo muestran MAC).',
-                                  'No named printers found. Turn the thermal printer on and scan again (devices that only show a MAC are hidden).',
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            )
-                          : const SizedBox.shrink())
-                      : ListView.builder(
-                          scrollCacheExtent:
-                              const ScrollCacheExtent.pixels(160),
-                          itemCount: found.length,
-                          itemBuilder: (context, index) {
-                            final d = found[index];
-                            return RepaintBoundary(
-                              child: ListTile(
-                                dense: true,
-                                enabled: _bonding == null,
-                                leading: _bonding == d.address
-                                    ? const RepaintBoundary(
-                                        child: SizedBox(
-                                          width: 24,
-                                          height: 24,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ),
-                                        ),
-                                      )
-                                    : const Icon(Icons.bluetooth_searching),
-                                title: Text(d.name),
-                                subtitle: Text(d.address),
-                                onTap: _bonding != null
-                                    ? null
-                                    : () => _select(d),
-                              ),
-                            );
-                          },
-                        ),
+                final maxH = MediaQuery.sizeOf(context).height * 0.4;
+                if (found.isEmpty) {
+                  if (_scanning || _error != null) {
+                    return const SizedBox(height: 8);
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Text(
+                      l(
+                        'No aparece ninguna impresora. Enciéndela y busca de nuevo. '
+                            'Se ocultan los equipos que solo muestran su MAC.',
+                        'No printer showed up. Turn it on and scan again. '
+                            'Devices that only show a MAC are hidden.',
+                      ),
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(color: AppColors.inkSoft),
+                    ),
+                  );
+                }
+                return ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: maxH.clamp(160, 320)),
+                  child: Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      scrollCacheExtent: const ScrollCacheExtent.pixels(160),
+                      itemCount: found.length,
+                      separatorBuilder: (_, __) =>
+                          const Divider(height: 1, indent: 66),
+                      itemBuilder: (context, index) {
+                        final d = found[index];
+                        final bonding = _bonding == d.address;
+                        return RepaintBoundary(
+                          child: NavRow(
+                            icon: Icons.print_outlined,
+                            color: AppColors.bluetooth,
+                            title: d.name,
+                            subtitle: d.address,
+                            trailing: bonding
+                                ? const Padding(
+                                    padding: EdgeInsets.all(6),
+                                    child: ButtonSpinner(),
+                                  )
+                                : null,
+                            onTap: _bonding != null ? null : () => _select(d),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                 );
               },
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Row(
               children: [
-                TextButton(
-                  onPressed: _bonding != null
-                      ? null
-                      : () => Navigator.pop(context),
-                  child: Text(l('Cancelar', 'Cancel')),
+                Expanded(
+                  child: TextButton(
+                    onPressed:
+                        _bonding != null ? null : () => Navigator.pop(context),
+                    child: Text(l('Cancelar', 'Cancel')),
+                  ),
                 ),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: (_scanning || _bonding != null) ? null : _start,
-                  icon: const Icon(Icons.refresh),
-                  label: Text(l('Buscar de nuevo', 'Scan again')),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: (_scanning || _bonding != null) ? null : _start,
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: Text(l('Buscar de nuevo', 'Scan again')),
+                  ),
                 ),
               ],
             ),
