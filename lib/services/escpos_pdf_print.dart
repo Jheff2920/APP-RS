@@ -152,15 +152,22 @@ class EscPosPdfPrint {
     final paperSize = _paperSize(layout.paper);
     final generator = Generator(paperSize, profile);
 
+    final network = printer.type == PrinterLinkType.network;
     final bytes = <int>[
       ...generator.reset(),
+      ...EscPosFeed.topMargin(
+        mm: sharedImageTopMm,
+        paperDotsWidth: layout.fullWidth,
+        dotsPerMm: printer.dpi.dotsPerMm,
+        network: network,
+      ),
       ...body,
       ...EscPosFeed.finishJob(
         bottomMm: printer.margins.bottomMm,
         paperDotsWidth: layout.fullWidth,
         cut: printer.cut,
         dotsPerMm: printer.dpi.dotsPerMm,
-        network: printer.type == PrinterLinkType.network,
+        network: network,
       ),
     ];
     timing?.event('raster_complete', fields: {
@@ -169,6 +176,9 @@ class EscPosPdfPrint {
     });
     return bytes;
   }
+
+  /// Aire sobre capturas compartidas (logo de BCP pegado al borde).
+  static const sharedImageTopMm = 3.0;
 
   static _PrintLayout _layout(
     SavedPrinter printer, {

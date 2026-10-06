@@ -16,6 +16,16 @@ void main() {
     expect(out.contains(0x76), isFalse);
   });
 
+  test('top margin: ESC J on LAN, blank GS v 0 elsewhere', () {
+    expect(
+      EscPosFeed.topMargin(mm: 3, paperDotsWidth: 384, network: true),
+      [0x1b, 0x4a, 24],
+    );
+    final bt = EscPosFeed.topMargin(mm: 3, paperDotsWidth: 384);
+    expect(bt.take(2).toList(), [0x1d, 0x76]);
+    expect(EscPosFeed.topMargin(mm: 0, paperDotsWidth: 384), isEmpty);
+  });
+
   test('Bluetooth finish still uses blank GS v 0 tear-off', () {
     final out = EscPosFeed.finishJob(
       bottomMm: 15,

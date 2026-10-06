@@ -33,6 +33,25 @@ class EscPosFeed {
     return out;
   }
 
+  /// Margen antes de una imagen: sin esto, si la captura no trae aire arriba,
+  /// las primeras líneas quedan pegadas al borde de corte y se pierden.
+  static List<int> topMargin({
+    required double mm,
+    required int paperDotsWidth,
+    double dotsPerMm = dotsPerMm203,
+    bool network = false,
+  }) {
+    if (mm <= 0) return const [];
+    if (network) {
+      return [0x1b, 0x4a, (mm * dotsPerMm).round().clamp(1, 255)];
+    }
+    return tearOff(
+      mm: mm,
+      paperDotsWidth: paperDotsWidth,
+      dotsPerMm: dotsPerMm,
+    );
+  }
+
   /// Cierre de ticket: margen inferior y corte (la gaveta va aparte).
   /// En LAN/803L no uses GS v 0 en blanco: el módulo Ethernet se cuelga.
   static List<int> finishJob({
