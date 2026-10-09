@@ -50,6 +50,7 @@ class _PrintHistoryScreenState extends State<PrintHistoryScreen> {
       builder: (ctx) {
         final loc = L.of(ctx);
         return AlertDialog(
+          scrollable: true,
           title: Text(loc('Borrar historial', 'Clear history')),
           content: Text(
             widget.printer == null

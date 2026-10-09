@@ -36,10 +36,11 @@ class HelpScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(4, 12, 4, 0),
             child: Text(
               l(
-                'Si no imprime o tienes dudas del código o la suscripción, '
-                    'escríbenos. Imprimir nunca se bloquea.',
-                'If it does not print, or you have questions about the code '
-                    'or subscription, write us. Printing is never blocked.',
+                'Si no imprime o tienes dudas del código de activación o la '
+                    'suscripción, escríbenos. Imprimir nunca se bloquea.',
+                'If it does not print, or you have questions about the '
+                    'activation code or subscription, write us. Printing is '
+                    'never blocked.',
               ),
               style: tt.bodyMedium?.copyWith(color: AppColors.inkSoft),
             ),
@@ -145,7 +146,10 @@ class HelpScreen extends StatelessWidget {
             ],
           ),
           SectionLabel(
-            l('Código, suscripción y licencia', 'Code, subscription, and license'),
+            l(
+              'Código de activación, suscripción y licencia',
+              'Activation code, subscription and license',
+            ),
           ),
           SectionGroup(
             dividerIndent: 68,
@@ -154,11 +158,11 @@ class HelpScreen extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                 child: Text(
                   l(
-                    'El código RedPOS quita la publicidad sin iniciar sesión. '
-                        'La suscripción mensual se paga en Google Play; si la '
-                        'cancelas vuelven los avisos, pero imprimir sigue '
+                    'El código de activación quita la publicidad sin iniciar '
+                        'sesión. La suscripción mensual se paga en Google Play; '
+                        'si la cancelas vuelven los avisos, pero imprimir sigue '
                         'disponible.',
-                    'The RedPOS code removes ads without signing in. The '
+                    'The activation code removes ads without signing in. The '
                         'monthly subscription is paid in Google Play; if you '
                         'cancel it, ads return but printing still works.',
                   ),

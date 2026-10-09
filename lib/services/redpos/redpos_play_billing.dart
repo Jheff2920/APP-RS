@@ -9,6 +9,7 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 
 import '../printer_store.dart';
+import '../../brand.dart';
 import '../../l10n/app_lang.dart';
 import 'redpos_config.dart';
 import 'redpos_license.dart';
@@ -98,30 +99,30 @@ class RedPosPlayBilling {
     }
     if (!await _iap.isAvailable()) {
       lastError = tr(
-        'Google Play no está en este aparato, o la app no se instaló desde Play Store. '
-        'El APK copiado (inst-apk) no puede cobrar. Instala RedPOS Service desde la prueba interna o cerrada, con un Gmail de testers de licencia.',
-        'Google Play is missing on this device, or the app was not installed from Play Store. '
-        'A sideloaded APK cannot charge. Install RedPOS Service from internal or closed testing, using a license-tester Gmail.',
+        'No se puede cobrar desde este equipo. Instala ${AppBrand.name} desde '
+        'Google Play e inténtalo de nuevo.',
+        'Payments are not available on this device. Install ${AppBrand.name} '
+        'from Google Play and try again.',
       );
       return null;
     }
     final response = await _iap.queryProductDetails({productId});
     if (response.error != null) {
       lastError = tr(
-        'Play no pudo leer la suscripción (${response.error!.message}).',
-        'Play could not read the subscription (${response.error!.message}).',
+        'Google Play no pudo cargar la suscripción. Inténtalo de nuevo en unos minutos.',
+        'Google Play could not load the subscription. Try again in a few minutes.',
       );
       return null;
     }
     if (response.productDetails.isEmpty ||
         response.notFoundIDs.contains(productId)) {
       lastError = tr(
-        'Play no encontró el producto $productId. Suele pasar si instalaste el APK a mano, '
-        'si la suscripción no está activa en Play Console, o si tu Gmail no está en testers de licencia. '
-        'Instala desde Play (prueba interna o cerrada) con la misma cuenta.',
-        'Play did not find product $productId. That usually means a sideloaded APK, '
-        'an inactive subscription in Play Console, or a Gmail missing from license testers. '
-        'Install from Play (internal or closed testing) with the same account.',
+        'La suscripción no está disponible ahora. Instala ${AppBrand.name} desde '
+        'Google Play con la misma cuenta e inténtalo de nuevo. Si sigue igual, '
+        'escríbenos desde Ayuda.',
+        'The subscription is not available right now. Install ${AppBrand.name} '
+        'from Google Play with the same account and try again. If it keeps '
+        'happening, write to us from Help.',
       );
       return null;
     }
@@ -184,7 +185,7 @@ class RedPosPlayBilling {
     }
     if (!await _iap.isAvailable()) {
       return tr(
-        'Google Play no está disponible en este aparato.',
+        'Google Play no está disponible en este equipo.',
         'Google Play is not available on this device.',
       );
     }
@@ -202,8 +203,8 @@ class RedPosPlayBilling {
     if (product is GooglePlayProductDetails &&
         (offerToken == null || offerToken.isEmpty)) {
       return tr(
-        'Play no devolvió la oferta de la suscripción. Revisa el plan base mensual en Play Console.',
-        'Play did not return a subscription offer. Check the monthly base plan in Play Console.',
+        'Google Play no mostró la oferta de la suscripción. Inténtalo de nuevo en unos minutos.',
+        'Google Play did not show the subscription offer. Try again in a few minutes.',
       );
     }
     lastError = null;

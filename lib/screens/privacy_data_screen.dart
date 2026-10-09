@@ -8,11 +8,12 @@ import '../services/printer_store.dart';
 import '../services/privacy_data_wipe.dart';
 import '../services/redpos/redpos_config.dart';
 import '../services/redpos/redpos_links.dart';
+import '../services/user_error.dart';
 import '../theme.dart';
 import '../widgets/ui_kit.dart';
 import 'legal_screen.dart';
 
-/// Pantalla Play-facing: resumen de datos, IA, terceros, política y borrado.
+/// Resumen de datos, IA, servicios de terceros, política y borrado.
 class PrivacyDataScreen extends StatefulWidget {
   const PrivacyDataScreen({super.key, required this.store});
 
@@ -32,19 +33,21 @@ class _PrivacyDataScreenState extends State<PrivacyDataScreen> {
       builder: (ctx) {
         final loc = L.of(ctx);
         return AlertDialog(
+          scrollable: true,
           title: Text(loc('Borrar datos locales', 'Delete local data')),
           content: Text(
             loc(
-              'Se borrarán impresoras vinculadas, historial, plantillas de tickets '
-              'propios, logo/ajustes SUNAT, pase de licencia local y el correo de '
-              'Google guardado en este aparato.\n\n'
+              'Se borrarán las impresoras vinculadas, el historial, las plantillas de '
+              'tickets propios, el logo y los ajustes de SUNAT, el código de '
+              'activación guardado y el correo de Google guardado en este equipo.\n\n'
               'No cancela la suscripción de Google Play ni borra el canje del código '
-              'en el servidor RedPOS. Para eso usa los enlaces de esta pantalla.',
-              'This will delete paired printers, history, custom ticket templates, '
-              'SUNAT logo/settings, the local license pass, and the Google email '
-              'stored on this device.\n\n'
-              'It does not cancel the Google Play subscription or remove code '
-              'redemption on the RedPOS server. Use the links on this screen for that.',
+              'en el servidor de RedPOS. Para eso usa los enlaces de esta pantalla.',
+              'This will delete the paired printers, history, custom ticket '
+              'templates, the SUNAT logo and settings, the saved activation code, '
+              'and the Google email stored on this device.\n\n'
+              'It does not cancel the Google Play subscription or remove the code '
+              'redemption from the RedPOS server. Use the links on this screen for '
+              'that.',
             ),
           ),
           actions: [
@@ -83,8 +86,8 @@ class _PrivacyDataScreenState extends State<PrivacyDataScreen> {
         SnackBar(
           content: Text(
             l(
-              'No se pudo completar el borrado: ${result.message ?? "error"}',
-              'Could not finish deletion: ${result.message ?? "error"}',
+              'No se pudo completar el borrado. ${friendlyError(result.message ?? "")}',
+              'Could not finish deleting. ${friendlyError(result.message ?? "")}',
             ),
           ),
         ),
@@ -158,21 +161,8 @@ class _PrivacyDataScreenState extends State<PrivacyDataScreen> {
             children: [
               for (final section in summary) block(section.title, section.body),
               block(
-                l('Terceros y APIs', 'Third parties and APIs'),
-                l(
-                  'Google Play Billing, Google Sign-In (solo al suscribirte), '
-                      'API de códigos RedPOS (canje), url_launcher, plugins '
-                      'locales de impresión y SharedPreferences. '
-                      'Sin SDK de AdMob, Firebase, Crashlytics ni Analytics; '
-                      'Play Billing y Sign-In pueden enviar telemetría técnica '
-                      'propia a Google.',
-                  'Google Play Billing, Google Sign-In (subscribe only), '
-                      'RedPOS codes API (redemption), url_launcher, local print '
-                      'plugins, and SharedPreferences. '
-                      'No AdMob, Firebase, Crashlytics, or Analytics SDKs; '
-                      'Play Billing and Sign-In may send their own technical '
-                      'telemetry to Google.',
-                ),
+                LegalCopy.thirdParties(l).title,
+                LegalCopy.thirdParties(l).body,
               ),
             ],
           ),
@@ -215,8 +205,8 @@ class _PrivacyDataScreenState extends State<PrivacyDataScreen> {
                 destructive: true,
                 title: l('Borrar datos locales', 'Delete local data'),
                 subtitle: l(
-                  'Impresoras, historial, plantillas, logos y licencia local',
-                  'Printers, history, templates, logos and local license',
+                  'Impresoras, historial, plantillas, logos y código guardado',
+                  'Printers, history, templates, logos and saved code',
                 ),
                 trailing: _wiping ? const ButtonSpinner() : null,
                 showChevron: false,

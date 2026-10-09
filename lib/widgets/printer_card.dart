@@ -62,9 +62,13 @@ class PrinterCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    Row(
+                    // Wrap: con letra grande o poco ancho, la insignia baja de línea.
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 2,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        if (printer.isDefault) ...[
+                        if (printer.isDefault)
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
@@ -83,16 +87,12 @@ class PrinterCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                        ],
-                        Flexible(
-                          child: Text(
-                            '${printer.type.label}, ${printer.paper.label}',
-                            style: tt.bodySmall
-                                ?.copyWith(color: cs.onSurfaceVariant),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                        Text(
+                          '${printer.type.label}, ${printer.paper.label}',
+                          style: tt.bodySmall
+                              ?.copyWith(color: cs.onSurfaceVariant),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),

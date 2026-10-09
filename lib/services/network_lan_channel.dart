@@ -45,7 +45,7 @@ class NetworkLanChannel {
     if (raw == null || raw.isEmpty) {
       throw PlatformException(
         code: 'empty',
-        message: tr('Ticket vacio', 'Empty ticket'),
+        message: tr('Ticket vacío', 'Empty ticket'),
       );
     }
     return raw;
@@ -56,8 +56,8 @@ class NetworkLanChannel {
       throw PlatformException(
         code: 'unsupported',
         message: tr(
-          'El socket LAN nativo solo esta en Android.',
-          'Native LAN sockets are Android only.',
+          'La conexión por red no está disponible en este equipo.',
+          'Network printing is not available on this device.',
         ),
       );
     }

@@ -78,7 +78,7 @@ class _CustomTicketPreviewScreenState extends State<CustomTicketPreviewScreen> {
         if (!ok) {
           throw PrinterTransportException(
             l(
-              'Faltan permisos de Bluetooth. Concedelos en Ajustes de la app.',
+              'Faltan permisos de Bluetooth. Concédelos en Ajustes de la app.',
               'Bluetooth permission is missing. Allow it in app Settings.',
             ),
           );

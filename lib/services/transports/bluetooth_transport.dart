@@ -21,7 +21,7 @@ class BluetoothTransport implements PrinterTransport {
     if (!enabled) {
       throw PrinterTransportException(
         tr(
-          'Bluetooth esta apagado. Activalo e intenta de nuevo.',
+          'Bluetooth está apagado. Actívalo e inténtalo de nuevo.',
           'Bluetooth is off. Turn it on and try again.',
         ),
       );
@@ -77,7 +77,7 @@ class BluetoothTransport implements PrinterTransport {
     if (!_connected) {
       throw PrinterTransportException(
         tr(
-          'No hay conexion Bluetooth activa.',
+          'No hay conexión Bluetooth activa.',
           'There is no active Bluetooth connection.',
         ),
       );
@@ -108,8 +108,8 @@ class BluetoothTransport implements PrinterTransport {
     if (!ok) {
       throw PrinterTransportException(
         tr(
-          'Fallo al enviar datos a la impresora Bluetooth.',
-          'Failed to send data to the Bluetooth printer.',
+          'No se pudieron enviar los datos a la impresora Bluetooth.',
+          'Could not send the data to the Bluetooth printer.',
         ),
       );
     }

@@ -26,7 +26,7 @@ enum CashDrawer {
         );
       case CashDrawer.pin2:
         return tr(
-          'Conector habitual; el cajon se abre cuando ya salio el ticket',
+          'Conector habitual; el cajón se abre cuando ya salió el ticket',
           'Usual connector; the drawer opens after the ticket prints',
         );
       case CashDrawer.pin5:

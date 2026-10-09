@@ -22,9 +22,9 @@ class RedPosPaidGateBanner extends StatelessWidget {
   final bool compact;
 
   static String message(L l) => l(
-        'Función de pago. Se desbloquea con un código RedPOS, la suscripción '
-            'mensual o la licencia de por vida.',
-        'Paid feature. Unlock it with a RedPOS code, the monthly '
+        'Función de pago. Se desbloquea con un código de activación, la '
+            'suscripción mensual o la licencia de por vida.',
+        'Paid feature. Unlock it with an activation code, the monthly '
             'subscription, or the lifetime license.',
       );
 

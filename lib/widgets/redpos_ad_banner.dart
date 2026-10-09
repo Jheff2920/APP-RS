@@ -85,11 +85,13 @@ Future<void> showUnlockOptionsSheet({
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
     builder: (ctx) {
       final l = L.of(ctx);
       final tt = Theme.of(ctx).textTheme;
+      // Desplazable: en pantallas bajas o con letra grande no cabe entera.
       return SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -239,6 +241,7 @@ class _ActivateCodeDialogState extends State<_ActivateCodeDialog> {
   Widget build(BuildContext context) {
     final l = L.of(context);
     return AlertDialog(
+      scrollable: true,
       icon: const Align(
         child: IconTile(icon: Icons.vpn_key_outlined, size: 52),
       ),

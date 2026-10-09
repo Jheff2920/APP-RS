@@ -392,13 +392,24 @@ class PageList extends StatelessWidget {
 
 /// Barra inferior fija con las acciones principales de la pantalla.
 class BottomActions extends StatelessWidget {
-  const BottomActions({super.key, required this.children, this.maxWidth = 640});
+  const BottomActions({
+    super.key,
+    required this.children,
+    this.maxWidth = 640,
+    this.flexes,
+  });
 
   final List<Widget> children;
   final double maxWidth;
 
+  /// Proporción de ancho de cada botón; por defecto, partes iguales.
+  final List<int>? flexes;
+
   @override
   Widget build(BuildContext context) {
+    // Pantalla baja (teléfono en horizontal): barra más delgada para dejar
+    // espacio al contenido.
+    final vertical = MediaQuery.sizeOf(context).height < 500 ? 8.0 : 12.0;
     return Material(
       color: AppColors.paper,
       child: DecoratedBox(
@@ -412,12 +423,17 @@ class BottomActions extends StatelessWidget {
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: maxWidth),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                padding: EdgeInsets.fromLTRB(16, vertical, 16, vertical),
                 child: Row(
                   children: [
                     for (var i = 0; i < children.length; i++) ...[
                       if (i > 0) const SizedBox(width: 10),
-                      Expanded(child: children[i]),
+                      Expanded(
+                        flex: flexes != null && i < flexes!.length
+                            ? flexes![i]
+                            : 1,
+                        child: children[i],
+                      ),
                     ],
                   ],
                 ),
@@ -429,6 +445,12 @@ class BottomActions extends StatelessWidget {
     );
   }
 }
+
+/// Letra muy grande en pantalla angosta: los botones de la barra y el botón
+/// flotante pasan a solo icono (con tooltip) para no salirse de la pantalla.
+bool useCompactActions(BuildContext context) =>
+    MediaQuery.textScalerOf(context).scale(16) / 16 > 1.4 &&
+    MediaQuery.widthOf(context) < 480;
 
 IconData printerTypeIcon(PrinterLinkType t) => switch (t) {
       PrinterLinkType.bluetooth => Icons.bluetooth_rounded,

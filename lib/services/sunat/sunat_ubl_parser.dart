@@ -22,7 +22,7 @@ class SunatUblParser {
   static SunatTicket parse(String xmlSource) {
     final source = xmlSource.replaceFirst('\uFEFF', '').trim();
     if (source.isEmpty) {
-      throw SunatXmlException(tr('El XML esta vacio.', 'The XML is empty.'));
+      throw SunatXmlException(tr('El XML está vacío.', 'The XML is empty.'));
     }
 
     final XmlDocument doc;
@@ -31,7 +31,7 @@ class SunatUblParser {
     } on XmlException {
       throw SunatXmlException(
         tr(
-          'El archivo no es un XML valido.',
+          'El archivo no es un XML válido.',
           'The file is not valid XML.',
         ),
       );
@@ -41,10 +41,10 @@ class SunatUblParser {
     if (_rejectRoots.contains(root.localName)) {
       throw SunatXmlException(
         tr(
-          'Este XML no es un comprobante imprimible '
-          '(${root.localName}: es CDR o resumen SUNAT).',
-          'This XML is not a printable receipt '
-          '(${root.localName}: SUNAT CDR or summary).',
+          'Este XML no es un comprobante imprimible: es una constancia de '
+          'recepción o un resumen de SUNAT.',
+          'This XML is not a printable receipt: it is a SUNAT acknowledgment '
+          'or summary.',
         ),
       );
     }
@@ -54,8 +54,8 @@ class SunatUblParser {
     if (id.isEmpty) {
       throw SunatXmlException(
         tr(
-          'El XML no tiene serie-numero (cbc:ID).',
-          'The XML has no series-number (cbc:ID).',
+          'El XML no trae la serie y el número del comprobante.',
+          'The XML has no series and number for the receipt.',
         ),
       );
     }
@@ -136,10 +136,10 @@ class SunatUblParser {
         if (type == '07' || type == '08') {
           throw SunatXmlException(
             tr(
-              'La nota ${type == '07' ? 'de credito' : 'de debito'} '
-              'debe venir como CreditNote/DebitNote, no como Invoice.',
-              'The ${type == '07' ? 'credit' : 'debit'} note must be '
-              'CreditNote/DebitNote, not Invoice.',
+              'El XML de la nota ${type == '07' ? 'de crédito' : 'de débito'} '
+              'no tiene el formato que exige SUNAT para esa nota.',
+              'The XML of the ${type == '07' ? 'credit' : 'debit'} note does '
+              'not have the format SUNAT requires for that note.',
             ),
           );
         }
@@ -159,10 +159,8 @@ class SunatUblParser {
       default:
         throw SunatXmlException(
           tr(
-            'Este XML no es un comprobante UBL de SUNAT '
-            '(llego ${root.localName}).',
-            'This XML is not a SUNAT UBL receipt '
-            '(got ${root.localName}).',
+            'Este XML no es un comprobante de SUNAT que se pueda imprimir.',
+            'This XML is not a SUNAT receipt that can be printed.',
           ),
         );
     }

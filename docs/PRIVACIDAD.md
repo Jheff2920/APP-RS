@@ -1,12 +1,17 @@
 # Política de privacidad — RedPOS Service
 
-**Última actualización:** 28 de septiembre de 2026  
+**Última actualización:** 9 de octubre de 2026  
 **Package ID:** `com.redpos.service`  
 **URL Play Console (HTTPS):** https://redpos-codigos-prueba.vercel.app/privacidad.html  
 **Eliminar cuenta:** https://redpos-codigos-prueba.vercel.app/eliminar-cuenta.html  
 
 Copia en markdown de la política alojada. La app también muestra el texto en  
 **Ayuda → Datos y privacidad** y **Política de privacidad (completa)**.
+
+> Este archivo es para el equipo de desarrollo y por eso nombra las librerías.
+> El texto que ve el usuario (app y web) está escrito en lenguaje llano y **no**
+> debe mencionar nombres de librerías, ids de producto, puertos ni variables de
+> compilación; lo vigila `test/copy_check_test.dart`.
 
 ## 1. Responsable
 

@@ -36,15 +36,16 @@ Future<void> openLifetimeLicenseMail(BuildContext context) async {
     builder: (ctx) {
       final l = L.of(ctx);
       return AlertDialog(
+        scrollable: true,
         title: Text(l('Licencia de por vida', 'Lifetime license')),
         content: Text(
           l(
-            'Escríbenos y te respondemos con un código RedPOS para pegar en '
-            '«Tengo un código». El precio se acuerda por correo; no se cobra '
-            'dentro de Play.',
-            'Write us and we will reply with a RedPOS code to paste under '
+            'Escríbenos y te respondemos con un código de activación para '
+            'ingresar en «Tengo un código». El precio se acuerda por correo; '
+            'no se cobra en Google Play.',
+            'Write us and we will reply with an activation code to enter under '
             '“I have a code”. The price is agreed by email; it is not charged '
-            'in Play.',
+            'in Google Play.',
           ),
         ),
         actions: [

@@ -43,10 +43,10 @@ class _RedPosSubscribeScreenState extends State<RedPosSubscribeScreen> {
       if (product == null) {
         _message = RedPosPlayBilling.instance.lastError ??
             tr(
-              'La suscripción mensual aún no está publicada en Play Console. '
-              'Mientras tanto usa un código RedPOS o pide la licencia de por vida por correo.',
-              'The monthly subscription is not live in Play Console yet. '
-              'Use a RedPOS code or request a lifetime license by email.',
+              'La suscripción mensual aún no está disponible. Mientras tanto '
+              'usa un código de activación o pide la licencia de por vida por correo.',
+              'The monthly subscription is not available yet. Meanwhile, use '
+              'an activation code or request a lifetime license by email.',
             );
       }
     });
@@ -58,10 +58,10 @@ class _RedPosSubscribeScreenState extends State<RedPosSubscribeScreen> {
       setState(() {
         _message = RedPosPlayBilling.instance.lastError ??
             tr(
-              'La suscripción mensual aún no está publicada en Play Console. '
-              'Mientras tanto usa un código RedPOS o pide la licencia de por vida por correo.',
-              'The monthly subscription is not live in Play Console yet. '
-              'Use a RedPOS code or request a lifetime license by email.',
+              'La suscripción mensual aún no está disponible. Mientras tanto '
+              'usa un código de activación o pide la licencia de por vida por correo.',
+              'The monthly subscription is not available yet. Meanwhile, use '
+              'an activation code or request a lifetime license by email.',
             );
       });
       return;
@@ -178,8 +178,8 @@ class _RedPosSubscribeScreenState extends State<RedPosSubscribeScreen> {
                   Text(
                     price == null
                         ? l(
-                            'El precio aparece cuando el producto está publicado en Play.',
-                            'The price shows once the product is live in Play.',
+                            'El precio lo muestra Google Play cuando carga la suscripción.',
+                            'Google Play shows the price once the subscription loads.',
                           )
                         : l(
                             '$price al mes, cobrado por Google Play',
@@ -236,10 +236,12 @@ class _RedPosSubscribeScreenState extends State<RedPosSubscribeScreen> {
             [
               if (_email != null) l('Cuenta: $_email.', 'Account: $_email.'),
               l(
-                'Google Play cobra con la cuenta de este aparato. En otro '
-                    'teléfono, entra a Play Store con ese Gmail y pulsa Restaurar.',
+                'Google Play cobra con la cuenta de este equipo. En otro '
+                    'teléfono, entra a Play Store con esa cuenta de Google y '
+                    'pulsa Restaurar.',
                 'Google Play charges the account on this device. On another '
-                    'phone, sign in to Play Store with that Gmail and tap Restore.',
+                    'phone, sign in to Play Store with that Google account and '
+                    'tap Restore.',
               ),
             ].join(' '),
             textAlign: TextAlign.center,

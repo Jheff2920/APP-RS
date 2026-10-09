@@ -12,10 +12,8 @@ class UsbTransport implements PrinterTransport {
     if (!PlatformCaps.supportsUsb) {
       throw PrinterTransportException(
         tr(
-          'USB solo está disponible en Android (impresora integrada IMIN/Falcon). '
-          'En iPhone/iPad usa WiFi (TCP 9100).',
-          'USB is only available on Android (built-in IMIN/Falcon printer). '
-          'On iPhone/iPad use WiFi (TCP 9100).',
+          'USB solo está disponible en Android. En iPhone/iPad usa WiFi.',
+          'USB is only available on Android. On iPhone/iPad use WiFi.',
         ),
       );
     }
@@ -51,7 +49,7 @@ class UsbTransport implements PrinterTransport {
   Future<void> writeBytes(List<int> bytes) async {
     if (!_connected) {
       throw PrinterTransportException(
-        tr('No hay conexion USB activa.', 'There is no active USB connection.'),
+        tr('No hay conexión USB activa.', 'There is no active USB connection.'),
       );
     }
     try {

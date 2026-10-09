@@ -362,27 +362,38 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
         appBar: AppBar(
           title: Text(l('Editar ticket', 'Edit ticket')),
           actions: [
-            TextButton.icon(
-              style: TextButton.styleFrom(foregroundColor: Colors.white),
-              onPressed: _loading || _saving ? null : _preview,
-              icon: const Icon(Icons.visibility_outlined, size: 20),
-              label: Text(l('Vista previa', 'Preview')),
-            ),
+            if (useCompactActions(context))
+              IconButton(
+                tooltip: l('Vista previa', 'Preview'),
+                onPressed: _loading || _saving ? null : _preview,
+                icon: const Icon(Icons.visibility_outlined),
+              )
+            else
+              TextButton.icon(
+                style: TextButton.styleFrom(foregroundColor: Colors.white),
+                onPressed: _loading || _saving ? null : _preview,
+                icon: const Icon(Icons.visibility_outlined, size: 20),
+                label: Text(l('Vista previa', 'Preview')),
+              ),
             const SizedBox(width: 4),
           ],
         ),
-        body: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : BoletaPage(
-                maxContentWidth: 640,
-                bottomBar: SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
+        // En el Scaffold para que los avisos salgan encima de «Guardar».
+        bottomNavigationBar: _loading
+            ? null
+            : BottomActions(
+                children: [
+                  FilledButton.icon(
                     onPressed: _saving ? null : _saveAndClose,
                     icon: const Icon(Icons.check_rounded),
                     label: Text(l('Guardar', 'Save')),
                   ),
-                ),
+                ],
+              ),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : BoletaPage(
+                maxContentWidth: 640,
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                   keyboardDismissBehavior:
@@ -787,7 +798,7 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                                 controller: _qrCtrl,
                                 maxLength: CustomTicketTemplate.maxCodeLength,
                                 decoration: InputDecoration(
-                                  labelText: l('Datos del QR', 'QR payload'),
+                                  labelText: l('Datos del QR', 'QR content'),
                                   hintText: l(
                                     'Ej.: un enlace o tu número de Yape',
                                     'E.g. a link or a phone number',
@@ -813,7 +824,7 @@ class _CustomTicketEditScreenState extends State<CustomTicketEditScreen> {
                                 maxLength: CustomTicketTemplate.maxCodeLength,
                                 decoration: InputDecoration(
                                   labelText:
-                                      l('Datos del código', 'Barcode payload'),
+                                      l('Datos del código', 'Barcode content'),
                                 ),
                               ),
                             ),

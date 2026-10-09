@@ -48,8 +48,8 @@ class NetworkTransport implements PrinterTransport {
     if (printer == null || key == null) {
       throw PrinterTransportException(
         tr(
-          'No hay conexion WiFi/TCP activa.',
-          'There is no active WiFi/TCP connection.',
+          'No hay conexión WiFi activa.',
+          'There is no active WiFi connection.',
         ),
       );
     }

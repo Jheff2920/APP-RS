@@ -35,8 +35,8 @@ class BluetoothSppChannel {
       throw PlatformException(
         code: 'unsupported',
         message: tr(
-          'Bluetooth SPP nativo solo esta en Android.',
-          'Native Bluetooth SPP is Android only.',
+          'El Bluetooth directo no está disponible en este equipo.',
+          'Direct Bluetooth is not available on this device.',
         ),
       );
     }

@@ -120,7 +120,7 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
         if (!ok) {
           throw PrinterTransportException(
             tr(
-              'Faltan permisos de Bluetooth. Concedelos en Ajustes de la app.',
+              'Faltan permisos de Bluetooth. Concédelos en Ajustes de la app.',
               'Bluetooth permission is missing. Allow it in app Settings.',
             ),
           );

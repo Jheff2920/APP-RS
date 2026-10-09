@@ -3,12 +3,12 @@
 > **Lee este archivo primero** en cada sesión nueva (Cursor / Cloud / Claude / Codex).
 > Es la fuente de verdad del estado actual del proyecto. Si README y este archivo discrepan, prioriza **CONTEXTO.md**.
 
-**Última actualización:** 2026-10-06  
+**Última actualización:** 2026-10-09  
 **Empresa:** **Red Soluciones** (una sola **d** — nunca «Redd Soluciones»)  
 **Producto:** RedPOS Service  
 **Carpeta Windows (preferida):** `C:\Users\RS-Soporte\Documents\app`  
 **Repo:** https://github.com/Jheff2920/APP-RS · rama estable `main`  
-**Versión app:** `1.8.9+53` (`pubspec.yaml`) — rediseño fusionado en `main`  
+**Versión app:** `1.8.9+54` (`pubspec.yaml`) — Play ya tiene 51, 52 y 53 (53 en Producción)  
 **Package / applicationId:** `com.redpos.service`  
 **iOS bundle:** `com.redpos.service`
 
@@ -40,7 +40,17 @@
 
 ---
 
-## Estado actual (v1.8.9+53 · oct 2026)
+## Estado actual (v1.8.9+54 · oct 2026)
+
+### Reglas de diseño responsivo y textos (1.8.9+54)
+
+- **Dos paneles solo en tablets:** `_expanded` en `printer_list_screen.dart` exige ancho ≥ 840 **y** lado corto ≥ 600. Un teléfono en horizontal usa una sola columna centrada.
+- **Todo lo que se abre encima debe poder desplazarse:** las hojas inferiores (`showModalBottomSheet`) llevan `isScrollControlled`, `useSafeArea` y `SingleChildScrollView`; los `AlertDialog` llevan `scrollable: true`.
+- **Acciones fijas abajo en `Scaffold.bottomNavigationBar`** con `BottomActions` (no dentro del cuerpo): así los `SnackBar` salen encima y no tapan «Probar» / «Guardar». `BoletaPage` ya no tiene `bottomBar`.
+- **Letra grande en pantalla angosta:** `useCompactActions(context)` (`ui_kit.dart`) pasa botones de la barra y el flotante a solo icono; las filas con insignias usan `Wrap`.
+- **Los textos son para quien usa la app:** nada de nombres de librerías, ids de producto, puertos ni variables en pantalla (textos legales, ayuda, errores). Los errores muestran `friendlyError()` (`services/user_error.dart`), nunca la excepción cruda. «Código de activación» es el término único (no «código RedPOS»). Palabras en español con tilde; excepción: lo que sale **impreso** en papel (`escpos_test_page.dart`, etc.).
+- **Pruebas que lo vigilan:** `test/responsive_layout_test.dart` (12 tamaños × letra 1.0/1.5/2.0 × todas las pantallas, hojas y diálogos; falla ante cualquier desborde, texto cortado o botón tapado por la barra del sistema), `test/copy_check_test.dart` (textos sin nombres de código y con tildes) y `test/app_flows_test.dart` (recorridos con impresora falsa vía `PrinterTransportFactory.testOverride`).
+- Si agregas una pantalla, añádela a `responsive_layout_test.dart`.
 
 ### Rama activa: `redesign/ui-simplificada` (4 commits adelante de `main`)
 
@@ -317,10 +327,10 @@ compilar desde la terminal del usuario.
 
 ### Próximos pasos (en orden)
 
-1. Compilar AAB `1.8.9+53` con `--dart-define=REDPOS_API=...` y copiarlo a `inst-apk\`
-2. Subirlo a Play Console y en "Problemas detectados" usar "Actualizar paquetes afectados"
-3. Confirmar en el merged manifest que no aparece `READ_MEDIA_*`
-4. Revisar en teléfono real (Telpo M1K) el inicio en ancho angosto
+1. Compilar AAB `1.8.9+54` con `--dart-define=REDPOS_API=...` y copiarlo a `inst-apk\`
+2. Subirlo a Play Console (Producción ya tiene 53)
+3. Publicar en Vercel `admin-web/public` (privacidad, términos y sus versiones en inglés cambiaron de texto)
+4. Probar en equipo real (Lenovo y Telpo) con letra grande, rotación y densidad alterada; imprimir de prueba en el Telpo
 
 ---
 
@@ -336,6 +346,7 @@ compilar desde la terminal del usuario.
 
 ## Cómo retomar (changelog corto)
 
+- **1.8.9+54:** App responsiva en cualquier pantalla (matriz de pruebas), dos paneles solo en tablets, hojas y diálogos desplazables, avisos que ya no tapan «Probar/Guardar», textos legales y de errores sin nombres de código ni variables, tildes corregidas, `friendlyError`, tests de flujos de punta a punta. Corregido un error sin manejar al fallar la conexión mientras se preparaba el ticket.
 - **1.8.9+53 (+52 ya usado en Play):** Privacidad exacta: la app no incluye SDK Firebase/AdMob/Analytics, pero Play Billing y Google Sign-In pueden enviar telemetría técnica a Google (textos in-app, PRIVACIDAD.md, privacidad.html y privacy.html actualizados). Margen superior 3 mm en imágenes compartidas.
 - **1.8.8+50 (rama redesign/ui-simplificada):** Rediseño UI morado marca, PrinterCard nuevo, eliminado código maestro R100301S, fix TCP half-open socket.
 - **1.8.8+49 → +50 (main):** Bump versionCode, fix TCP half-open socket.

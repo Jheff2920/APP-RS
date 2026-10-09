@@ -4,7 +4,7 @@ Controlador **Android e iOS** de impresoras térmicas ESC/POS (58 y 80 mm).
 Imprime PDF/imagen del POS **o** convierte el **XML/ZIP UBL de SUNAT** (boleta, factura, NC/ND, guía de remisión, retención/percepción) a ticket 58/80 mm.
 
 **Repo:** https://github.com/Jheff2920/APP-RS  
-**Versión:** 1.8.9+53 · Package ID: `com.redpos.service`  
+**Versión:** 1.8.9+54 · Package ID: `com.redpos.service`  
 **Empresa:** Red Soluciones (una d — nunca «Redd»)  
 **Rama estable:** `main`
 
@@ -13,7 +13,7 @@ Imprime PDF/imagen del POS **o** convierte el **XML/ZIP UBL de SUNAT** (boleta, 
 
 ---
 
-## Dónde quedamos (2026-09-28 / inicios oct 2026 · v1.8.9+53)
+## Dónde quedamos (2026-09-28 / inicios oct 2026 · v1.8.9+54)
 
 Estado canónico y reglas para AIs: **[CONTEXTO.md](CONTEXTO.md)**. Resumen:
 
@@ -45,7 +45,7 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 
 ---
 
-## Estado actual (v1.8.9+53)
+## Estado actual (v1.8.9+54)
 
 | Hecho | Pendiente |
 |-------|-----------|

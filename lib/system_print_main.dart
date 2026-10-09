@@ -13,6 +13,7 @@ import 'services/print_timing.dart';
 import 'services/printer_permissions.dart';
 import 'services/printer_store.dart';
 import 'services/transports/printer_transport.dart';
+import 'services/user_error.dart';
 import 'widgets/print_status_dialog.dart';
 
 /// Entrypoint headless: PrintService rasteriza PDF → bytes ESC/POS.
@@ -42,7 +43,7 @@ void systemPrintMain() {
     if (filePath.isEmpty) {
       throw PlatformException(
         code: 'bad_args',
-        message: tr('filePath vacio', 'filePath is empty'),
+        message: tr('No se recibió ningún archivo.', 'No file was received.'),
       );
     }
 
@@ -160,7 +161,7 @@ class SystemPrintUiHandler {
     try {
       if (rawPath.isEmpty) {
         throw PrinterTransportException(
-          tr('Archivo vacio', 'Empty file'),
+          tr('El archivo está vacío.', 'The file is empty.'),
         );
       }
       final store = _store;
@@ -233,7 +234,7 @@ class SystemPrintUiHandler {
     } on PrinterTransportException catch (e) {
       await _notify(token: token, ok: false, message: e.message);
     } catch (e) {
-      await _notify(token: token, ok: false, message: '$e');
+      await _notify(token: token, ok: false, message: friendlyError(e));
     } finally {
       if (rawPath.isNotEmpty) {
         try {

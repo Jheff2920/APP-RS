@@ -21,6 +21,7 @@ import '../services/printer_store.dart';
 import '../services/redpos/redpos_license.dart';
 import '../services/usb_printer_channel.dart';
 import '../services/transports/printer_transport.dart';
+import '../services/user_error.dart';
 import '../theme.dart';
 import '../widgets/boleta_page.dart';
 import '../widgets/ui_kit.dart';
@@ -339,6 +340,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
       builder: (ctx) {
         final loc = L.of(ctx);
         return AlertDialog(
+          scrollable: true,
           title: Text(loc('Desvincular impresora', 'Unlink printer')),
           content: Text(
             loc(
@@ -479,6 +481,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
       builder: (ctx) {
         final loc = L.of(ctx);
         return AlertDialog(
+          scrollable: true,
           title: Text(loc('Desvincular impresora', 'Unlink printer')),
           content: Text(
             loc(
@@ -511,8 +514,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
         SnackBar(
           content: Text(
             tr(
-              'No se pudo olvidar del Bluetooth: $e',
-              'Could not forget Bluetooth device: $e',
+              'No se pudo olvidar del Bluetooth. ${friendlyError(e)}',
+              'Could not forget the Bluetooth device. ${friendlyError(e)}',
             ),
           ),
         ),
@@ -571,6 +574,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     final added = await showModalBottomSheet<_BtChoice>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       showDragHandle: true,
       builder: (ctx) => _AddBtDeviceSheet(excludeAddresses: exclude),
     );
@@ -681,7 +685,14 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(tr('USB: $e', 'USB: $e'))),
+          SnackBar(
+            content: Text(
+              tr(
+                'No se pudo usar el USB. ${friendlyError(e)}',
+                'Could not use USB. ${friendlyError(e)}',
+              ),
+            ),
+          ),
         );
       }
     }
@@ -1267,9 +1278,9 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
           Text(
             l(
               'Sin código, los tickets salen con un pie de publicidad. '
-                  'Si tienes un código RedPOS, escríbelo y se activa al guardar.',
+                  'Si tienes un código de activación, escríbelo y se activa al guardar.',
               'Without a code, tickets print with an ad footer. If you have '
-                  'a RedPOS code, enter it and it activates when you save.',
+                  'an activation code, enter it and it activates when you save.',
             ),
             style: Theme.of(context)
                 .textTheme
@@ -1281,7 +1292,10 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
             controller: _codeCtrl,
             textCapitalization: TextCapitalization.characters,
             decoration: InputDecoration(
-              labelText: l('Código RedPOS (opcional)', 'RedPOS code (optional)'),
+              labelText: l(
+                'Código de activación (opcional)',
+                'Activation code (optional)',
+              ),
               hintText: 'RP-XXXX-XXXX-XXXX',
             ),
           ),
@@ -1336,35 +1350,31 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
               : l('Vincular impresora', 'Pair printer'),
         ),
       ),
+      // Barra de acciones del Scaffold: los avisos (SnackBar) salen encima y
+      // no tapan «Probar» ni «Guardar».
+      bottomNavigationBar: BottomActions(
+        flexes: const [2, 3],
+        children: [
+          OutlinedButton.icon(
+            onPressed: busy ? null : _test,
+            icon: _testing
+                ? const ButtonSpinner()
+                : const Icon(Icons.print_outlined),
+            label: Text(l('Probar', 'Test')),
+          ),
+          FilledButton.icon(
+            onPressed: busy ? null : () => _save(),
+            icon: (_saving || _activating)
+                ? const ButtonSpinner(color: Colors.white)
+                : const Icon(Icons.check_rounded),
+            label: Text(l('Guardar', 'Save')),
+          ),
+        ],
+      ),
       body: Form(
         key: _formKey,
         child: BoletaPage(
           maxContentWidth: 640,
-          bottomBar: Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: OutlinedButton.icon(
-                  onPressed: busy ? null : _test,
-                  icon: _testing
-                      ? const ButtonSpinner()
-                      : const Icon(Icons.print_outlined),
-                  label: Text(l('Probar', 'Test')),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 3,
-                child: FilledButton.icon(
-                  onPressed: busy ? null : () => _save(),
-                  icon: (_saving || _activating)
-                      ? const ButtonSpinner(color: Colors.white)
-                      : const Icon(Icons.check_rounded),
-                  label: Text(l('Guardar', 'Save')),
-                ),
-              ),
-            ],
-          ),
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
             scrollCacheExtent: const ScrollCacheExtent.pixels(280),
@@ -1682,8 +1692,8 @@ class _AddBtDeviceSheetState extends State<_AddBtDeviceSheet> {
         setState(() {
           _scanning = false;
           _error = tr(
-            'No se pudieron buscar dispositivos: $e',
-            'Could not scan for devices: $e',
+            'No se pudieron buscar dispositivos. ${friendlyError(e)}',
+            'Could not scan for devices. ${friendlyError(e)}',
           );
         });
       }
@@ -1783,11 +1793,11 @@ class _AddBtDeviceSheetState extends State<_AddBtDeviceSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.paddingOf(context).bottom;
     final l = L.of(context);
+    // Desplazable: en pantallas bajas o con letra grande no cabe entera.
     return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottom),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1820,7 +1830,9 @@ class _AddBtDeviceSheetState extends State<_AddBtDeviceSheet> {
                   children: [
                     const RepaintBoundary(child: ButtonSpinner()),
                     const SizedBox(width: 12),
-                    Text(l('Buscando cerca…', 'Scanning nearby…')),
+                    Expanded(
+                      child: Text(l('Buscando cerca…', 'Scanning nearby…')),
+                    ),
                   ],
                 ),
               ),
@@ -1889,25 +1901,32 @@ class _AddBtDeviceSheetState extends State<_AddBtDeviceSheet> {
               },
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed:
-                        _bonding != null ? null : () => Navigator.pop(context),
-                    child: Text(l('Cancelar', 'Cancel')),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: (_scanning || _bonding != null) ? null : _start,
-                    icon: const Icon(Icons.refresh_rounded),
-                    label: Text(l('Buscar de nuevo', 'Scan again')),
-                  ),
-                ),
-              ],
-            ),
+            Builder(builder: (context) {
+              final cancel = TextButton(
+                onPressed:
+                    _bonding != null ? null : () => Navigator.pop(context),
+                child: Text(l('Cancelar', 'Cancel')),
+              );
+              final again = OutlinedButton.icon(
+                onPressed: (_scanning || _bonding != null) ? null : _start,
+                icon: const Icon(Icons.refresh_rounded),
+                label: Text(l('Buscar de nuevo', 'Scan again')),
+              );
+              // Letra grande en pantalla angosta: uno debajo del otro.
+              if (useCompactActions(context)) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [again, const SizedBox(height: 4), cancel],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: cancel),
+                  const SizedBox(width: 10),
+                  Expanded(child: again),
+                ],
+              );
+            }),
           ],
         ),
       ),

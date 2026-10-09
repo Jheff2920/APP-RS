@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 import '../brand.dart';
@@ -25,6 +26,7 @@ import 'sunat/sunat_xml_source.dart';
 import 'transports/printer_transport.dart';
 import 'transports/printer_transport_factory.dart';
 import 'usb_printer_channel.dart';
+import 'user_error.dart';
 import 'redpos/redpos_ad_escpos.dart';
 import 'redpos/redpos_license.dart';
 
@@ -41,13 +43,17 @@ class PrintService {
 
   PrintHistoryStore get history => _history;
 
+  /// Solo pruebas: espera a que terminen de guardarse los registros pendientes.
+  @visibleForTesting
+  Future<void> get pendingHistoryWrites => _historyWrites;
+
   Future<void> printTestPage(
     SavedPrinter printer, {
     void Function(PrintPhase phase)? onPhase,
   }) async {
     await _runJob(
       printer: printer,
-      title: 'Pagina de prueba',
+      title: 'Página de prueba',
       source: 'test',
       onPhase: onPhase,
       buildBytes: (_) => EscPosTestPage.build(printer),
@@ -67,9 +73,9 @@ class PrintService {
     if (!unlocked) {
       throw PrinterTransportException(
         tr(
-          'Tickets propios es una función de pago. Necesitas un código RedPOS, '
-          'una suscripción mensual o una licencia de por vida.',
-          'Custom tickets is a paid feature. You need a RedPOS code, '
+          'Tickets propios es una función de pago. Necesitas un código de '
+          'activación, una suscripción mensual o una licencia de por vida.',
+          'Custom tickets is a paid feature. You need an activation code, '
           'a monthly subscription, or a lifetime license.',
         ),
       );
@@ -187,7 +193,7 @@ class PrintService {
         if (!ok) {
           throw PrinterTransportException(
             tr(
-              'Faltan permisos de Bluetooth. Concedelos en Ajustes de la app.',
+              'Faltan permisos de Bluetooth. Concédelos en Ajustes de la app.',
               'Bluetooth permission is missing. Allow it in app Settings.',
             ),
           );
@@ -197,7 +203,7 @@ class PrintService {
       if (printer.address.trim().isEmpty) {
         throw PrinterTransportException(
           tr(
-            'La direccion de la impresora esta vacia.',
+            'La dirección de la impresora está vacía.',
             'The printer address is empty.',
           ),
         );
@@ -229,6 +235,10 @@ class PrintService {
               ),
             ),
       );
+      // Si una de las dos falla mientras se espera la otra, el error se
+      // recoge más abajo: no debe quedar como excepción sin manejar.
+      bytesFuture.ignore();
+      connectFuture.ignore();
       final bytes = await bytesFuture;
       byteCount = bytes.length;
       final adsFree = await RedPosLicenseStore.instance.isAdsFree();
@@ -361,8 +371,8 @@ class PrintService {
     } catch (e) {
       throw PrinterTransportException(
         tr(
-          'No se pudo armar el ticket SUNAT: $e',
-          'Could not build the SUNAT ticket: $e',
+          'No se pudo armar el ticket SUNAT. ${friendlyError(e)}',
+          'Could not build the SUNAT ticket. ${friendlyError(e)}',
         ),
       );
     }

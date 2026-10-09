@@ -15,6 +15,7 @@ import '../services/printer_permissions.dart';
 import '../services/printer_store.dart';
 import '../services/redpos/redpos_license.dart';
 import '../services/transports/printer_transport.dart';
+import '../services/user_error.dart';
 import '../theme.dart';
 import '../widgets/print_status_dialog.dart';
 import '../widgets/printer_card.dart';
@@ -30,6 +31,7 @@ import 'custom_tickets_list_screen.dart';
 import 'sunat_print_settings_screen.dart';
 
 const _expandedBreakpoint = 840.0;
+const _expandedMinShortSide = 600.0;
 
 class PrinterListScreen extends StatefulWidget {
   const PrinterListScreen({
@@ -54,7 +56,14 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
   bool _openingForm = false;
   bool _adsFree = false;
 
-  bool get _expanded => MediaQuery.sizeOf(context).width >= _expandedBreakpoint;
+  /// Dos paneles solo en tablets y pantallas grandes. Un teléfono en
+  /// horizontal es ancho pero bajo: ahí el panel de detalle quedaría
+  /// apretado, así que usa una sola columna.
+  bool get _expanded {
+    final size = MediaQuery.sizeOf(context);
+    return size.width >= _expandedBreakpoint &&
+        size.shortestSide >= _expandedMinShortSide;
+  }
 
   @override
   void initState() {
@@ -73,6 +82,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
       builder: (ctx) {
         final l = L.of(ctx);
         return AlertDialog(
+          scrollable: true,
           title: Text(l('Impresión del sistema', 'System printing')),
           content: Text(
             l(
@@ -185,7 +195,10 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            L.of(context)('No se pudo abrir el archivo: $e', 'Could not open the file: $e'),
+            L.of(context)(
+              'No se pudo abrir el archivo. ${friendlyError(e)}',
+              'Could not open the file. ${friendlyError(e)}',
+            ),
           ),
         ),
       );
@@ -258,6 +271,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         title: Text(l('Desvincular impresora', 'Unlink printer')),
         content: Text(
           l(
@@ -297,8 +311,8 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
         }
       } catch (e) {
         bluetoothError = tr(
-          'Se quitó de la app, pero no se pudo olvidar del Bluetooth: $e',
-          'Removed from the app, but it could not be forgotten from Bluetooth: $e',
+          'Se quitó de la app, pero no se pudo olvidar del Bluetooth. ${friendlyError(e)}',
+          'Removed from the app, but it could not be forgotten from Bluetooth. ${friendlyError(e)}',
         );
       }
     }
@@ -359,6 +373,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       builder: (ctx) {
         final l = L.of(ctx);
         final tt = Theme.of(ctx).textTheme;

@@ -108,6 +108,7 @@ class _CustomTicketsListScreenState extends State<CustomTicketsListScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         title: Text(l('Eliminar plantilla', 'Delete template')),
         content: Text(
           l(
@@ -147,6 +148,28 @@ class _CustomTicketsListScreenState extends State<CustomTicketsListScreen> {
     await _reload();
   }
 
+  /// Con letra muy grande en pantalla angosta, el botón con texto no cabe:
+  /// queda solo el icono (con su etiqueta para accesibilidad).
+  Widget _newTicketButton(BuildContext context, L l) {
+    final label = l('Nuevo ticket', 'New ticket');
+    final onPressed = _creating || _loading ? null : _create;
+    final icon = _creating
+        ? const ButtonSpinner(color: Colors.white)
+        : const Icon(Icons.add_rounded);
+    if (useCompactActions(context)) {
+      return FloatingActionButton(
+        onPressed: onPressed,
+        tooltip: label,
+        child: icon,
+      );
+    }
+    return FloatingActionButton.extended(
+      onPressed: onPressed,
+      icon: icon,
+      label: Text(label),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = L.of(context);
@@ -164,13 +187,7 @@ class _CustomTicketsListScreenState extends State<CustomTicketsListScreen> {
       appBar: AppBar(
         title: Text(title),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _creating || _loading ? null : _create,
-        icon: _creating
-            ? const ButtonSpinner(color: Colors.white)
-            : const Icon(Icons.add_rounded),
-        label: Text(l('Nuevo ticket', 'New ticket')),
-      ),
+      floatingActionButton: _newTicketButton(context, l),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _items.isEmpty

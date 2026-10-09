@@ -34,7 +34,7 @@ class SunatXmlSource {
     final bytes = await File(filePath).readAsBytes();
     if (bytes.isEmpty) {
       throw SunatXmlException(
-        tr('El archivo esta vacio.', 'The file is empty.'),
+        tr('El archivo está vacío.', 'The file is empty.'),
       );
     }
     if (_isZip(bytes) || filePath.toLowerCase().endsWith('.zip')) {
@@ -110,7 +110,7 @@ class SunatXmlSource {
     if (content == null || content.isEmpty) {
       throw SunatXmlException(
         tr(
-          'El XML dentro del ZIP esta vacio.',
+          'El XML dentro del ZIP está vacío.',
           'The XML inside the ZIP is empty.',
         ),
       );
