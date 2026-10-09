@@ -500,6 +500,17 @@ void main() {
       t,
       'formulario nuevo',
       (_) async => PrinterFormScreen(store: PrinterStore()),
+      after: (t) async {
+        // «Bluetooth» / «WiFi» / «USB» deben quedar en una sola línea (en 360 dp
+        // llegó a partirse como «Blueto-oth»).
+        final scale = t.platformDispatcher.textScaleFactor;
+        for (final label in ['Bluetooth', 'WiFi', 'USB']) {
+          final h = t.getSize(find.text(label).first).height;
+          if (h > 24 * scale) {
+            throw StateError('«$label» se parte en varias líneas (alto $h)');
+          }
+        }
+      },
     );
   }, timeout: timeout);
 

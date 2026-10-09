@@ -1388,21 +1388,35 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
-                      child: SegmentedButton<PrinterLinkType>(
-                        expandedInsets: EdgeInsets.zero,
-                        showSelectedIcon: false,
-                        segments: [
-                          for (final t in _linkTypes)
-                            ButtonSegment(
-                              value: t,
-                              label: Text(
-                                t == PrinterLinkType.network ? 'WiFi' : t.label,
+                      // En teléfonos angostos el icono no cabe junto a
+                      // «Bluetooth»: se quita y el texto nunca se parte.
+                      child: LayoutBuilder(
+                        builder: (context, box) => SegmentedButton<PrinterLinkType>(
+                          expandedInsets: EdgeInsets.zero,
+                          showSelectedIcon: false,
+                          segments: [
+                            for (final t in _linkTypes)
+                              ButtonSegment(
+                                value: t,
+                                label: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    t == PrinterLinkType.network
+                                        ? 'WiFi'
+                                        : t.label,
+                                    maxLines: 1,
+                                    softWrap: false,
+                                  ),
+                                ),
+                                icon: box.maxWidth < 380
+                                    ? null
+                                    : Icon(printerTypeIcon(t), size: 18),
                               ),
-                              icon: Icon(printerTypeIcon(t), size: 18),
-                            ),
-                        ],
-                        selected: {_type},
-                        onSelectionChanged: (set) => _onTypeChanged(set.first),
+                          ],
+                          selected: {_type},
+                          onSelectionChanged: (set) =>
+                              _onTypeChanged(set.first),
+                        ),
                       ),
                     ),
                     ..._connectionChildren(),
