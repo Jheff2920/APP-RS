@@ -60,6 +60,14 @@ algoritmos tradicionales.
 2. **Play:** Pagos y suscripciones → cancelar  
 3. **Servidor:** [eliminar-cuenta.html](https://redpos-codigos-prueba.vercel.app/eliminar-cuenta.html) o correo (≈ 30 días)
 
+## 6. Usuarios de la Unión Europea (RGPD)
+
+Sección 9 del texto público (`legal_copy.dart`, `privacidad.html`, `privacy.html`), añadida al distribuir en España.
+Resume: qué se guarda en el servidor (solo el uso del código y la IP que procesa el alojamiento), base legal
+(ejecución del servicio e interés legítimo contra el fraude), conservación, transferencias fuera de la UE,
+derechos (30 días), reclamación ante la AEPD y ausencia de decisiones automatizadas.
+Si cambia lo que guarda `admin-web/lib/store.js`, actualiza esta sección y el texto público.
+
 ## Relacionado
 
 - HTML desplegado: `admin-web/public/privacidad.html`

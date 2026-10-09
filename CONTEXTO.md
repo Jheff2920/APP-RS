@@ -346,6 +346,7 @@ compilar desde la terminal del usuario.
 
 ## Cómo retomar (changelog corto)
 
+- **1.8.9+54 (distribución):** Ficha de Play para 7 países (AR, CL, CO, ES, US, PE, MX). Se añadió la sección 9 «Usuarios de la Unión Europea (RGPD)» a la política (app, `privacidad.html`, `privacy.html`, `docs/PRIVACIDAD.md`); si cambia lo que guarda `admin-web/lib/store.js`, actualizarla. El ticket SUNAT es **solo Perú** y la ficha lo dice. Textos de la ficha e imágenes (no versionadas) en `inst-apk/play-store/`.
 - **1.8.9+54:** App responsiva en cualquier pantalla (matriz de pruebas), dos paneles solo en tablets, hojas y diálogos desplazables, avisos que ya no tapan «Probar/Guardar», textos legales y de errores sin nombres de código ni variables, tildes corregidas, `friendlyError`, tests de flujos de punta a punta. Corregido un error sin manejar al fallar la conexión mientras se preparaba el ticket.
 - **1.8.9+53 (+52 ya usado en Play):** Privacidad exacta: la app no incluye SDK Firebase/AdMob/Analytics, pero Play Billing y Google Sign-In pueden enviar telemetría técnica a Google (textos in-app, PRIVACIDAD.md, privacidad.html y privacy.html actualizados). Margen superior 3 mm en imágenes compartidas.
 - **1.8.8+50 (rama redesign/ui-simplificada):** Rediseño UI morado marca, PrinterCard nuevo, eliminado código maestro R100301S, fix TCP half-open socket.

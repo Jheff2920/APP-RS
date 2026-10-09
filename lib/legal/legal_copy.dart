@@ -282,6 +282,58 @@ class LegalCopy {
           'Delete account: ${RedPosConfig.deleteAccountUrlEn}.',
         ),
       ),
+      LegalSection(
+        l('9. Usuarios de la Unión Europea (RGPD)',
+            '9. Users in the European Union (GDPR)'),
+        l(
+          'Si usas la app desde la Unión Europea (por ejemplo, España), esto se '
+          'suma a lo anterior. El responsable es el de la sección 1.\n\n'
+          '• Qué datos tratamos: casi todo se queda en tu equipo y no lo vemos. '
+          'En nuestro servicio solo queda el registro de que un código de '
+          'activación ya se usó (el código y la fecha) y los datos técnicos de la '
+          'conexión, como la dirección IP, que el proveedor de alojamiento '
+          'procesa para atender la solicitud. Si nos escribes, usamos tu correo '
+          'para responderte.\n'
+          '• Para qué y con qué base legal: activar el código que tú pides y '
+          'evitar que se use dos veces (ejecución del servicio e interés legítimo '
+          'en prevenir el fraude), y responder tus consultas.\n'
+          '• Cuánto tiempo: el registro del código se conserva mientras el código '
+          'siga vigente, para que no pueda reutilizarse; puedes pedir su borrado. '
+          'Tus correos de soporte, el tiempo necesario para resolver tu consulta. '
+          'Las solicitudes de borrado (correo y fecha), hasta 90 días.\n'
+          '• Transferencias: los servidores del servicio de canje pueden estar '
+          'fuera de la Unión Europea, por ejemplo en Estados Unidos.\n'
+          '• Tus derechos: acceso, rectificación, supresión, limitación, '
+          'oposición y portabilidad. Escríbenos a ${RedPosConfig.supportEmail} y '
+          'respondemos en un máximo de 30 días. También puedes reclamar ante la '
+          'autoridad de protección de datos de tu país; en España, la Agencia '
+          'Española de Protección de Datos (aepd.es).\n'
+          '• No tomamos decisiones automatizadas ni elaboramos perfiles sobre ti.',
+          'If you use the app from the European Union (for example, Spain), this '
+          'adds to the above. The controller is the one in section 1.\n\n'
+          '• What data we process: almost everything stays on your device and we '
+          'never see it. In our service we only keep the record that an '
+          'activation code was already used (the code and the date) and '
+          'technical connection data, such as the IP address, which the hosting '
+          'provider processes to serve the request. If you write to us, we use '
+          'your email to reply.\n'
+          '• Why and legal basis: activating the code you ask for and preventing '
+          'it from being used twice (performance of the service and legitimate '
+          'interest in preventing fraud), and answering your questions.\n'
+          '• How long: the code record is kept while the code remains valid, so it '
+          'cannot be reused; you can ask for it to be deleted. Your support '
+          'emails, as long as needed to resolve your question. Deletion requests '
+          '(email and date), up to 90 days.\n'
+          '• Transfers: the redemption service servers may be outside the '
+          'European Union, for example in the United States.\n'
+          '• Your rights: access, rectification, erasure, restriction, objection, '
+          'and portability. Write to ${RedPosConfig.supportEmail} and we reply '
+          'within 30 days. You can also complain to the data protection '
+          'authority of your country; in Spain, the Spanish Data Protection '
+          'Agency (aepd.es).\n'
+          '• We do not make automated decisions or build profiles about you.',
+        ),
+      ),
     ];
   }
 
