@@ -15,6 +15,8 @@ import 'escpos_test_page.dart';
 import 'drawer_wait.dart';
 import 'print_history_store.dart';
 import 'print_timing.dart';
+import 'label_print.dart';
+import 'print_job_coordinator.dart';
 import 'printer_permissions.dart';
 import 'network_lan_channel.dart';
 import 'custom_ticket/custom_ticket.dart';
@@ -56,7 +58,9 @@ class PrintService {
       title: 'Página de prueba',
       source: 'test',
       onPhase: onPhase,
-      buildBytes: (_) => EscPosTestPage.build(printer),
+      buildBytes: (_) => printer.isLabel
+          ? LabelPrint.testPage(printer)
+          : EscPosTestPage.build(printer),
     );
   }
 
@@ -69,14 +73,18 @@ class PrintService {
     void Function(PrintPhase phase)? onPhase,
     bool requestPermissions = true,
   }) async {
+    if (printer.isLabel) {
+      throw PrinterTransportException(
+          'Selecciona una impresora de recibos para imprimir tickets propios.');
+    }
     final unlocked = await RedPosLicenseStore.instance.isAdsFree();
     if (!unlocked) {
       throw PrinterTransportException(
         tr(
           'Tickets propios es una función de pago. Necesitas un código de '
-          'activación, una suscripción mensual o una licencia de por vida.',
+              'activación, una suscripción mensual o una licencia de por vida.',
           'Custom tickets is a paid feature. You need an activation code, '
-          'a monthly subscription, or a lifetime license.',
+              'a monthly subscription, or a lifetime license.',
         ),
       );
     }
@@ -89,6 +97,7 @@ class PrintService {
       buildBytes: (_) => CustomTicketEscPos.build(printer, template),
     );
   }
+
   Future<void> printSharedFile({
     required SavedPrinter printer,
     required String filePath,
@@ -98,6 +107,10 @@ class PrintService {
     String? jobId,
     // Nota de este trabajo SUNAT. null usa la nota guardada.
     String? sunatNote,
+    String? systemMediaSizeId,
+    int? mediaWidthMils,
+    int? mediaHeightMils,
+    int copies = 1,
   }) async {
     final name = p.basename(filePath);
     final lower = filePath.toLowerCase();
@@ -110,8 +123,22 @@ class PrintService {
       onPhase: onPhase,
       requestPermissions: requestPermissions,
       buildBytes: (timing) async {
+        if (printer.isLabel) {
+          final bytes = await LabelPrint.build(printer,
+              filePath: filePath,
+              mediaId: systemMediaSizeId,
+              mediaWidthMils: mediaWidthMils,
+              mediaHeightMils: mediaHeightMils);
+          if (bytes.length * copies.clamp(1, 99) > LabelPrint.maxJobBytes) {
+            throw PrinterTransportException(
+                'Reduce la cantidad de copias o divide el archivo de etiquetas.');
+          }
+          return List<int>.generate(bytes.length * copies.clamp(1, 99),
+              (i) => bytes[i % bytes.length]);
+        }
         Future<List<int>> pdf() {
-          if (printer.type == PrinterLinkType.network &&
+          if (systemMediaSizeId == null &&
+              printer.type == PrinterLinkType.network &&
               NetworkLanChannel.isSupported) {
             return timing.measure(
               'native_raster',
@@ -129,6 +156,8 @@ class PrintService {
             printer,
             filePath: filePath,
             timing: timing,
+            systemMediaSizeId: systemMediaSizeId,
+            mediaWidthMils: mediaWidthMils,
           );
         }
 
@@ -172,6 +201,24 @@ class PrintService {
     String? jobId,
     void Function(PrintPhase phase)? onPhase,
     bool requestPermissions = true,
+  }) =>
+      PrintJobCoordinator.run(() => _executeJob(
+          printer: printer,
+          title: title,
+          source: source,
+          buildBytes: buildBytes,
+          jobId: jobId,
+          onPhase: onPhase,
+          requestPermissions: requestPermissions));
+
+  Future<void> _executeJob({
+    required SavedPrinter printer,
+    required String title,
+    required String source,
+    required Future<List<int>> Function(PrintTiming timing) buildBytes,
+    String? jobId,
+    void Function(PrintPhase phase)? onPhase,
+    bool requestPermissions = true,
   }) async {
     void phase(PrintPhase p) => onPhase?.call(p);
 
@@ -187,6 +234,7 @@ class PrintService {
     final transport = PrinterTransportFactory.create(printer);
     var succeeded = false;
     int? byteCount;
+    Future<void>? pendingConnect;
     try {
       if (requestPermissions && printer.type == PrinterLinkType.bluetooth) {
         final ok = await PrinterPermissions.ensureBluetooth();
@@ -225,15 +273,22 @@ class PrintService {
       );
       final connectFuture = timing.measure(
         'connect',
-        () => transport.connect(printer).timeout(
-              const Duration(seconds: 45),
-              onTimeout: () => throw PrinterTransportException(
-                tr(
-                  'No se pudo conectar con la impresora (tiempo agotado).',
-                  'Could not connect to the printer (timed out).',
-                ),
+        () {
+          // A timeout does not cancel a native connection attempt. Keep its
+          // lease until the attempt settles and we can close that connection.
+          final rawConnect = transport.connect(printer);
+          pendingConnect = rawConnect;
+          rawConnect.ignore();
+          return rawConnect.timeout(
+            const Duration(seconds: 45),
+            onTimeout: () => throw PrinterTransportException(
+              tr(
+                'No se pudo conectar con la impresora (tiempo agotado).',
+                'Could not connect to the printer (timed out).',
               ),
             ),
+          );
+        },
       );
       // Si una de las dos falla mientras se espera la otra, el error se
       // recoge más abajo: no debe quedar como excepción sin manejar.
@@ -242,11 +297,13 @@ class PrintService {
       final bytes = await bytesFuture;
       byteCount = bytes.length;
       final adsFree = await RedPosLicenseStore.instance.isAdsFree();
-      final payload = RedPosAdEscPos.maybeWrap(
-        bytes,
-        printer: printer,
-        adsFree: adsFree,
-      );
+      final payload = printer.isLabel
+          ? bytes
+          : RedPosAdEscPos.maybeWrap(
+              bytes,
+              printer: printer,
+              adsFree: adsFree,
+            );
       byteCount = payload.length;
       phase(PrintPhase.connecting);
       await paint();
@@ -264,9 +321,11 @@ class PrintService {
         fields: {'bytes': payload.length},
       );
 
-      final kick = printer.cashDrawer.kickBytes(
-        usb: printer.type == PrinterLinkType.usb,
-      );
+      final kick = printer.isLabel
+          ? <int>[]
+          : printer.cashDrawer.kickBytes(
+              usb: printer.type == PrinterLinkType.usb,
+            );
       if (kick.isNotEmpty) {
         await Future<void>.delayed(
           DrawerWait.forPrinter(printer, bytes.length),
@@ -304,6 +363,9 @@ class PrintService {
       );
       rethrow;
     } finally {
+      try {
+        await pendingConnect;
+      } catch (_) {}
       try {
         await timing.measure('disconnect', transport.disconnect);
       } finally {
@@ -346,11 +408,9 @@ class PrintService {
       final ticket = SunatUblParser.parse(xml);
       final saved = await _sunatPrint.load();
       final unlocked = await RedPosLicenseStore.instance.isAdsFree();
-      final settings = unlocked
-          ? saved.forJob(noteOverride)
-          : saved.withoutPaidExtras();
-      final logo =
-          unlocked ? await _sunatPrint.loadLogoBytes() : null;
+      final settings =
+          unlocked ? saved.forJob(noteOverride) : saved.withoutPaidExtras();
+      final logo = unlocked ? await _sunatPrint.loadLogoBytes() : null;
       return await SunatEscPosPrint.build(
         printer,
         ticket,
@@ -363,9 +423,9 @@ class PrintService {
       throw PrinterTransportException(
         tr(
           'No se pudo leer el XML. En Android 10+ comparte el archivo '
-          'o usa Abrir con ${AppBrand.name} (no la ruta de Descargas).',
+              'o usa Abrir con ${AppBrand.name} (no la ruta de Descargas).',
           'Could not read the XML. On Android 10+ share the file '
-          'or use Open with ${AppBrand.name} (not the Downloads path).',
+              'or use Open with ${AppBrand.name} (not the Downloads path).',
         ),
       );
     } catch (e) {

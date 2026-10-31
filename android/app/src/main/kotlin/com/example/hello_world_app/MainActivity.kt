@@ -15,7 +15,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
 
     private var systemChannel: MethodChannel? = null
-    private var pendingSystemPrint: Map<String, String>? = null
+    private val pendingSystemPrints = java.util.ArrayDeque<Map<String, Any?>>()
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -45,9 +45,7 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                     "takePendingSystemPrint" -> {
-                        val pending = pendingSystemPrint
-                        pendingSystemPrint = null
-                        result.success(pending)
+                        result.success(pendingSystemPrints.pollFirst())
                     }
                     "copyFromIntent" -> {
                         result.success(SharedIncomingFile.copyFromIntent(this))
@@ -85,14 +83,25 @@ class MainActivity : FlutterActivity() {
         intent.removeExtra(EXTRA_SYSTEM_PRINT_PRINTER_ID)
         intent.removeExtra(EXTRA_SYSTEM_PRINT_TOKEN)
 
+        val mediaSizeId = intent.getStringExtra("mediaSizeId")
+        val mediaWidthMils = intent.getIntExtra("mediaWidthMils", 0)
+        val mediaHeightMils = intent.getIntExtra("mediaHeightMils", 0)
+        val copies = intent.getIntExtra("copies", 1)
+        val snapshot = intent.getStringExtra("printerSnapshot")
+        listOf("mediaSizeId", "mediaWidthMils", "mediaHeightMils", "copies", "printerSnapshot").forEach { intent.removeExtra(it) }
         val payload = mapOf(
             "filePath" to path,
             "printerId" to printerId,
             "token" to token,
+            "mediaSizeId" to mediaSizeId,
+            "mediaWidthMils" to mediaWidthMils,
+            "mediaHeightMils" to mediaHeightMils,
+            "copies" to copies,
+            "printerSnapshot" to snapshot,
         )
         Log.i(TAG, "System print intent path=$path printerId=$printerId")
         // Siempre dejar pending: Dart puede aún no haber registrado el handler.
-        pendingSystemPrint = payload
+        pendingSystemPrints.addLast(payload)
         systemChannel?.invokeMethod("runSystemPrint", payload)
     }
 

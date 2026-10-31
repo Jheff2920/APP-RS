@@ -55,7 +55,10 @@ class UsbPrinterPlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallH
             binding.applicationContext.unregisterReceiver(usbReceiver)
         } catch (_: Exception) {
         }
-        io.execute { UsbEscPos.closeHeld() }
+        val lease = com.example.hello_world_app.printservice.PrinterJobCoordinator.currentLease()
+        io.execute {
+            com.example.hello_world_app.printservice.PrinterJobCoordinator.ifOwner(lease) { UsbEscPos.closeHeld() }
+        }
         channel?.setMethodCallHandler(null)
         channel = null
         appContext = null

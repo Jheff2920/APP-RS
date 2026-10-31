@@ -88,7 +88,9 @@ class PrinterCard extends StatelessWidget {
                             ),
                           ),
                         Text(
-                          '${printer.type.label}, ${printer.paper.label}',
+                          printer.isLabel
+                              ? l('Etiquetas', 'Labels')
+                              : '${printer.type.label}, ${printer.paper.label}',
                           style: tt.bodySmall
                               ?.copyWith(color: cs.onSurfaceVariant),
                           maxLines: 1,

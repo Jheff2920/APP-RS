@@ -1,6 +1,10 @@
 package com.example.hello_world_app.printservice
 
 import android.content.Context
+import android.content.SharedPreferences
+import android.os.Handler
+import android.os.Looper
+import org.json.JSONObject
 import android.print.PrintAttributes
 import android.print.PrinterCapabilitiesInfo
 import android.print.PrinterId
@@ -19,19 +23,33 @@ class BoletaPrinterDiscoverySession(
     private val printService: PrintService,
 ) : PrinterDiscoverySession() {
 
+    private val main = Handler(Looper.getMainLooper())
+    private val prefs = printService.getSharedPreferences(PrintersNativePrefsPlugin.PREFS, Context.MODE_PRIVATE)
+    private val refresh = Runnable { if (!isDestroyed) publish() }
+    private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == PrintersNativePrefsPlugin.KEY) {
+            main.removeCallbacks(refresh)
+            main.post(refresh)
+        }
+    }
+    init { prefs.registerOnSharedPreferenceChangeListener(listener) }
+
     override fun onStartPrinterDiscovery(priorityList: MutableList<PrinterId>) {
         publish()
     }
 
     override fun onStopPrinterDiscovery() {}
 
-    override fun onValidatePrinters(printerIds: MutableList<PrinterId>) {}
+    override fun onValidatePrinters(printerIds: MutableList<PrinterId>) { publish() }
 
-    override fun onStartPrinterStateTracking(printerId: PrinterId) {}
+    override fun onStartPrinterStateTracking(printerId: PrinterId) { publish() }
 
     override fun onStopPrinterStateTracking(printerId: PrinterId) {}
 
-    override fun onDestroy() {}
+    override fun onDestroy() {
+        prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        main.removeCallbacks(refresh)
+    }
 
     private fun publish() {
         val printers = loadSavedPrinters(printService.applicationContext)
@@ -47,11 +65,16 @@ class BoletaPrinterDiscoverySession(
             } else {
                 PrinterInfo.STATUS_IDLE
             }
-            val label = if (p.isDefault) "${p.name} (predeterminada)" else p.name
+            val label = p.name
             val builder = PrinterInfo.Builder(id, label, status)
                 .setDescription(p.description)
-                .setCapabilities(capabilitiesFor(id, p.paper, p.dpi))
-            infos.add(builder.build())
+            try {
+                builder.setCapabilities(capabilitiesFor(id, p))
+                infos.add(builder.build())
+            } catch (e: Exception) {
+                Log.e(TAG, "Invalid printer capabilities", e)
+                infos.add(PrinterInfo.Builder(id, label, PrinterInfo.STATUS_UNAVAILABLE).build())
+            }
         }
 
         if (infos.isEmpty()) {
@@ -66,9 +89,9 @@ class BoletaPrinterDiscoverySession(
         addPrinters(infos)
 
         val toRemove = ArrayList<PrinterId>()
-        for (tracked in trackedPrinters) {
+        for (tracked in getPrinters().map { it.id }) {
             val local = tracked.localId
-            if (local != "no_printers" && local !in keepIds && printers.isNotEmpty()) {
+            if (local != "no_printers" && local !in keepIds) {
                 toRemove.add(tracked)
             }
             if (local == "no_printers" && printers.isNotEmpty()) {
@@ -82,9 +105,11 @@ class BoletaPrinterDiscoverySession(
 
     private fun capabilitiesFor(
         printerId: PrinterId,
-        paper: String,
-        dpi: Int,
+        row: SavedPrinterRow,
     ): PrinterCapabilitiesInfo {
+        val paper = row.paper
+        val dpi = row.dpi
+        if (row.kind == "label") return labelCapabilities(printerId, row)
         // Ancho en mils. 58 mm físico = 2283, pero Chrome pone ~0,5" de
         // margen y el ticket se encoge a la mitad. RawBT usa 3000 mils
         // (~76 mm) para que el contenido útil siga en ~58 mm.
@@ -127,13 +152,21 @@ class BoletaPrinterDiscoverySession(
         )
 
         val prefer80 = paper == "mm80"
+        val allMedia = listOf(roll58, roll58Max, roll58Google, roll80, roll80Max, roll80Google)
+        val enabled = row.profiles?.let { profiles ->
+            (0 until profiles.length()).map { profiles.getJSONObject(it) }
+                .filter { it.optBoolean("enabled", true) && it.optString("logicalPrinterId") == row.id }
+                .map { it.optString("receiptMediaId") }.toSet()
+        }
+        val media = allMedia.filter { enabled == null || it.id in enabled }
+        val preferred = row.profiles?.let { profiles ->
+            (0 until profiles.length()).map { profiles.getJSONObject(it) }
+                .firstOrNull { it.optString("paperProfileId") == row.defaultProfile }?.optString("receiptMediaId")
+        } ?: if (prefer80) roll80Google.id else roll58Google.id
+        val defaultMedia = media.firstOrNull { it.id == preferred } ?: media.first()
         val builder = PrinterCapabilitiesInfo.Builder(printerId)
-            .addMediaSize(roll58, false)
-            .addMediaSize(roll58Max, false)
-            .addMediaSize(roll58Google, !prefer80)
-            .addMediaSize(roll80, false)
-            .addMediaSize(roll80Max, false)
-            .addMediaSize(roll80Google, prefer80)
+        media.forEach { builder.addMediaSize(it, it.id == defaultMedia.id) }
+        builder
             .addResolution(
                 PrintAttributes.Resolution("203dpi", "203 dpi", 203, 203),
                 dpi < 280,
@@ -148,6 +181,25 @@ class BoletaPrinterDiscoverySession(
                 PrintAttributes.COLOR_MODE_MONOCHROME,
             )
         return builder.build()
+    }
+
+    private fun labelCapabilities(id: PrinterId, row: SavedPrinterRow): PrinterCapabilitiesInfo {
+        val profiles = row.profiles ?: JSONArray()
+        val enabled = (0 until profiles.length()).map { profiles.getJSONObject(it) }.filter {
+            it.optBoolean("enabled", true) && it.optString("logicalPrinterId") == row.id &&
+                !it.has("receiptMediaId") && it.optDouble("widthMm", 0.0) > 0 && it.optDouble("heightMm", 0.0) > 0
+        }
+        val selected = enabled.firstOrNull { it.optString("paperProfileId") == row.defaultProfile } ?: enabled.first()
+        val builder = PrinterCapabilitiesInfo.Builder(id)
+        for (p in enabled) {
+            val media = PrintAttributes.MediaSize("REDPOS_LABEL_${p.getString("paperProfileId")}",
+                p.getString("name"), (p.getDouble("widthMm") * 1000 / 25.4).toInt().coerceAtLeast(1),
+                (p.getDouble("heightMm") * 1000 / 25.4).toInt().coerceAtLeast(1))
+            builder.addMediaSize(media, p === selected)
+        }
+        return builder.addResolution(PrintAttributes.Resolution("head", "${row.dpi} dpi", row.dpi, row.dpi), true)
+            .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+            .setColorModes(PrintAttributes.COLOR_MODE_MONOCHROME, PrintAttributes.COLOR_MODE_MONOCHROME).build()
     }
 
     companion object {
@@ -166,6 +218,9 @@ class BoletaPrinterDiscoverySession(
             val dpi: Int,
             val isDefault: Boolean,
             val description: String,
+            val kind: String,
+            val profiles: JSONArray?,
+            val defaultProfile: String,
         )
 
         fun loadSavedPrinters(context: Context): List<SavedPrinterRow> {
@@ -224,6 +279,9 @@ class BoletaPrinterDiscoverySession(
                         dpi = dpi,
                         isDefault = isDefault,
                         description = desc,
+                        kind = o.optString("kind", "receipt"),
+                        profiles = o.optJSONArray("paperProfiles"),
+                        defaultProfile = o.optString("defaultPaperProfileId"),
                     ),
                 )
             }

@@ -26,6 +26,7 @@ import '../theme.dart';
 import '../widgets/boleta_page.dart';
 import '../widgets/ui_kit.dart';
 import '../widgets/margin_fields.dart';
+import '../widgets/logical_printer_settings.dart';
 import '../widgets/paper_width_selector.dart';
 import '../widgets/print_status_dialog.dart';
 import '../widgets/raster_scale_fields.dart';
@@ -60,6 +61,17 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
 
   /// Mismo ID al Probar y Guardar; cambia si eliges otra impresora de la lista.
   late String _id;
+  String? _physicalPrinterId;
+  PrinterKind _kind = PrinterKind.receipt;
+  PrinterProtocol _protocol = PrinterProtocol.escpos;
+  List<PaperProfile>? _profiles;
+  String _defaultProfileId = '';
+
+  List<PaperProfile> get _currentProfiles =>
+      _profiles ??
+      (_kind == PrinterKind.label
+          ? PaperProfile.labels(_id)
+          : PaperProfile.receipts(_id));
 
   late PrinterLinkType _type;
   late PaperWidth _paper;
@@ -82,9 +94,11 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   bool _firstPrinter = false;
   bool _adsFree = false;
   bool _activating = false;
+
   /// Impresora que ya estaba guardada al abrir o al elegir una de la lista.
   var _protectFromRollback = false;
   final Set<String> _bondedThisSession = {};
+
   /// MAC que falló el PIN: no mostrarlas en emparejados ni rellenar el formulario.
   final Set<String> _hidePaired = {};
 
@@ -112,6 +126,11 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     }
     final draft = _drafts[_type]!;
     _id = draft.id;
+    _physicalPrinterId = e?.physicalPrinterId;
+    _kind = e?.kind ?? PrinterKind.receipt;
+    _protocol = e?.protocol ?? PrinterProtocol.escpos;
+    _profiles = e?.paperProfiles;
+    _defaultProfileId = e?.defaultPaperProfileId ?? '';
     _nameCtrl = TextEditingController(text: draft.name);
     _addressCtrl = TextEditingController(text: draft.address);
     _portCtrl = TextEditingController(text: draft.port);
@@ -191,6 +210,11 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
 
   void _restoreDraft(PrinterLinkType type) {
     final d = _drafts[type]!;
+    if (_id != d.id) {
+      _profiles = null;
+      _defaultProfileId = '';
+      _physicalPrinterId = null;
+    }
     _id = d.id;
     _nameCtrl.text = d.name;
     _addressCtrl.text = d.address;
@@ -207,10 +231,16 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
 
   void _onTypeChanged(PrinterLinkType next) {
     if (next == _type) return;
+    final editing = widget.existing;
     _captureDraft(_type);
     setState(() {
       _type = next;
-      _restoreDraft(next);
+      if (editing == null) {
+        _restoreDraft(next);
+      } else {
+        _addressCtrl.clear();
+        _showAddress = true;
+      }
     });
     if (next == PrinterLinkType.bluetooth) {
       unawaited(_loadPaired());
@@ -262,9 +292,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
       PrinterLinkType.bluetooth => '',
     };
     if (prefix.isEmpty) return;
-    final auto = current.isEmpty ||
-        current == prefix ||
-        current.startsWith('$prefix ');
+    final auto =
+        current.isEmpty || current == prefix || current.startsWith('$prefix ');
     if (!auto) return;
     _nameCtrl.text = _fallbackName(type, address);
   }
@@ -298,6 +327,15 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   }
 
   void _applyPrinter(SavedPrinter printer) {
+    if (widget.existing == null && printer.id != _id) {
+      _usePhysical(printer);
+      return;
+    }
+    _physicalPrinterId = printer.physicalPrinterId;
+    _kind = printer.kind;
+    _protocol = printer.protocol;
+    _profiles = printer.paperProfiles;
+    _defaultProfileId = printer.defaultPaperProfileId;
     _captureDraft(_type);
     setState(() {
       _protectFromRollback = true;
@@ -314,6 +352,23 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     }
   }
 
+  void _usePhysical(SavedPrinter printer) {
+    setState(() {
+      _type = printer.type;
+      _physicalPrinterId = printer.physicalPrinterId;
+      _addressCtrl.text = printer.address;
+      _portCtrl.text = '${printer.port}';
+      _showAddress = true;
+      _paper = printer.paper;
+      _dpi = printer.dpi;
+      _protectFromRollback = true;
+      if (_nameCtrl.text.trim().isEmpty) {
+        _nameCtrl.text =
+            '${printer.name}-${_kind == PrinterKind.label ? 'Etiquetas' : 'Recibos'}';
+      }
+    });
+  }
+
   void _startNew(PrinterLinkType type, {bool showAddress = false}) {
     _captureDraft(_type);
     setState(() {
@@ -326,6 +381,9 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
         isDefault: _firstPrinter,
       );
       _restoreDraft(type);
+      _physicalPrinterId = null;
+      _profiles = null;
+      _defaultProfileId = '';
     });
     if (type == PrinterLinkType.bluetooth) {
       unawaited(_loadPaired());
@@ -354,7 +412,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
               child: Text(loc('Cancelar', 'Cancel')),
             ),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
+              style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(ctx).colorScheme.error),
               onPressed: () => Navigator.pop(ctx, true),
               child: Text(loc('Desvincular', 'Unlink')),
             ),
@@ -476,6 +535,18 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   }
 
   Future<void> _forgetPaired(BluetoothInfo device) async {
+    final shared = _saved
+            .where((p) =>
+                p.type == PrinterLinkType.bluetooth &&
+                p.address.toLowerCase() == device.macAdress.toLowerCase())
+            .length >
+        1;
+    if (shared) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Este equipo lo usan varias impresoras. Elimina cada impresora desde sus opciones antes de olvidar el Bluetooth.')));
+      return;
+    }
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) {
@@ -486,9 +557,9 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
           content: Text(
             loc(
               '¿Quitar "${device.name}" de ${AppBrand.name} y del Bluetooth '
-              'del teléfono?',
+                  'del teléfono?',
               'Remove "${device.name}" from ${AppBrand.name} and from this '
-              'phone’s Bluetooth?',
+                  'phone’s Bluetooth?',
             ),
           ),
           actions: [
@@ -497,7 +568,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
               child: Text(loc('Cancelar', 'Cancel')),
             ),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
+              style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(ctx).colorScheme.error),
               onPressed: () => Navigator.pop(ctx, true),
               child: Text(loc('Desvincular', 'Unlink')),
             ),
@@ -528,8 +600,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     );
     widget.onStoreChanged?.call();
     if (!mounted) return;
-    final gone = removedIds.contains(_id) ||
-        removedIds.contains(widget.existing?.id);
+    final gone =
+        removedIds.contains(_id) || removedIds.contains(widget.existing?.id);
     if (gone && widget.existing != null) {
       Navigator.pop(context, true);
       return;
@@ -665,7 +737,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(tr('Permiso USB denegado', 'USB permission denied')),
+              content:
+                  Text(tr('Permiso USB denegado', 'USB permission denied')),
             ),
           );
         }
@@ -702,6 +775,12 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     final port = int.tryParse(_portCtrl.text.trim()) ?? 9100;
     return SavedPrinter(
       id: _id,
+      physicalPrinterId: _physicalPrinterId,
+      kind: _kind,
+      protocol:
+          _kind == PrinterKind.receipt ? PrinterProtocol.escpos : _protocol,
+      paperProfiles: _currentProfiles,
+      defaultPaperProfileId: _defaultProfileId,
       name: _nameCtrl.text.trim(),
       type: _type,
       address: _addressCtrl.text.trim(),
@@ -718,17 +797,23 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   }
 
   Future<void> _persistSettings() async {
-    if (!_isEdit || !_formKey.currentState!.validate()) return;
+    if (_kind != PrinterKind.receipt ||
+        !_isEdit ||
+        !_formKey.currentState!.validate()) return;
     await widget.store.upsert(_buildPrinter());
   }
 
   Future<void> _rollbackUncommitted({required bool unpair}) async {
     if (_protectFromRollback) return;
     final address = _addressCtrl.text.trim();
-    if (address.isNotEmpty) {
-      await widget.store.deleteByAddress(address, type: _type);
-    }
+    final others = (await widget.store.loadAll())
+        .where((p) =>
+            p.id != _id &&
+            p.type == _type &&
+            p.address.toLowerCase() == address.toLowerCase())
+        .toList();
     await widget.store.delete(_id);
+    if (others.isNotEmpty) return;
     final mac = address.toUpperCase();
     if (unpair &&
         _type == PrinterLinkType.bluetooth &&
@@ -832,7 +917,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            _adsFree
+            _adsFree || _kind == PrinterKind.label
                 ? tr('Impresora guardada', 'Printer saved')
                 : tr(
                     'Guardada. Imprimirá con publicidad.',
@@ -841,6 +926,12 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
           ),
         ),
       );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content:
+                Text('No se pudo guardar la impresora. ${friendlyError(e)}')));
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -871,7 +962,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
       await runWithPrintStatusDialog(
         context: context,
         printerName: printer.name,
-        job: (setPhase) => (widget.printService ?? PrintService()).printTestPage(
+        job: (setPhase) =>
+            (widget.printService ?? PrintService()).printTestPage(
           printer,
           onPhase: setPhase,
         ),
@@ -996,7 +1088,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     );
   }
 
-  Widget _listHeader(String title, {required bool loading, required VoidCallback onRefresh}) {
+  Widget _listHeader(String title,
+      {required bool loading, required VoidCallback onRefresh}) {
     final tt = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 6, 4, 0),
@@ -1135,7 +1228,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
               title: d.name,
               subtitle: d.hasPermission
                   ? d.address
-                  : l('${d.address}, falta permiso', '${d.address}, needs permission'),
+                  : l('${d.address}, falta permiso',
+                      '${d.address}, needs permission'),
               selected: _addressCtrl.text == d.address,
               onTap: () => _pickUsb(d),
             ),
@@ -1305,7 +1399,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
             children: [
               TextButton(
                 onPressed: () async {
-                  final ok = await openMonthlySubscription(context, widget.store);
+                  final ok =
+                      await openMonthlySubscription(context, widget.store);
                   if (!mounted) return;
                   if (ok) setState(() => _adsFree = true);
                 },
@@ -1391,7 +1486,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                       // En teléfonos angostos el icono no cabe junto a
                       // «Bluetooth»: se quita y el texto nunca se parte.
                       child: LayoutBuilder(
-                        builder: (context, box) => SegmentedButton<PrinterLinkType>(
+                        builder: (context, box) =>
+                            SegmentedButton<PrinterLinkType>(
                           expandedInsets: EdgeInsets.zero,
                           showSelectedIcon: false,
                           segments: [
@@ -1423,11 +1519,28 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                   ],
                 ),
               ),
+              if (widget.existing == null && _saved.isNotEmpty) ...[
+                const SectionLabel('Usar un equipo registrado'),
+                Card(
+                    child: Column(children: [
+                  for (final p in {
+                    for (final p in _saved) p.physicalPrinterId: p
+                  }.values)
+                    ListTile(
+                        key: ValueKey('use-physical-${p.id}'),
+                        leading: Icon(printerTypeIcon(p.type)),
+                        title: Text(p.name),
+                        subtitle: Text(p.connectionSummary),
+                        trailing: const Icon(Icons.add),
+                        onTap: () => _usePhysical(p)),
+                ])),
+              ],
               SectionLabel(l('Nombre', 'Name')),
               Card(
                 child: SectionBody(
                   children: [
                     TextFormField(
+                      key: const ValueKey('logical-printer-name'),
                       controller: _nameCtrl,
                       decoration: InputDecoration(
                         hintText: l('Ej.: Caja 1', 'E.g. Front desk'),
@@ -1447,6 +1560,24 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                   ],
                 ),
               ),
+              LogicalPrinterSettings(
+                  printerId: _id,
+                  kind: _kind,
+                  protocol: _protocol,
+                  profiles: _currentProfiles,
+                  defaultProfileId: _defaultProfileId.isEmpty
+                      ? _buildPrinter().defaultProfile.paperProfileId
+                      : _defaultProfileId,
+                  onKindChanged: (v) => setState(() {
+                        _kind = v;
+                        _profiles = null;
+                        _defaultProfileId = '';
+                        _protocol = PrinterProtocol.escpos;
+                      }),
+                  onProtocolChanged: (v) => setState(() => _protocol = v),
+                  onProfilesChanged: (v) => setState(() => _profiles = v),
+                  onDefaultChanged: (v) =>
+                      setState(() => _defaultProfileId = v)),
               SectionLabel(l('Papel', 'Paper')),
               Card(
                 child: SectionBody(
@@ -1457,7 +1588,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                       onChanged: (v) => setState(() => _paper = v),
                     ),
                     const SizedBox(height: 18),
-                    fieldTitle(l('Resolución del cabezal', 'Print head resolution')),
+                    fieldTitle(
+                        l('Resolución del cabezal', 'Print head resolution')),
                     SegmentedButton<PrinterDpi>(
                       expandedInsets: EdgeInsets.zero,
                       showSelectedIcon: false,
@@ -1476,61 +1608,66 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                   ],
                 ),
               ),
-              SectionLabel(l('Corte y gaveta', 'Cut and drawer')),
-              Card(
-                child: SectionBody(
-                  children: [
-                    DropdownMenu<CutMode>(
-                      key: ValueKey('cut-$_id'),
-                      initialSelection: _cut,
-                      expandedInsets: EdgeInsets.zero,
-                      label: Text(l('Corte automático', 'Auto cut')),
-                      dropdownMenuEntries: [
-                        for (final m in CutMode.uiOrder)
-                          DropdownMenuEntry(value: m, label: m.label),
-                      ],
-                      onSelected: (v) {
-                        if (v == null) return;
-                        setState(() => _cut = v);
-                        _persistSettings();
-                      },
-                    ),
-                    hint(_cut.hint),
-                    const SizedBox(height: 18),
-                    DropdownMenu<CashDrawer>(
-                      key: ValueKey('drawer-$_id'),
-                      initialSelection: _cashDrawer,
-                      expandedInsets: EdgeInsets.zero,
-                      label: Text(l('Gaveta de dinero', 'Cash drawer')),
-                      dropdownMenuEntries: [
-                        for (final m in CashDrawer.values)
-                          DropdownMenuEntry(value: m, label: m.label),
-                      ],
-                      onSelected: (v) {
-                        if (v != null) setState(() => _cashDrawer = v);
-                      },
-                    ),
-                    if (_cashDrawer != CashDrawer.none) hint(_cashDrawer.hint),
-                  ],
+              if (_kind == PrinterKind.receipt) ...[
+                SectionLabel(l('Corte y gaveta', 'Cut and drawer')),
+                Card(
+                  child: SectionBody(
+                    children: [
+                      DropdownMenu<CutMode>(
+                        key: ValueKey('cut-$_id'),
+                        initialSelection: _cut,
+                        expandedInsets: EdgeInsets.zero,
+                        label: Text(l('Corte automático', 'Auto cut')),
+                        dropdownMenuEntries: [
+                          for (final m in CutMode.uiOrder)
+                            DropdownMenuEntry(value: m, label: m.label),
+                        ],
+                        onSelected: (v) {
+                          if (v == null) return;
+                          setState(() => _cut = v);
+                          _persistSettings();
+                        },
+                      ),
+                      hint(_cut.hint),
+                      const SizedBox(height: 18),
+                      DropdownMenu<CashDrawer>(
+                        key: ValueKey('drawer-$_id'),
+                        initialSelection: _cashDrawer,
+                        expandedInsets: EdgeInsets.zero,
+                        label: Text(l('Gaveta de dinero', 'Cash drawer')),
+                        dropdownMenuEntries: [
+                          for (final m in CashDrawer.values)
+                            DropdownMenuEntry(value: m, label: m.label),
+                        ],
+                        onSelected: (v) {
+                          if (v != null) setState(() => _cashDrawer = v);
+                        },
+                      ),
+                      if (_cashDrawer != CashDrawer.none)
+                        hint(_cashDrawer.hint),
+                    ],
+                  ),
                 ),
-              ),
+              ],
               SectionLabel(l('Ajuste fino', 'Fine tuning')),
               SectionGroup(
                 dividerIndent: 68,
                 children: [
-                  MarginFields(
-                    key: ValueKey('margins-$_id'),
-                    value: _margins,
-                    onChanged: (v) => _margins = v,
-                  ),
-                  RasterScaleFields(
-                    key: ValueKey('raster-$_id'),
-                    value: _rasterScale,
-                    onChanged: (v) {
-                      setState(() => _rasterScale = v);
-                      _persistSettings();
-                    },
-                  ),
+                  if (_kind == PrinterKind.receipt)
+                    MarginFields(
+                      key: ValueKey('margins-$_id'),
+                      value: _margins,
+                      onChanged: (v) => _margins = v,
+                    ),
+                  if (_kind == PrinterKind.receipt)
+                    RasterScaleFields(
+                      key: ValueKey('raster-$_id'),
+                      value: _rasterScale,
+                      onChanged: (v) {
+                        setState(() => _rasterScale = v);
+                        _persistSettings();
+                      },
+                    ),
                   if (_firstPrinter)
                     NavRow(
                       icon: Icons.star_rounded,
@@ -1947,4 +2084,3 @@ class _AddBtDeviceSheetState extends State<_AddBtDeviceSheet> {
     );
   }
 }
-

@@ -158,6 +158,8 @@ object EscPosTransport {
         ensureNetwork(host, port, jobId = "dart")
     }
 
+    fun closeHeldNet() { synchronized(netLock) { dropNetLocked() } }
+
     fun writeHeldNet(data: ByteArray) {
         val host: String
         synchronized(netLock) {

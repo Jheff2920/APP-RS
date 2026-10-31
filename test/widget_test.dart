@@ -1,16 +1,66 @@
-import 'dart:ui' show FakeViewPadding, Locale, Size;
+import 'dart:ui' show Locale, Size;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
+// ignore: depend_on_referenced_packages
+import 'package:in_app_purchase_platform_interface/in_app_purchase_platform_interface.dart';
 
 import 'package:hello_world_app/app.dart';
 import 'package:hello_world_app/platform_caps.dart';
 import 'package:hello_world_app/services/print_service.dart';
 import 'package:hello_world_app/services/printer_store.dart';
+import 'package:hello_world_app/services/redpos/redpos_license.dart';
+
+Future<void> _settleApp(WidgetTester tester) async {
+  // App startup synchronizes the catalog and hydrates the license asynchronously.
+  for (var i = 0; i < 10; i++) {
+    await tester
+        .runAsync(() => Future<void>.delayed(const Duration(milliseconds: 10)));
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+}
+
+class _UnavailableStore extends InAppPurchasePlatform {
+  @override
+  Stream<List<PurchaseDetails>> get purchaseStream => const Stream.empty();
+  @override
+  Future<bool> isAvailable() async => false;
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() async {
+    // Initialize the facade before replacing its platform implementation.
+    final previousPlatform = debugDefaultTargetPlatformOverride;
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    InAppPurchase.instance;
+    debugDefaultTargetPlatformOverride = previousPlatform;
+    InAppPurchasePlatform.instance = _UnavailableStore();
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockStreamHandler(
+        const EventChannel('receive_sharing_intent/events-media'),
+        MockStreamHandler.inline(onListen: (_, __) {}));
+    messenger.setMockMethodCallHandler(
+        const MethodChannel('receive_sharing_intent/messages'),
+        (call) async => call.method == 'getInitialMedia' ? '[]' : null);
+    messenger.setMockMethodCallHandler(
+        const MethodChannel('flutter.baseflow.com/permissions/methods'),
+        (call) async => call.method == 'requestPermissions' ? <int, int>{} : 1);
+    messenger.setMockMethodCallHandler(
+        const MethodChannel('boleta_print/printers_prefs'),
+        (call) async => null);
+    messenger.setMockMethodCallHandler(
+        const MethodChannel('boleta_print/system_print_ui'),
+        (call) async => null);
+    SharedPreferences.setMockInitialValues({});
+    RedPosLicenseStore.instance
+        .resetForTest(prefs: await SharedPreferences.getInstance());
+  });
 
   testWidgets('Shows empty printers state', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({});
@@ -25,8 +75,7 @@ void main() {
     await tester.pumpWidget(
       BoletaPrintApp(store: store, printService: printService),
     );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
+    await _settleApp(tester);
     expect(find.textContaining('Sin impresoras'), findsOneWidget);
     expect(find.text('RedPOS Service'), findsOneWidget);
     expect(find.textContaining('WiFi / Red'), findsOneWidget);
@@ -74,8 +123,7 @@ void main() {
     await tester.pumpWidget(
       BoletaPrintApp(store: PrinterStore(), printService: PrintService()),
     );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 500));
+    await _settleApp(tester);
     expect(find.textContaining('Sin impresoras'), findsOneWidget);
     expect(find.text('Abrir archivo'), findsWidgets);
   });

@@ -49,6 +49,7 @@ class PrivacyDataWipe {
   SharedPreferences? _prefs;
 
   static const knownKeys = <String>[
+    'printer_catalog_v2',
     'saved_printers_v1',
     'print_history_v1',
     CustomTicketStore.templatesKey,

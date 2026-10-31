@@ -3,6 +3,7 @@ package com.example.hello_world_app
 import android.os.Handler
 import android.os.Looper
 import com.example.hello_world_app.printservice.EscPosTransport
+import com.example.hello_world_app.printservice.PrinterJobCoordinator
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -25,7 +26,8 @@ class BluetoothSppPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        io.execute { EscPosTransport.closeHeld() }
+        val lease = PrinterJobCoordinator.currentLease()
+        io.execute { PrinterJobCoordinator.ifOwner(lease) { EscPosTransport.closeHeld() } }
         channel?.setMethodCallHandler(null)
         channel = null
     }

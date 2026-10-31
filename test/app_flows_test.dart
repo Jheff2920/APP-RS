@@ -175,7 +175,8 @@ void main() {
 
     test('XML de SUNAT: imprime el comprobante', () async {
       await _prefs();
-      final path = await _write('20123456789-03-B001-00001234.xml', utf8.encode(_boleta));
+      final path = await _write(
+          '20123456789-03-B001-00001234.xml', utf8.encode(_boleta));
       await PrintService().printSharedFile(printer: _lan(), filePath: path);
       final text = _visible(_sent.single);
       expect(text, contains('LIMAFAC SAC'));
@@ -189,8 +190,8 @@ void main() {
       await expectLater(
         service.printSharedFile(printer: _lan(), filePath: path),
         throwsA(
-          isA<PrinterTransportException>()
-              .having((e) => e.message, 'mensaje', contains('Formato no soportado')),
+          isA<PrinterTransportException>().having(
+              (e) => e.message, 'mensaje', contains('Formato no soportado')),
         ),
       );
       await service.pendingHistoryWrites;
@@ -228,8 +229,7 @@ void main() {
       );
     });
 
-    test('tickets propios: bloqueado sin código, imprime con código',
-        () async {
+    test('tickets propios: bloqueado sin código, imprime con código', () async {
       await _prefs();
       final store = CustomTicketStore();
       final t = await store.create(name: 'Recibo');
@@ -245,7 +245,8 @@ void main() {
       expect(_sent, isEmpty);
 
       await _prefs({RedPosLicenseStore.playEntitlementKey: true});
-      await PrintService().printCustomTicket(printer: _lan(), template: template);
+      await PrintService()
+          .printCustomTicket(printer: _lan(), template: template);
       expect(_visible(_sent.single), contains('MI TIENDA DEMO'));
     });
 
@@ -394,8 +395,44 @@ void main() {
       expect(_sent, hasLength(1));
     });
 
-    testWidgets('probar con la impresora apagada: dice qué pasó',
+    testWidgets(
+        'crear etiquetas sobre un equipo registrado conserva sus recibos',
         (t) async {
+      await _prefs();
+      await setView(t, const Size(412, 915));
+      await t.runAsync(() => PrinterStore().upsert(_lan()));
+      final before =
+          (await t.runAsync(() => PrinterStore().loadAll()))!.single.toJson();
+      await t.pumpWidget(app(home()));
+      await settle(t, rounds: 6);
+      await tapText(t, 'Vincular otra impresora');
+      final physical = find.byKey(const ValueKey('use-physical-lan'));
+      await t.scrollUntilVisible(physical, 150,
+          scrollable: find.byType(Scrollable).first, maxScrolls: 40);
+      await t.tap(physical);
+      await settle(t, rounds: 6);
+      final nameField = find.byKey(const ValueKey('logical-printer-name'));
+      await t.scrollUntilVisible(nameField, 100,
+          scrollable: find.byType(Scrollable).first, maxScrolls: 40);
+      await t.enterText(nameField, 'HQ300-Etiquetas');
+      t.testTextInput.hide();
+      await settle(t, rounds: 4);
+      await t.scrollUntilVisible(find.text('Etiquetas'), 100,
+          scrollable: find.byType(Scrollable).first, maxScrolls: 40);
+      await t.pump(const Duration(milliseconds: 100));
+      await t.tap(find.text('Etiquetas'));
+      await settle(t, rounds: 4);
+      await tapText(t, 'Guardar');
+      final all = (await t.runAsync(() => PrinterStore().loadAll()))!;
+      expect(all, hasLength(2));
+      expect(all.first.toJson(), before);
+      final label = all.singleWhere((p) => p.isLabel);
+      expect(label.name, 'HQ300-Etiquetas');
+      expect(label.physicalPrinterId, all.first.physicalPrinterId);
+      expect(label.enabledProfiles.map((p) => p.widthMm), [50, 30]);
+    });
+
+    testWidgets('probar con la impresora apagada: dice qué pasó', (t) async {
       await _prefs();
       _failWith = 'No se pudo conectar por WiFi. Revisa que la impresora esté '
           'encendida y la IP sea correcta.';
@@ -406,12 +443,12 @@ void main() {
 
       await tapText(t, 'Probar');
       await settle(t, rounds: 40);
-      expect(find.textContaining('No se pudo conectar por WiFi'), findsOneWidget);
+      expect(
+          find.textContaining('No se pudo conectar por WiFi'), findsOneWidget);
       expect(_sent, isEmpty);
     });
 
-    testWidgets('definir principal y desvincular con confirmación',
-        (t) async {
+    testWidgets('definir principal y desvincular con confirmación', (t) async {
       await _prefs();
       await setView(t, const Size(412, 915));
       await t.runAsync(() async {
@@ -479,17 +516,20 @@ void main() {
     });
 
     testWidgets('Datos y privacidad: borrar datos locales', (t) async {
-      await _prefs();
-      await setView(t, const Size(412, 915));
-      await t.runAsync(() => PrinterStore().upsert(_lan()));
-      await t.pumpWidget(app(PrivacyDataScreen(store: PrinterStore())));
-      await settle(t, rounds: 6);
+      // Keep cache cleanup inside this test's own temporary directory.
+      await IOOverrides.runZoned(() async {
+        await _prefs();
+        await setView(t, const Size(412, 915));
+        await t.runAsync(() => PrinterStore().upsert(_lan()));
+        await t.pumpWidget(app(PrivacyDataScreen(store: PrinterStore())));
+        await settle(t, rounds: 6);
 
-      await tapText(t, 'Borrar datos locales');
-      await t.tap(find.widgetWithText(FilledButton, 'Borrar'));
-      await settle(t, rounds: 20);
-      expect(find.textContaining('Datos locales borrados'), findsOneWidget);
-      expect(await t.runAsync(() => PrinterStore().loadAll()), isEmpty);
+        await tapText(t, 'Borrar datos locales');
+        await t.tap(find.widgetWithText(FilledButton, 'Borrar'));
+        await settle(t, rounds: 20);
+        expect(find.textContaining('Datos locales borrados'), findsOneWidget);
+        expect(await t.runAsync(() => PrinterStore().loadAll()), isEmpty);
+      }, getSystemTempDirectory: () => _tmp);
     });
 
     testWidgets('tablet: Atrás cierra el panel y no la app', (t) async {
@@ -587,5 +627,4 @@ const _boleta = '''
     <cac:Price><cbc:PriceAmount currencyID="PEN">6.00</cbc:PriceAmount></cac:Price>
   </cac:InvoiceLine>
 </Invoice>
-'''
-    ;
+''';

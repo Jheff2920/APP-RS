@@ -5,6 +5,8 @@ import 'print_margins.dart';
 import 'printer_dpi.dart';
 import 'raster_scale.dart';
 import '../l10n/app_lang.dart';
+import 'logical_printer.dart';
+export 'logical_printer.dart';
 
 enum PrinterLinkType {
   bluetooth,
@@ -30,6 +32,9 @@ enum PrinterLinkType {
   }
 }
 
+/// Compatibility view consumed by existing receipt renderers and transports.
+/// PrinterStore persists connection data once, in the physical catalog, and
+/// independent settings in the logical catalog. This object is a job snapshot.
 class SavedPrinter {
   SavedPrinter({
     required this.id,
@@ -45,7 +50,44 @@ class SavedPrinter {
     this.rasterScale = RasterScale.x1,
     this.isDefault = false,
     this.adsFree = false,
-  });
+    String? physicalPrinterId,
+    this.kind = PrinterKind.receipt,
+    this.protocol = PrinterProtocol.escpos,
+    List<PaperProfile>? paperProfiles,
+    String? defaultPaperProfileId,
+  })  : physicalPrinterId = physicalPrinterId ?? 'physical-$id',
+        paperProfiles = List.unmodifiable(paperProfiles ??
+            (kind == PrinterKind.receipt
+                ? PaperProfile.receipts(id)
+                : PaperProfile.labels(id))),
+        defaultPaperProfileId = defaultPaperProfileId ?? '';
+
+  final String physicalPrinterId;
+  final PrinterKind kind;
+  final PrinterProtocol protocol;
+  final List<PaperProfile> paperProfiles;
+  final String defaultPaperProfileId;
+  bool get isLabel => kind == PrinterKind.label;
+  List<PaperProfile> get enabledProfiles => paperProfiles
+      .where(
+          (p) => p.enabled && p.logicalPrinterId == id && p.isLabel == isLabel)
+      .toList();
+  PaperProfile get defaultProfile => enabledProfiles.firstWhere(
+      (p) => p.paperProfileId == defaultPaperProfileId,
+      orElse: () => enabledProfiles.firstWhere(
+          (p) =>
+              !isLabel &&
+              p.receiptMediaId ==
+                  'BOLETA_ROLL_${paper == PaperWidth.mm80 ? 80 : 58}_GOOGLE',
+          orElse: () => enabledProfiles.first));
+  LogicalPrinter get logicalPrinter => LogicalPrinter(
+      logicalPrinterId: id,
+      physicalPrinterId: physicalPrinterId,
+      name: name,
+      kind: kind,
+      protocol: protocol,
+      paperProfiles: paperProfiles,
+      defaultPaperProfileId: defaultPaperProfileId);
 
   final String id;
   final String name;
@@ -55,12 +97,15 @@ class SavedPrinter {
   final PaperWidth paper;
   final PrinterDpi dpi;
   final PrintMargins margins;
+
   /// Corte automatico (RawBT cutCommand). Default: corte total GS V 0.
   final CutMode cut;
+
   /// Gaveta: none = no enviar ESC p. Default off.
   final CashDrawer cashDrawer;
   final RasterScale rasterScale;
   final bool isDefault;
+
   /// Copia para el PrintService nativo. En Dart se verifica el pase firmado.
   final bool adsFree;
 
@@ -80,6 +125,11 @@ class SavedPrinter {
     RasterScale? rasterScale,
     bool? isDefault,
     bool? adsFree,
+    String? physicalPrinterId,
+    PrinterKind? kind,
+    PrinterProtocol? protocol,
+    List<PaperProfile>? paperProfiles,
+    String? defaultPaperProfileId,
   }) {
     return SavedPrinter(
       id: id ?? this.id,
@@ -95,6 +145,12 @@ class SavedPrinter {
       rasterScale: rasterScale ?? this.rasterScale,
       isDefault: isDefault ?? this.isDefault,
       adsFree: adsFree ?? this.adsFree,
+      physicalPrinterId: physicalPrinterId ?? this.physicalPrinterId,
+      kind: kind ?? this.kind,
+      protocol: protocol ?? this.protocol,
+      paperProfiles: paperProfiles ?? this.paperProfiles,
+      defaultPaperProfileId:
+          defaultPaperProfileId ?? this.defaultPaperProfileId,
     );
   }
 
@@ -112,6 +168,11 @@ class SavedPrinter {
         'rasterScale': rasterScale.name,
         'isDefault': isDefault,
         'adsFree': adsFree,
+        'physicalPrinterId': physicalPrinterId,
+        'kind': kind.name,
+        'protocol': protocol.name,
+        'paperProfiles': paperProfiles.map((p) => p.toJson()).toList(),
+        'defaultPaperProfileId': defaultPaperProfileId,
       };
 
   factory SavedPrinter.fromJson(Map<String, dynamic> json) {
@@ -131,6 +192,16 @@ class SavedPrinter {
       rasterScale: RasterScale.fromName(json['rasterScale'] as String? ?? 'x1'),
       isDefault: json['isDefault'] as bool? ?? false,
       adsFree: json['adsFree'] as bool? ?? false,
+      physicalPrinterId: json['physicalPrinterId'] as String?,
+      kind: json['kind'] == 'label' ? PrinterKind.label : PrinterKind.receipt,
+      protocol: json['protocol'] == 'tspl'
+          ? PrinterProtocol.tspl
+          : PrinterProtocol.escpos,
+      paperProfiles: (json['paperProfiles'] as List?)
+          ?.map(
+              (p) => PaperProfile.fromJson(Map<String, dynamic>.from(p as Map)))
+          .toList(),
+      defaultPaperProfileId: json['defaultPaperProfileId'] as String?,
     );
   }
 

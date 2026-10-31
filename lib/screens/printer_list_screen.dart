@@ -87,10 +87,10 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
           content: Text(
             l(
               'Para imprimir desde el diálogo Imprimir sin salir de la otra app, '
-              'hay que permitir «Mostrar sobre otras apps». Verás un recuadro '
-              'flotante de progreso encima.',
+                  'hay que permitir «Mostrar sobre otras apps». Verás un recuadro '
+                  'flotante de progreso encima.',
               'To print from the system Print dialog without leaving the other app, '
-              'allow “Display over other apps”. You will see a floating progress box.',
+                  'allow “Display over other apps”. You will see a floating progress box.',
             ),
           ),
           actions: [
@@ -257,17 +257,23 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
 
   Future<void> _unlink(SavedPrinter printer) async {
     final l = L.of(context);
-    final bluetoothNote = printer.type != PrinterLinkType.bluetooth
-        ? ''
-        : PlatformCaps.isAndroid
-            ? l(
-                '\nTambién se olvidará del Bluetooth del teléfono.',
-                '\nIt will also be forgotten from the phone Bluetooth.',
-              )
-            : l(
-                '\nEn iPhone/iPad hay que olvidarla en Ajustes > Bluetooth.',
-                '\nOn iPhone/iPad, forget it in Settings > Bluetooth.',
-              );
+    final sharedHardware = (await widget.store.loadAll()).any((p) =>
+        p.id != printer.id && p.physicalPrinterId == printer.physicalPrinterId);
+    if (!mounted) return;
+    final bluetoothNote = sharedHardware
+        ? l('\nLas otras impresoras que usan este equipo seguirán disponibles.',
+            '\nOther printers using this device will remain available.')
+        : printer.type != PrinterLinkType.bluetooth
+            ? ''
+            : PlatformCaps.isAndroid
+                ? l(
+                    '\nTambién se olvidará del Bluetooth del teléfono.',
+                    '\nIt will also be forgotten from the phone Bluetooth.',
+                  )
+                : l(
+                    '\nEn iPhone/iPad hay que olvidarla en Ajustes > Bluetooth.',
+                    '\nOn iPhone/iPad, forget it in Settings > Bluetooth.',
+                  );
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -285,7 +291,8 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
             child: Text(l('Cancelar', 'Cancel')),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
+            style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error),
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(l('Desvincular', 'Unlink')),
           ),
@@ -294,7 +301,7 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
     );
     if (ok != true) return;
     String? bluetoothError;
-    if (printer.type == PrinterLinkType.bluetooth) {
+    if (printer.type == PrinterLinkType.bluetooth && !sharedHardware) {
       try {
         if (PlatformCaps.isAndroid) {
           final permitted = await PrinterPermissions.ensureBluetooth();
@@ -434,7 +441,8 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
                     ),
                     NavRow(
                       icon: Icons.history_rounded,
-                      title: l('Historial de esta impresora', 'History for this printer'),
+                      title: l('Historial de esta impresora',
+                          'History for this printer'),
                       onTap: () => run(() => _openHistory(printer: printer)),
                     ),
                     if (!printer.isDefault)
@@ -516,83 +524,83 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
 
   List<Widget> _homeChildren(L l, SavedPrinter? main, {required bool compact}) {
     return [
-        _ReceiptHero(
-          printer: main,
-          busy: main != null && _busyId == main.id,
-          showUsb: PlatformCaps.supportsUsb,
-          onOpenFile: _openSharedFile,
-          onTest: main == null ? null : () => _testPrint(main),
-          onOptions: main == null ? null : () => _showPrinterActions(main),
-          onAdd: _openingForm ? null : () => _openForm(),
-          showAddAnother: _printers.length == 1,
-          compact: compact,
-        ),
-        _Centered(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (_printers.length > 1) ...[
-                SectionLabel(
-                  l(
-                    'Impresoras (${_printers.length})',
-                    'Printers (${_printers.length})',
-                  ),
-                  trailing: TextButton.icon(
-                    onPressed: _openingForm ? null : () => _openForm(),
-                    icon: const Icon(Icons.add_rounded, size: 20),
-                    label: Text(l('Vincular', 'Pair')),
-                  ),
-                  padding: const EdgeInsets.fromLTRB(4, 14, 0, 4),
+      _ReceiptHero(
+        printer: main,
+        busy: main != null && _busyId == main.id,
+        showUsb: PlatformCaps.supportsUsb,
+        onOpenFile: _openSharedFile,
+        onTest: main == null ? null : () => _testPrint(main),
+        onOptions: main == null ? null : () => _showPrinterActions(main),
+        onAdd: _openingForm ? null : () => _openForm(),
+        showAddAnother: _printers.length == 1,
+        compact: compact,
+      ),
+      _Centered(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_printers.length > 1) ...[
+              SectionLabel(
+                l(
+                  'Impresoras (${_printers.length})',
+                  'Printers (${_printers.length})',
                 ),
-                for (final p in _printers) ...[
-                  RepaintBoundary(
-                    child: PrinterCard(
-                      printer: p,
-                      busy: _busyId == p.id,
-                      onTestPrint: () => _testPrint(p),
-                      onOptions: () => _showPrinterActions(p),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-              ],
-              SectionLabel(l('Herramientas', 'Tools')),
-              _ToolsRow(
-                tools: [
-                  _Tool(
-                    icon: Icons.receipt_long_outlined,
-                    label: l('Ticket SUNAT', 'SUNAT ticket'),
-                    onTap: _openSunat,
-                  ),
-                  _Tool(
-                    icon: Icons.edit_note_rounded,
-                    label: l('Tickets propios', 'Custom tickets'),
-                    locked: !_adsFree,
-                    onTap: _openTickets,
-                  ),
-                  _Tool(
-                    icon: Icons.history_rounded,
-                    label: l('Historial', 'History'),
-                    onTap: () => _openHistory(),
-                  ),
-                  _Tool(
-                    icon: Icons.support_agent_rounded,
-                    label: l('Ayuda', 'Help'),
-                    onTap: () => _openPage(HelpScreen(store: widget.store)),
-                  ),
-                ],
+                trailing: TextButton.icon(
+                  onPressed: _openingForm ? null : () => _openForm(),
+                  icon: const Icon(Icons.add_rounded, size: 20),
+                  label: Text(l('Vincular', 'Pair')),
+                ),
+                padding: const EdgeInsets.fromLTRB(4, 14, 0, 4),
               ),
-              if (!_adsFree) ...[
-                const SizedBox(height: 20),
-                RedPosAdBanner(
-                  adsFree: _adsFree,
-                  store: widget.store,
-                  onActivated: _reload,
+              for (final p in _printers) ...[
+                RepaintBoundary(
+                  child: PrinterCard(
+                    printer: p,
+                    busy: _busyId == p.id,
+                    onTestPrint: () => _testPrint(p),
+                    onOptions: () => _showPrinterActions(p),
+                  ),
                 ),
+                const SizedBox(height: 10),
               ],
             ],
-          ),
+            SectionLabel(l('Herramientas', 'Tools')),
+            _ToolsRow(
+              tools: [
+                _Tool(
+                  icon: Icons.receipt_long_outlined,
+                  label: l('Ticket SUNAT', 'SUNAT ticket'),
+                  onTap: _openSunat,
+                ),
+                _Tool(
+                  icon: Icons.edit_note_rounded,
+                  label: l('Tickets propios', 'Custom tickets'),
+                  locked: !_adsFree,
+                  onTap: _openTickets,
+                ),
+                _Tool(
+                  icon: Icons.history_rounded,
+                  label: l('Historial', 'History'),
+                  onTap: () => _openHistory(),
+                ),
+                _Tool(
+                  icon: Icons.support_agent_rounded,
+                  label: l('Ayuda', 'Help'),
+                  onTap: () => _openPage(HelpScreen(store: widget.store)),
+                ),
+              ],
+            ),
+            if (!_adsFree) ...[
+              const SizedBox(height: 20),
+              RedPosAdBanner(
+                adsFree: _adsFree,
+                store: widget.store,
+                onActivated: _reload,
+              ),
+            ],
+          ],
         ),
+      ),
     ];
   }
 
@@ -684,7 +692,8 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
               children: [
                 // La franja morada cruza ambas columnas; ticket y panel
                 // salen de ella a la misma altura.
-                Container(height: _ReceiptHero.compactBand, color: AppColors.brand),
+                Container(
+                    height: _ReceiptHero.compactBand, color: AppColors.brand),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -779,7 +788,8 @@ class _RenderBalancedFill extends RenderBox
   @override
   void performLayout() {
     final width = constraints.maxWidth;
-    _content.layout(BoxConstraints.tightFor(width: width), parentUsesSize: true);
+    _content.layout(BoxConstraints.tightFor(width: width),
+        parentUsesSize: true);
     final free = math.max(0.0, _viewportHeight - _content.size.height);
     _top = (free * _topShare).roundToDouble();
     (_content.parentData! as BoxParentData).offset = Offset(0, _top);
@@ -961,7 +971,8 @@ class _ReceiptHero extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Container(height: compact ? compactBand : bandHeight, color: AppColors.brand),
+        Container(
+            height: compact ? compactBand : bandHeight, color: AppColors.brand),
         _Centered(
           child: Padding(
             padding: EdgeInsets.only(top: compact ? compactPaperTop : paperTop),
@@ -1021,8 +1032,8 @@ class _ReceiptHero extends StatelessWidget {
                           '${p.type.label}, ${p.paper.label}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: tt.bodyMedium
-                              ?.copyWith(color: AppColors.inkSoft),
+                          style:
+                              tt.bodyMedium?.copyWith(color: AppColors.inkSoft),
                         ),
                       ),
                     ],
@@ -1293,13 +1304,13 @@ class _DetailPlaceholder extends StatelessWidget {
       child: Center(
         child: SingleChildScrollView(
           child: EmptyMessage(
-          icon: Icons.tune_rounded,
-          title: l('Ajustes y detalle', 'Settings and details'),
-          body: l(
-            'Los ajustes de la impresora, el historial y el formulario para '
-                'vincular se abren en este lado.',
-            'Printer settings, history and the pairing form open on this side.',
-          ),
+            icon: Icons.tune_rounded,
+            title: l('Ajustes y detalle', 'Settings and details'),
+            body: l(
+              'Los ajustes de la impresora, el historial y el formulario para '
+                  'vincular se abren en este lado.',
+              'Printer settings, history and the pairing form open on this side.',
+            ),
           ),
         ),
       ),

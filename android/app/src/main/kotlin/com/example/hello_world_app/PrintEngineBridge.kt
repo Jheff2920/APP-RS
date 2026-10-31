@@ -62,6 +62,8 @@ object PrintEngineBridge {
         jobId: String,
         mediaSizeId: String? = null,
         mediaWidthMils: Int? = null,
+        mediaHeightMils: Int? = null,
+        printerSnapshot: String? = null,
     ): ByteArray {
         val engineStartedAt = PrintTiming.now()
         val coldStart = ensureEngine(context.applicationContext)
@@ -93,6 +95,8 @@ object PrintEngineBridge {
                             "jobId" to jobId,
                             "mediaSizeId" to mediaSizeId,
                             "mediaWidthMils" to mediaWidthMils,
+                            "mediaHeightMils" to mediaHeightMils,
+                            "printerSnapshot" to printerSnapshot,
                         ),
                         object : MethodChannel.Result {
                             override fun success(result: Any?) {

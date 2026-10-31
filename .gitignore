@@ -60,3 +60,4 @@ design-assets/brand-page-*.png
 # Machine-local / build noise
 **/local.properties
 android/build/
+android/.kotlin/

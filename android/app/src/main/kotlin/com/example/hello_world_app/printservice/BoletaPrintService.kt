@@ -93,19 +93,31 @@ class BoletaPrintService : PrintService() {
                 return@post
             }
 
+            val row = job.info.printerId?.localId?.let { loadPrinter(it) }
+            if (row == null) {
+                failJob(job, "Impresora no encontrada. Vuelve a seleccionarla.")
+                return@post
+            }
+
             val overlay = SystemPrintOverlay(this)
             if (!overlay.canShow) {
-                fallbackOpenApp(job)
+                fallbackOpenApp(job, row)
                 return@post
             }
 
             executor.execute {
-                runInlinePrint(job, overlay)
+                try {
+                    PrinterJobCoordinator.runJob {
+                        if (mainHandler.runSync { job.isStarted }) runInlinePrint(job, overlay, row)
+                    }
+                } catch (_: InterruptedException) {
+                    failJob(job, "Impresion cancelada")
+                }
             }
         }
     }
 
-    private fun runInlinePrint(job: PrintJob, overlay: SystemPrintOverlay) {
+    private fun runInlinePrint(job: PrintJob, overlay: SystemPrintOverlay, row: PrinterRow) {
         val totalStartedAt = PrintTiming.now()
         var jobId = "unknown"
         var pdfFile: File? = null
@@ -122,9 +134,6 @@ class BoletaPrintService : PrintService() {
                 failJob(job, "Vincula una impresora en RedPOS Service")
                 return
             }
-
-            val row = loadPrinter(printerLocalId)
-                ?: throw IllegalStateException("Impresora no encontrada")
 
             mainHandler.post { overlay.show(row.name) }
             val sharp = if (row.rasterScale <= 1) "x1" else "x${row.rasterScale}"
@@ -143,11 +152,17 @@ class BoletaPrintService : PrintService() {
             val media = mainHandler.runSync { job.info.attributes?.mediaSize }
             val mediaSizeId = media?.id
             val mediaWidthMils = media?.widthMils
+            val mediaHeightMils = media?.heightMils
+            val copies = mainHandler.runSync { job.info.copies.coerceIn(1, 99) }
             Log.i(TAG, "mediaSize id=$mediaSizeId widthMils=$mediaWidthMils")
 
             val rasterStartedAt = PrintTiming.now()
             val data = try {
-                NativePdfEscPos.build(
+                if (row.kind == "label") {
+                    PrintEngineBridge.rasterize(applicationContext, copiedPdf.absolutePath,
+                        printerLocalId, jobId, mediaSizeId, mediaWidthMils,
+                        mediaHeightMils, row.snapshot)
+                } else NativePdfEscPos.build(
                     copiedPdf,
                     mediaSizeId,
                     mediaWidthMils,
@@ -159,6 +174,7 @@ class BoletaPrintService : PrintService() {
                     row.type,
                 )
             } catch (nativeError: Exception) {
+                if (row.kind == "label") throw nativeError
                 Log.w(TAG, "Native raster fallback to Flutter", nativeError)
                 PrintEngineBridge.rasterize(
                     applicationContext,
@@ -167,6 +183,8 @@ class BoletaPrintService : PrintService() {
                     jobId,
                     mediaSizeId,
                     mediaWidthMils,
+                    mediaHeightMils,
+                    row.snapshot,
                 )
             }
             PrintTiming.phase(
@@ -180,13 +198,13 @@ class BoletaPrintService : PrintService() {
             }
 
             var payload = data
-            if (!row.adsFree) {
+            if (row.kind != "label" && !row.adsFree) {
                 payload = RedPosAdEscPos.appendBeforeCut(payload, row.paper, row.cut)
             }
 
             mainHandler.post { overlay.setStatus("Enviando a ${row.name}...") }
 
-            val drawer = EscPosTransport.drawerBytes(row.cashDrawer, row.type)
+            val drawer = if (row.kind == "label") byteArrayOf() else EscPosTransport.drawerBytes(row.cashDrawer, row.type)
             val waitMs = EscPosTransport.drawerWaitMs(row.type, payload.size)
             if (drawer.isNotEmpty()) {
                 mainHandler.post {
@@ -194,6 +212,8 @@ class BoletaPrintService : PrintService() {
                 }
             }
             try {
+                repeat(copies) {
+                if (!mainHandler.runSync { job.isStarted }) throw IllegalStateException("Impresion cancelada")
                 when (row.type) {
                     "usb" -> EscPosTransport.sendUsb(
                         applicationContext,
@@ -218,6 +238,7 @@ class BoletaPrintService : PrintService() {
                         drawer,
                         waitMs,
                     )
+                }
                 }
             } catch (sendError: Exception) {
                 if (drawer.isNotEmpty()) {
@@ -264,7 +285,7 @@ class BoletaPrintService : PrintService() {
         val pfd: ParcelFileDescriptor = mainHandler.runSync { doc.data }
             ?: throw IllegalStateException("Sin datos del documento")
 
-        val outFile = File(cacheDir, "system_print_${System.currentTimeMillis()}.pdf")
+        val outFile = File.createTempFile("system_print_", ".pdf", cacheDir)
         try {
             ParcelFileDescriptor.AutoCloseInputStream(pfd).use { input ->
                 FileOutputStream(outFile).use { output ->
@@ -281,7 +302,7 @@ class BoletaPrintService : PrintService() {
         }
     }
 
-    private fun fallbackOpenApp(job: PrintJob) {
+    private fun fallbackOpenApp(job: PrintJob, row: PrinterRow) {
         var token: String? = null
         var outFile: File? = null
         try {
@@ -290,7 +311,7 @@ class BoletaPrintService : PrintService() {
             token = jobToken
             val doc = job.document
             val pfd = doc.data ?: throw IllegalStateException("Sin datos")
-            val copiedFile = File(cacheDir, "system_print_${System.currentTimeMillis()}.pdf")
+            val copiedFile = File.createTempFile("system_print_", ".pdf", cacheDir)
             outFile = copiedFile
             val copyStartedAt = PrintTiming.now()
             ParcelFileDescriptor.AutoCloseInputStream(pfd).use { input ->
@@ -316,6 +337,11 @@ class BoletaPrintService : PrintService() {
                 putExtra(MainActivity.EXTRA_SYSTEM_PRINT_PATH, copiedFile.absolutePath)
                 putExtra(MainActivity.EXTRA_SYSTEM_PRINT_PRINTER_ID, printerLocalId)
                 putExtra(MainActivity.EXTRA_SYSTEM_PRINT_TOKEN, jobToken)
+                putExtra("mediaSizeId", job.info.attributes?.mediaSize?.id)
+                putExtra("mediaWidthMils", job.info.attributes?.mediaSize?.widthMils ?: 0)
+                putExtra("mediaHeightMils", job.info.attributes?.mediaSize?.heightMils ?: 0)
+                putExtra("copies", job.info.copies)
+                putExtra("printerSnapshot", row.snapshot)
             }
             lateinit var timeout: Runnable
             timeout = Runnable {
@@ -332,7 +358,8 @@ class BoletaPrintService : PrintService() {
                 startedAt = PrintTiming.now(),
             )
             mainHandler.postDelayed(timeout, FALLBACK_TIMEOUT_MS)
-            postPrintNotification(launch)
+            launch.data = android.net.Uri.parse("redpos://system-print/${android.net.Uri.encode(jobToken)}")
+            postPrintNotification(launch, jobToken)
             Toast.makeText(
                 this,
                 "Activa «Mostrar sobre otras apps» en RedPOS Service para imprimir sin salir",
@@ -358,6 +385,7 @@ class BoletaPrintService : PrintService() {
 
     private fun finishFallback(token: String, ok: Boolean, message: String?) {
         val pending = pendingFallbacks.remove(token) ?: return
+        (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).cancel(token, NOTIF_ID)
         mainHandler.removeCallbacks(pending.timeout)
         try {
             if (ok) {
@@ -408,6 +436,8 @@ class BoletaPrintService : PrintService() {
                 val margins = o.optJSONObject("margins")
                 return PrinterRow(
                     id = id,
+                    kind = o.optString("kind", "receipt"),
+                    snapshot = o.toString(),
                     name = o.optString("name", "Impresora"),
                     type = o.optString("type", "bluetooth"),
                     address = o.optString("address", ""),
@@ -432,7 +462,7 @@ class BoletaPrintService : PrintService() {
         }
     }
 
-    private fun postPrintNotification(launch: Intent) {
+    private fun postPrintNotification(launch: Intent, token: String) {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) {
             nm.createNotificationChannel(
@@ -445,7 +475,7 @@ class BoletaPrintService : PrintService() {
         }
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or
             (if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0)
-        val pi = PendingIntent.getActivity(this, 1001, launch, flags)
+        val pi = PendingIntent.getActivity(this, token.hashCode(), launch, flags)
         val notif = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_share)
             .setContentTitle("RedPOS Service")
@@ -454,11 +484,13 @@ class BoletaPrintService : PrintService() {
             .setAutoCancel(true)
             .setContentIntent(pi)
             .build()
-        nm.notify(NOTIF_ID, notif)
+        nm.notify(token, NOTIF_ID, notif)
     }
 
     private data class PrinterRow(
         val id: String,
+        val kind: String,
+        val snapshot: String,
         val name: String,
         val type: String,
         val address: String,

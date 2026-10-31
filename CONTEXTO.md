@@ -3,7 +3,7 @@
 > **Lee este archivo primero** en cada sesión nueva (Cursor / Cloud / Claude / Codex).
 > Es la fuente de verdad del estado actual del proyecto. Si README y este archivo discrepan, prioriza **CONTEXTO.md**.
 
-**Última actualización:** 2026-10-09  
+**Última actualización:** 2026-10-31
 **Empresa:** **Red Soluciones** (una sola **d** — nunca «Redd Soluciones»)  
 **Producto:** RedPOS Service  
 **Carpeta Windows (preferida):** `C:\Users\RS-Soporte\Documents\app`  
@@ -354,3 +354,37 @@ compilar desde la terminal del usuario.
 - **1.8.8+49:** Tickets propios (IGV opcional, sin título), paid gate SUNAT+custom, CP1252, QR más grande, privacidad Play, branding Red Soluciones.
 - **1.8.7:** Ticket SUNAT configurable (formato/logo/nota), builds previos de imagen voucher / LAN idle.
 - Detalle histórico largo: ver `README.md` y commits en `main`.
+
+## Impresoras lógicas independientes — 2026-10-31
+
+Trabajo autorizado por el usuario en `feature/impresoras-logicas-independientes`.
+**Continuidad:** conservar el trabajo en esta rama. El usuario pidió expresamente
+no fusionarla con `main`; seguir aquí las pruebas y correcciones hasta que autorice
+una integración. Primera implementación terminada y guardada para retomar.
+El usuario realizará las pruebas físicas con su impresora; no declarar el hardware
+validado hasta recibir sus resultados. Guía y matriz: `docs/IMPRESORAS_LOGICAS.md`.
+
+- Catálogo `printer_catalog_v2`: conexión física única y destinos lógicos con
+  UUID, uso Recibos/Etiquetas, protocolo y perfiles propios. `SavedPrinter` sigue
+  como vista compatible para los renderizadores/transportes existentes.
+- Migración desde `saved_printers_v1` conserva IDs, ajustes y respaldo original;
+  no deduplicar las lógicas por dirección en v2. Borrado local limpia ambos.
+- Android publica un `PrinterId` por lógica y actualiza capacidades al guardar.
+  Recibos conserva los seis IDs/tamaños históricos (incluidos Google y su ancho
+  especial para Chrome); Etiquetas anuncia únicamente sus perfiles habilitados.
+- Etiquetas: PDF/imagen de página completa, sin recorte de blancos de recibos,
+  con márgenes, GAP, desplazamientos y escala. ESC/POS avanza por distancia;
+  TSPL configura SIZE/GAP. No deducir sensor o lenguaje por el nombre HQ300.
+  En etiquetas no se añade publicidad en papel, corte de recibos ni gaveta.
+- Cola coordinada entre Flutter y PrintService: reserva durante el trabajo
+  completo. Actualmente serializa todos los dispositivos por los manejadores
+  globales existentes. No coordina otros teléfonos/apps. IDs explícitos ausentes
+  fallan sin sustituirse por la impresora principal.
+- Quitar una lógica conserva otras que usan el equipo. Olvidar Bluetooth desde
+  el formulario se bloquea mientras varias lógicas comparten ese dispositivo.
+- Generador de muestras: `python tool/create_label_test_pdfs.py`, salida local
+  en `inst-apk/impresoras-logicas/` (ignorada por Git).
+- Validación automática: 144 pruebas Flutter y 6 pruebas unitarias Android
+  aprobadas y análisis sin incidencias en los módulos nuevos.
+  APK de prueba firmado ARM64 en
+  `inst-apk/impresoras-logicas/RedPOS-Service-impresoras-logicas-prueba-arm64.apk`.

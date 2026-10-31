@@ -12,6 +12,8 @@ class PrinterTransportFactory {
   @visibleForTesting
   static PrinterTransport Function(SavedPrinter printer)? testOverride;
 
+  static bool get usesTestTransport => testOverride != null;
+
   static PrinterTransport create(SavedPrinter printer) {
     final override = testOverride;
     if (override != null) return override(printer);

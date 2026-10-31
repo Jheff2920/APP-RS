@@ -455,6 +455,19 @@ void main() {
     );
   }, timeout: timeout);
 
+  testWidgets('formulario: etiquetas y tamaños personalizados', (t) async {
+    await _runMatrix(t, 'etiquetas', (_) async => PrinterFormScreen(
+      store: PrinterStore(), existing: SavedPrinter(id: 'label-layout',
+        name: 'HQ300-Etiquetas', type: PrinterLinkType.network,
+        address: '192.168.1.50', paper: PaperWidth.mm80, kind: PrinterKind.label)),
+      after: (t) async {
+        await t.scrollUntilVisible(find.text('Agregar tamaño de etiqueta'), 180,
+          scrollable: find.byType(Scrollable).first, maxScrolls: 60);
+        await _tap(t, find.text('Agregar tamaño de etiqueta'));
+        await _expectAboveSystemBar(t, find.text('Guardar tamaño'));
+      });
+  }, timeout: timeout);
+
   testWidgets('formulario: impresora Bluetooth y USB', (t) async {
     await _runMatrix(
       t,

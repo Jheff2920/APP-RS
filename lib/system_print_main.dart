@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' show DartPluginRegistrant;
 
@@ -8,6 +9,7 @@ import 'package:flutter/widgets.dart';
 import 'l10n/app_lang.dart';
 import 'models/saved_printer.dart';
 import 'services/escpos_pdf_print.dart';
+import 'services/label_print.dart';
 import 'services/print_service.dart';
 import 'services/print_timing.dart';
 import 'services/printer_permissions.dart';
@@ -48,12 +50,12 @@ void systemPrintMain() {
     }
 
     final prefsWatch = Stopwatch()..start();
-    final printer = PrinterStore.findByIdOrDefault(
+    final currentPrinter = PrinterStore.findByIdOrDefault(
       await store.loadAll(),
       printerId,
     );
     prefsWatch.stop();
-    if (printer == null) {
+    if (currentPrinter == null) {
       throw PlatformException(
         code: 'no_printer',
         message: tr(
@@ -61,6 +63,14 @@ void systemPrintMain() {
           'No printers are paired',
         ),
       );
+    }
+    final snapshot = args['printerSnapshot'] as String?;
+    final printer = snapshot == null
+        ? currentPrinter
+        : SavedPrinter.fromJson(
+            Map<String, dynamic>.from(jsonDecode(snapshot) as Map));
+    if (printer.id != printerId) {
+      throw StateError('Destino de impresión inválido');
     }
 
     final timing = PrintTiming.forPrinter(
@@ -71,21 +81,27 @@ void systemPrintMain() {
     timing.duration('load_preferences', prefsWatch.elapsed);
     try {
       final lower = filePath.toLowerCase();
-      final bytes = lower.endsWith('.pdf')
-          ? await EscPosPdfPrint.build(
-              printer,
+      final bytes = printer.isLabel
+          ? await LabelPrint.build(printer,
               filePath: filePath,
-              timing: timing,
-              systemMediaSizeId: systemMediaSizeId,
+              mediaId: systemMediaSizeId,
               mediaWidthMils: mediaWidthMils,
-            )
-          : await EscPosPdfPrint.buildImageFile(
-              printer,
-              filePath: filePath,
-              timing: timing,
-              systemMediaSizeId: systemMediaSizeId,
-              mediaWidthMils: mediaWidthMils,
-            );
+              mediaHeightMils: (args['mediaHeightMils'] as num?)?.toInt())
+          : lower.endsWith('.pdf')
+              ? await EscPosPdfPrint.build(
+                  printer,
+                  filePath: filePath,
+                  timing: timing,
+                  systemMediaSizeId: systemMediaSizeId,
+                  mediaWidthMils: mediaWidthMils,
+                )
+              : await EscPosPdfPrint.buildImageFile(
+                  printer,
+                  filePath: filePath,
+                  timing: timing,
+                  systemMediaSizeId: systemMediaSizeId,
+                  mediaWidthMils: mediaWidthMils,
+                );
       timing.finish(ok: true, bytes: bytes.length);
       return Uint8List.fromList(bytes);
     } catch (_) {
@@ -111,6 +127,16 @@ class SystemPrintUiHandler {
   bool _attached = false;
   bool _busy = false;
   String? _activeToken;
+  Future<void> _queue = Future.value();
+  final Set<String> _acceptedTokens = {};
+  bool _draining = false;
+
+  Future<void> _enqueue(Map<String, dynamic> args) {
+    final token = args['token'] as String? ?? '';
+    if (token.isNotEmpty && !_acceptedTokens.add(token)) return Future.value();
+    _queue = _queue.then((_) => _runSystemPrint(args));
+    return _queue;
+  }
 
   void bind({
     required PrinterStore store,
@@ -131,20 +157,27 @@ class SystemPrintUiHandler {
   }
 
   Future<void> _drainPending() async {
+    if (_draining) return;
+    _draining = true;
     try {
-      final pending =
-          await _channel.invokeMethod<Map>('takePendingSystemPrint');
-      if (pending == null) return;
-      await _runSystemPrint(Map<String, dynamic>.from(pending));
+      while (true) {
+        final pending =
+            await _channel.invokeMethod<Map>('takePendingSystemPrint');
+        if (pending == null) return;
+        unawaited(_enqueue(Map<String, dynamic>.from(pending)));
+      }
     } catch (e) {
       debugPrint('takePendingSystemPrint: $e');
+    } finally {
+      _draining = false;
     }
   }
 
   Future<dynamic> _onCall(MethodCall call) async {
     if (call.method == 'runSystemPrint') {
       final args = Map<String, dynamic>.from(call.arguments as Map? ?? {});
-      unawaited(_runSystemPrint(args));
+      unawaited(_enqueue(args));
+      unawaited(_drainPending());
       return null;
     }
     throw PlatformException(code: 'unsupported', message: call.method);
@@ -152,7 +185,15 @@ class SystemPrintUiHandler {
 
   Future<void> _runSystemPrint(Map<String, dynamic> args) async {
     final token = args['token'] as String? ?? '';
-    if (_busy || (token.isNotEmpty && token == _activeToken)) return;
+    if (token.isNotEmpty && token == _activeToken) return;
+    if (_busy) {
+      await _notify(
+          token: token,
+          ok: false,
+          message:
+              'Hay otro trabajo pendiente en la aplicación. Vuelve a imprimir al terminar.');
+      return;
+    }
     _busy = true;
     _activeToken = token.isEmpty ? null : token;
     final rawPath = args['filePath'] as String? ?? '';
@@ -170,14 +211,22 @@ class SystemPrintUiHandler {
         throw PrinterTransportException(tr('App no lista', 'App is not ready'));
       }
 
-      final printer = PrinterStore.findByIdOrDefault(
+      final currentPrinter = PrinterStore.findByIdOrDefault(
         await store.loadAll(),
         printerId,
       );
-      if (printer == null) {
+      if (currentPrinter == null) {
         throw PrinterTransportException(
           tr('No hay impresoras vinculadas', 'No printers are paired'),
         );
+      }
+      final snapshot = args['printerSnapshot'] as String?;
+      final printer = snapshot == null
+          ? currentPrinter
+          : SavedPrinter.fromJson(
+              Map<String, dynamic>.from(jsonDecode(snapshot) as Map));
+      if (printer.id != printerId) {
+        throw StateError('Destino de impresión inválido');
       }
 
       final src = File(rawPath);
@@ -215,6 +264,10 @@ class SystemPrintUiHandler {
             printer: printer,
             filePath: filePath,
             source: 'system',
+            systemMediaSizeId: args['mediaSizeId'] as String?,
+            mediaWidthMils: (args['mediaWidthMils'] as num?)?.toInt(),
+            mediaHeightMils: (args['mediaHeightMils'] as num?)?.toInt(),
+            copies: (args['copies'] as num?)?.toInt() ?? 1,
             onPhase: setPhase,
             requestPermissions: false,
             jobId: token.isEmpty ? null : token,
@@ -225,6 +278,10 @@ class SystemPrintUiHandler {
           printer: printer,
           filePath: filePath,
           source: 'system',
+          systemMediaSizeId: args['mediaSizeId'] as String?,
+          mediaWidthMils: (args['mediaWidthMils'] as num?)?.toInt(),
+          mediaHeightMils: (args['mediaHeightMils'] as num?)?.toInt(),
+          copies: (args['copies'] as num?)?.toInt() ?? 1,
           requestPermissions: false,
           jobId: token.isEmpty ? null : token,
         );
