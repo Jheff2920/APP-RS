@@ -3,12 +3,12 @@
 > **Lee este archivo primero** en cada sesión nueva (Cursor / Cloud / Claude / Codex).
 > Es la fuente de verdad del estado actual del proyecto. Si README y este archivo discrepan, prioriza **CONTEXTO.md**.
 
-**Última actualización:** 2026-10-31
+**Última actualización:** 2026-11-03
 **Empresa:** **Red Soluciones** (una sola **d** — nunca «Redd Soluciones»)  
 **Producto:** RedPOS Service  
 **Carpeta Windows (preferida):** `C:\Users\RS-Soporte\Documents\app`  
 **Repo:** https://github.com/Jheff2920/APP-RS · rama estable `main`  
-**Versión app:** `1.8.9+54` (`pubspec.yaml`) — Play ya tiene 51, 52 y 53 (53 en Producción)  
+**Versión app:** `1.8.9+55` (`pubspec.yaml`) — Play tiene 54 en Producción (70 descargas); 55 es la que sube la feature de impresoras lógicas independientes  
 **Package / applicationId:** `com.redpos.service`  
 **iOS bundle:** `com.redpos.service`
 
