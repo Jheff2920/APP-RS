@@ -16,7 +16,7 @@
 
 ## Instrucciones para futuros AIs
 
-1. **Lee CONTEXTO.md primero.** Luego `README.md` y, si toca Play/códigos/privacidad, `docs/DISTRIBUCION.md` y `docs/PRIVACIDAD.md`.
+1. **Lee CONTEXTO.md primero.** Luego `README.md` y, si toca Play/códigos/privacidad, `docs/DISTRIBUCION.md` y `docs/PRIVACIDAD.md`. Si la sesión corre en Mac para probar iOS, lee también `docs/MAC_IOS_SETUP.md` (setup, firma con Apple ID gratis, checklist de pruebas pendientes).
 2. **No inventes funciones de IA generativa.** La app **no** usa generative AI ni ML sobre el contenido del usuario. Raster ESC/POS, recorte de vouchers y parseo XML SUNAT son algoritmos tradicionales. No agregues AdMob, Firebase Analytics, Crashlytics ni tracking.
 3. **Ortografía de marca:** siempre **Red Soluciones** (una d). Producto visible: **RedPOS Service**.
 4. **No subas secretos a git:** `android/upload-keystore.jks`, `android/key.properties`, `*.jks`, `*.env`, `local.properties`. El keystore de upload vive solo en el PC Windows RS-Soporte.

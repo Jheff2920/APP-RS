@@ -4,12 +4,12 @@ Controlador **Android e iOS** de impresoras térmicas ESC/POS (58 y 80 mm).
 Imprime PDF/imagen del POS **o** convierte el **XML/ZIP UBL de SUNAT** (boleta, factura, NC/ND, guía de remisión, retención/percepción) a ticket 58/80 mm.
 
 **Repo:** https://github.com/Jheff2920/APP-RS  
-**Versión:** 1.8.9+54 · Package ID: `com.redpos.service`  
+**Versión:** 1.8.9+55 · Package ID: `com.redpos.service`  
 **Empresa:** Red Soluciones (una d — nunca «Redd»)  
 **Rama estable:** `main`
 
 > **Agentes IA: leer primero [CONTEXTO.md](CONTEXTO.md)** (estado actual + reglas).  
-> Rendimiento: [docs/PRINT_PERFORMANCE.md](docs/PRINT_PERFORMANCE.md) · Play/RedPOS: [docs/DISTRIBUCION.md](docs/DISTRIBUCION.md) · Privacidad: [docs/PRIVACIDAD.md](docs/PRIVACIDAD.md)
+> Rendimiento: [docs/PRINT_PERFORMANCE.md](docs/PRINT_PERFORMANCE.md) · Play/RedPOS: [docs/DISTRIBUCION.md](docs/DISTRIBUCION.md) · Privacidad: [docs/PRIVACIDAD.md](docs/PRIVACIDAD.md) · Setup en Mac/iOS: [docs/MAC_IOS_SETUP.md](docs/MAC_IOS_SETUP.md)
 
 ---
 
@@ -50,7 +50,7 @@ Cuando valide en impresora real, merge a `main` (PR o merge local + push).
 | Hecho | Pendiente |
 |-------|-----------|
 | Android: Bluetooth Classic + WiFi TCP :9100 + USB host | v2: jobs HTTP/cola del POS |
-| Emparejar / olvidar BT desde la app (PIN del sistema; `removeBond`) | Validar build en Mac / iPhone |
+| Emparejar / olvidar BT desde la app (PIN del sistema; `removeBond`) | Validar build en Mac / iPhone (guía: [docs/MAC_IOS_SETUP.md](docs/MAC_IOS_SETUP.md)) |
 | iOS: WiFi TCP :9100 + XML/PDF/ZIP (Bluetooth BLE/MFi si el hardware lo permite) | En iOS no se puede olvidar el BT desde la app (Ajustes) |
 | Compartir o Abrir PDF/imagen **o XML/ZIP SUNAT** → imprimir | |
 | PrintService + overlay flotante (**solo Android**) | |
