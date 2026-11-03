@@ -9,6 +9,9 @@ enum PaperWidth {
   /// Ancho aproximado imprimible en mm (sin margenes).
   double get printableWidthMm => this == PaperWidth.mm58 ? 48.0 : 72.0;
 
+  /// Ancho físico del rollo en mm.
+  double get rollWidthMm => this == PaperWidth.mm58 ? 58.0 : 80.0;
+
   static PaperWidth fromName(String name) {
     return PaperWidth.values.firstWhere(
       (e) => e.name == name,

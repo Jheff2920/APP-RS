@@ -30,9 +30,13 @@ class LabelPrint {
       {required String filePath,
       String? mediaId,
       int? mediaWidthMils,
-      int? mediaHeightMils}) async {
+      int? mediaHeightMils,
+      int? firstPage,
+      int? lastPage}) async {
     final profile = resolveProfile(printer, mediaId);
     final landscape = isRotated(profile, mediaWidthMils, mediaHeightMils);
+    // Render the page in the shape it will have once turned onto the label.
+    final sideways = ((landscape ? 90 : 0) + profile.rotation) % 180 != 0;
     _validate(profile, printer);
     final data = await File(filePath).readAsBytes();
     final out = <int>[];
@@ -40,19 +44,21 @@ class LabelPrint {
         ascii.decode(data.take(5).toList(), allowInvalid: true) == '%PDF-') {
       final doc = await PdfDocument.openData(data);
       try {
-        if (doc.pagesCount > 200) {
+        final first = (firstPage ?? 1).clamp(1, doc.pagesCount);
+        final last = (lastPage ?? doc.pagesCount).clamp(first, doc.pagesCount);
+        if (last - first + 1 > 200) {
           throw PrinterTransportException(
               'El PDF supera el límite de 200 etiquetas. Divídelo en archivos más pequeños.');
         }
-        for (var i = 1; i <= doc.pagesCount; i++) {
+        for (var i = first; i <= last; i++) {
           final page = await doc.getPage(i);
           try {
             final dpi = printer.dpi.value;
             final width =
-                ((landscape ? profile.heightMm : profile.widthMm) * dpi / 25.4)
+                ((sideways ? profile.heightMm : profile.widthMm) * dpi / 25.4)
                     .round();
             final height =
-                ((landscape ? profile.widthMm : profile.heightMm) * dpi / 25.4)
+                ((sideways ? profile.widthMm : profile.heightMm) * dpi / 25.4)
                     .round();
             final ratio = math.min(width / page.width, height / page.height);
             final rendered = await page.render(
@@ -112,7 +118,7 @@ class LabelPrint {
       });
 
   static Future<List<int>> testPage(SavedPrinter printer) async {
-    final profile = printer.defaultProfile;
+    final profile = resolveProfile(printer, null);
     _validate(profile, printer);
     final width = (profile.widthMm * printer.dpi.dotsPerMm).round();
     final height = (profile.heightMm * printer.dpi.dotsPerMm).round();
@@ -137,11 +143,11 @@ class LabelPrint {
   static void _validate(PaperProfile profile, SavedPrinter printer) {
     final error = profile.validationError;
     if (error != null) throw PrinterTransportException(error);
-    // Receipt head widths remain the existing verified geometry. Other hardware
-    // can use the other roll/head option explicitly in its own logical config.
-    if (profile.widthMm * printer.dpi.dotsPerMm > printer.dotsWidth + 1) {
+    // A label wider than the head (50 mm on a 48 mm head) is fine: encodePage
+    // prints its centre. Only a label wider than the roll cannot fit.
+    if (profile.widthMm > printer.paper.rollWidthMm) {
       throw PrinterTransportException(
-          'La etiqueta supera el ancho imprimible del cabezal seleccionado. Revisa el ancho del rollo y la resolución.');
+          'La etiqueta es más ancha que el rollo de la impresora. Revisa el ancho del rollo.');
     }
   }
 
@@ -150,13 +156,14 @@ class LabelPrint {
       SavedPrinter printer, PaperProfile profile, img.Image source,
       {bool landscape = false}) {
     _validate(profile, printer);
-    if (landscape) source = img.copyRotate(source, angle: 90);
+    final angle = ((landscape ? 90 : 0) + profile.rotation) % 360;
+    if (angle != 0) source = img.copyRotate(source, angle: angle);
     final dpm = printer.dpi.dotsPerMm;
     final exactWidth = (profile.widthMm * dpm).round();
     // Pad the final byte; do not truncate the right edge of the label.
     final width = ((exactWidth + 7) ~/ 8) * 8;
     final height = (profile.heightMm * dpm).round();
-    final page = img.Image(width: width, height: height);
+    var page = img.Image(width: width, height: height);
     img.fill(page, color: img.ColorRgb8(255, 255, 255));
     final usableW =
         ((profile.widthMm - profile.leftMm - profile.rightMm) * dpm).round();
@@ -171,6 +178,9 @@ class LabelPrint {
         interpolation: img.Interpolation.cubic);
     final x0 = ((profile.leftMm + profile.offsetXmm) * dpm).round();
     final y0 = ((profile.topMm + profile.offsetYmm) * dpm).round();
+    // Darker settings also turn light greys (thin, anti-aliased text) into ink:
+    // 180 at the middle (8), 222 at 15. 0 keeps the original 180.
+    final ink = profile.darkness == 0 ? 180 : 180 + (profile.darkness - 8) * 6;
     for (var y = 0; y < resized.height; y++) {
       final yy = y0 + y;
       if (yy < 0 || yy >= height) continue;
@@ -182,8 +192,15 @@ class LabelPrint {
         final luminance =
             (pixel.r * .299 + pixel.g * .587 + pixel.b * .114) * a +
                 255 * (1 - a);
-        final v = luminance < 180 ? 0 : 255;
-        page.setPixelRgb(xx, yy, v, v, v);
+        // The page starts white, so only ink is drawn; that keeps the extra
+        // dots of [thicken] from being whitened by the pixels that follow.
+        if (luminance >= ink) continue;
+        final grow = profile.thicken ? 1 : 0;
+        for (var dy = 0; dy <= grow && yy + dy < height; dy++) {
+          for (var dx = 0; dx <= grow && xx + dx < exactWidth; dx++) {
+            page.setPixelRgb(xx + dx, yy + dy, 0, 0, 0);
+          }
+        }
       }
     }
     if (printer.protocol == PrinterProtocol.tspl) {
@@ -201,10 +218,22 @@ class LabelPrint {
       return [
         ...ascii.encode('SIZE ${profile.widthMm} mm,${profile.heightMm} mm\r\n'
             'GAP ${profile.gapMm} mm,0 mm\r\nDIRECTION 1\r\nREFERENCE 0,0\r\n'
-            'OFFSET 0 mm\r\nCLS\r\nBITMAP 0,0,${width ~/ 8},$height,0,'),
+            'OFFSET 0 mm\r\n'
+            '${profile.darkness > 0 ? 'DENSITY ${profile.darkness}\r\n' : ''}'
+            'CLS\r\nBITMAP 0,0,${width ~/ 8},$height,0,'),
         ...raster,
         ...ascii.encode('\r\nPRINT 1,1\r\n')
       ];
+    }
+    // The head is centred over the roll; a raster wider than the head prints
+    // garbled on ESC/POS, so send only the strip the head can reach.
+    final head = printer.dotsWidth;
+    if (width > head) {
+      page = img.copyCrop(page,
+          x: math.max(0, (exactWidth - head) ~/ 2),
+          y: 0,
+          width: head,
+          height: height);
     }
     final gapDots = (profile.gapMm * dpm).round();
     final feed = <int>[];

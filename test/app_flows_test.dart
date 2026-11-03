@@ -422,6 +422,20 @@ void main() {
       await t.pump(const Duration(milliseconds: 100));
       await t.tap(find.text('Etiquetas'));
       await settle(t, rounds: 4);
+      // Labels start with no preset sizes and receipts' sizes are hidden.
+      expect(find.textContaining('Aún no hay tamaños'), findsOneWidget);
+      expect(find.text('Rollo 58 mm'), findsNothing);
+      await tapText(t, 'Guardar');
+      expect(find.text('Agrega o activa al menos un tamaño de etiqueta.'),
+          findsOneWidget);
+      expect((await t.runAsync(() => PrinterStore().loadAll()))!, hasLength(1));
+      await tapText(t, 'Agregar tamaño de etiqueta');
+      await settle(t, rounds: 4);
+      await t.enterText(
+          find.widgetWithText(TextFormField, 'Nombre del tamaño'), 'Precios');
+      await tapText(t, 'Guardar tamaño');
+      await settle(t, rounds: 4);
+      expect(find.text('Precios'), findsOneWidget);
       await tapText(t, 'Guardar');
       final all = (await t.runAsync(() => PrinterStore().loadAll()))!;
       expect(all, hasLength(2));
@@ -429,7 +443,10 @@ void main() {
       final label = all.singleWhere((p) => p.isLabel);
       expect(label.name, 'HQ300-Etiquetas');
       expect(label.physicalPrinterId, all.first.physicalPrinterId);
-      expect(label.enabledProfiles.map((p) => p.widthMm), [50, 30]);
+      expect(label.enabledProfiles.map((p) => p.widthMm), [50]);
+      // No se asume TSPL por ser etiquetas: ESC/POS sigue siendo el valor
+      // por defecto hasta que el usuario lo cambie explícitamente.
+      expect(label.protocol, PrinterProtocol.escpos);
     });
 
     testWidgets('probar con la impresora apagada: dice qué pasó', (t) async {

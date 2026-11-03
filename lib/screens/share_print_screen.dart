@@ -1,5 +1,10 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
+import 'package:pdfx/pdfx.dart';
 
 import '../brand.dart';
 import '../l10n/app_lang.dart';
@@ -44,6 +49,10 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
   bool _noteDirty = false;
   String _loadedNote = '';
   SunatTicketFormat _format = SunatTicketFormat.claro;
+  // Etiquetas: páginas del PDF (null si no se pudo leer), rango y copias.
+  int? _pages;
+  RangeValues _range = const RangeValues(1, 1);
+  int _copies = 1;
 
   bool get _sunatFile => _isSunatPath(widget.filePath);
 
@@ -64,6 +73,7 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
     final adsFree =
         await RedPosLicenseStore.instance.isAdsFree(reloadDisk: false);
     final sunat = _sunatFile ? await _sunatStore.load() : null;
+    final pages = await _pdfPages();
     if (!mounted) return;
     if (sunat != null && !_noteDirty) {
       _noteController.text = sunat.footerNote;
@@ -77,13 +87,54 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
       _selected = PrinterStore.findByIdOrDefault(all, '');
       _adsFree = adsFree;
       _loading = false;
+      if (pages != _pages) {
+        _pages = pages;
+        // Si el PDF supera el límite de 200 que aplica LabelPrint, empieza
+        // con un rango dentro del límite en vez de uno que fallará al tocar
+        // «Imprimir».
+        final capped = pages == null ? 1 : math.min(pages, 200);
+        _range = RangeValues(1, capped.toDouble());
+      }
     });
+  }
+
+  Future<int?> _pdfPages() async {
+    // Esto alimenta firstPage/lastPage al imprimir (ver _print), así que SÍ
+    // debe coincidir con cómo LabelPrint.build decide si es un PDF: por su
+    // cabecera, nunca por el nombre/extensión. Un PDF real guardado con otra
+    // extensión (o sin ninguna, frecuente al compartir desde Yape/BCP) debe
+    // seguir contando sus páginas de verdad; lo contrario imprimiría solo la
+    // primera. La lectura de la cabecera es síncrona (5 bytes) para no
+    // depender de IO asíncrona real dentro de los widget tests.
+    bool looksLikePdf;
+    try {
+      final raf = File(widget.filePath).openSync();
+      try {
+        final head = raf.readSync(5);
+        looksLikePdf = head.length == 5 &&
+            ascii.decode(head, allowInvalid: true) == '%PDF-';
+      } finally {
+        raf.closeSync();
+      }
+    } catch (_) {
+      return null; // No se pudo ni abrir el archivo: desconocido.
+    }
+    if (!looksLikePdf) return 1; // Como LabelPrint.build: no es PDF, es imagen.
+    try {
+      final doc = await PdfDocument.openFile(widget.filePath);
+      final pages = doc.pagesCount;
+      await doc.close();
+      return pages;
+    } catch (_) {
+      return null; // Cabecera de PDF pero no se pudo contar: desconocido.
+    }
   }
 
   Future<void> _openSunatSettings() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => SunatPrintSettingsScreen(store: _sunatStore, printerStore: widget.printerStore),
+        builder: (_) => SunatPrintSettingsScreen(
+            store: _sunatStore, printerStore: widget.printerStore),
       ),
     );
     if (!mounted) return;
@@ -136,6 +187,9 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
           onPhase: setPhase,
           requestPermissions: false,
           sunatNote: _sunatFile && _adsFree ? _noteController.text : null,
+          copies: _copies,
+          firstPage: _pages == null ? null : _range.start.round(),
+          lastPage: _pages == null ? null : _range.end.round(),
         ),
       );
       if (!mounted) return;
@@ -167,6 +221,94 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
     } finally {
       if (mounted) setState(() => _printing = false);
     }
+  }
+
+  List<Widget> _labelOptions(L l, TextTheme tt) {
+    final pages = _pages;
+    final first = _range.start.round(), last = _range.end.round();
+    final total =
+        pages == null ? null : (last - first + 1) * _copies;
+    return [
+      SectionLabel(l('Etiquetas a imprimir', 'Labels to print')),
+      Card(
+        child: SectionBody(
+          children: [
+            if (pages == null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  l(
+                    'No se pudo contar las páginas: se imprimirán todas.',
+                    'Could not count pages: all of them will be printed.',
+                  ),
+                  style: tt.bodySmall?.copyWith(color: AppColors.inkSoft),
+                ),
+              )
+            else if (pages > 1) ...[
+              Text(
+                first == last
+                    ? l('Solo la etiqueta $first de $pages',
+                        'Only label $first of $pages')
+                    : l('De la etiqueta $first a la $last (de $pages)',
+                        'Labels $first to $last (of $pages)'),
+                style: tt.bodyLarge,
+              ),
+              RangeSlider(
+                values: _range,
+                min: 1,
+                max: pages.toDouble(),
+                divisions: pages - 1,
+                labels: RangeLabels('$first', '$last'),
+                onChanged: _printing
+                    ? null
+                    : (v) => setState(() => _range = RangeValues(
+                        v.start.roundToDouble(), v.end.roundToDouble())),
+              ),
+            ],
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    pages != null && pages > 1
+                        ? l('Copias de cada juego', 'Copies of the set')
+                        : l('Copias', 'Copies'),
+                    style: tt.bodyLarge,
+                  ),
+                ),
+                IconButton.outlined(
+                  tooltip: l('Menos copias', 'Fewer copies'),
+                  onPressed: _printing || _copies <= 1
+                      ? null
+                      : () => setState(() => _copies--),
+                  icon: const Icon(Icons.remove),
+                ),
+                SizedBox(
+                  width: 48,
+                  child: Text('$_copies',
+                      textAlign: TextAlign.center, style: tt.titleMedium),
+                ),
+                IconButton.outlined(
+                  tooltip: l('Más copias', 'More copies'),
+                  onPressed: _printing || _copies >= 99
+                      ? null
+                      : () => setState(() => _copies++),
+                  icon: const Icon(Icons.add),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              total == null
+                  ? l('Copias: $_copies (todas las páginas)',
+                      'Copies: $_copies (every page)')
+                  : l('Total: $total ${total == 1 ? 'etiqueta' : 'etiquetas'}',
+                      'Total: $total ${total == 1 ? 'label' : 'labels'}'),
+              style: tt.bodySmall?.copyWith(color: AppColors.inkSoft),
+            ),
+          ],
+        ),
+      ),
+    ];
   }
 
   @override
@@ -265,6 +407,7 @@ class _SharePrintScreenState extends State<SharePrintScreen> {
                     enabled: !_printing,
                     onSelected: (pr) => setState(() => _selected = pr),
                   ),
+                if (_selected?.isLabel ?? false) ..._labelOptions(l, tt),
                 if (_sunatFile) ...[
                   SectionLabel(l('Ticket SUNAT', 'SUNAT ticket')),
                   SectionGroup(

@@ -69,9 +69,8 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
 
   List<PaperProfile> get _currentProfiles =>
       _profiles ??
-      (_kind == PrinterKind.label
-          ? PaperProfile.labels(_id)
-          : PaperProfile.receipts(_id));
+      // Labels start empty: the user adds the sizes of their own rolls.
+      (_kind == PrinterKind.label ? const [] : PaperProfile.receipts(_id));
 
   late PrinterLinkType _type;
   late PaperWidth _paper;
@@ -323,6 +322,16 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(_connectionMissingMessage)),
     );
+    return false;
+  }
+
+  bool _requireLabelSize() {
+    if (_kind != PrinterKind.label || _currentProfiles.any((p) => p.enabled)) {
+      return true;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('Agrega o activa al menos un tamaño de etiqueta.',
+            'Add or turn on at least one label size.'))));
     return false;
   }
 
@@ -868,7 +877,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   }
 
   Future<void> _save({bool pop = true}) async {
-    if (!_requireConnection()) return;
+    if (!_requireConnection() || !_requireLabelSize()) return;
     _ensureName();
     if (!_formKey.currentState!.validate()) return;
     if (!await _ensureBluetoothBonded()) return;
@@ -943,7 +952,7 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
   }
 
   Future<void> _test() async {
-    if (!_requireConnection()) return;
+    if (!_requireConnection() || !_requireLabelSize()) return;
     _ensureName();
     if (!_formKey.currentState!.validate()) return;
     if (!await _ensureBluetoothBonded()) return;
@@ -1565,13 +1574,14 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
                   kind: _kind,
                   protocol: _protocol,
                   profiles: _currentProfiles,
-                  defaultProfileId: _defaultProfileId.isEmpty
-                      ? _buildPrinter().defaultProfile.paperProfileId
-                      : _defaultProfileId,
+                  defaultProfileId: _defaultProfileId,
                   onKindChanged: (v) => setState(() {
                         _kind = v;
                         _profiles = null;
                         _defaultProfileId = '';
+                        // No asumas el lenguaje por el tipo: la mayoría del
+                        // parque físico habla ESC/POS. TSPL es una elección
+                        // explícita del usuario (docs/IMPRESORAS_LOGICAS.md).
                         _protocol = PrinterProtocol.escpos;
                       }),
                   onProtocolChanged: (v) => setState(() => _protocol = v),

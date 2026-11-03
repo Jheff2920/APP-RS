@@ -10,16 +10,20 @@ protocolo ni el sensor de una HQ300 concreta.
    sincronizar las impresoras. La configuración anterior queda como respaldo.
 2. Editar la HQ300 existente: nombre `HQ300-Recibos`, uso **Recibos**. Conservar
    sus ajustes. Las seis medidas históricas, incluidas Max y Google, siguen
-   disponibles; se pueden deshabilitar medidas individualmente.
+   disponibles automáticamente; a diferencia de Etiquetas, Recibos no tiene
+   una pantalla para deshabilitar medidas una por una.
 3. Pulsar **Vincular otra impresora**. En **Usar un equipo registrado**, elegir
    la HQ300; escribir `HQ300-Etiquetas` y seleccionar **Etiquetas**.
 4. Elegir el ancho del rollo/cabezal y DPI adecuados. Conservar ESC/POS si se
    prueba como impresora de recibos; seleccionar TSPL únicamente si el hardware
-   lo admite. Guardar. Las capacidades del hardware se consideran desconocidas
-   hasta verificarlas; no se deducen del nombre comercial.
-5. Desde un lector PDF o sistema externo compatible, abrir **Imprimir** y
-   **Todas las impresoras**. Deben aparecer ambos nombres. Recibos solo debe
-   mostrar recibos; Etiquetas solo 50 × 25 y 30 × 20 mm inicialmente.
+   lo admite (nunca viene elegido por defecto). Guardar. Las capacidades del
+   hardware se consideran desconocidas hasta verificarlas; no se deducen del
+   nombre comercial.
+5. Etiquetas empieza sin tamaños: agregar al menos uno (p. ej. 50 × 25 mm)
+   antes de guardar o la app lo pide. Desde un lector PDF o sistema externo
+   compatible, abrir **Imprimir** y **Todas las impresoras**. Deben aparecer
+   ambos nombres. Recibos solo debe mostrar recibos; Etiquetas solo los
+   tamaños que se hayan agregado y habilitado.
 6. En Etiquetas, editar o agregar tamaños con ancho, alto, márgenes, GAP,
    desplazamientos y escala. Elegir su tamaño predeterminado y guardar. Abrir
    nuevamente el selector y comprobar la actualización. La sesión activa

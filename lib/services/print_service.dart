@@ -111,6 +111,9 @@ class PrintService {
     int? mediaWidthMils,
     int? mediaHeightMils,
     int copies = 1,
+    // Etiquetas: páginas del PDF a imprimir (1 = primera). null = todas.
+    int? firstPage,
+    int? lastPage,
   }) async {
     final name = p.basename(filePath);
     final lower = filePath.toLowerCase();
@@ -128,7 +131,9 @@ class PrintService {
               filePath: filePath,
               mediaId: systemMediaSizeId,
               mediaWidthMils: mediaWidthMils,
-              mediaHeightMils: mediaHeightMils);
+              mediaHeightMils: mediaHeightMils,
+              firstPage: firstPage,
+              lastPage: lastPage);
           if (bytes.length * copies.clamp(1, 99) > LabelPrint.maxJobBytes) {
             throw PrinterTransportException(
                 'Reduce la cantidad de copias o divide el archivo de etiquetas.');

@@ -38,6 +38,9 @@ class PaperProfile {
     this.offsetXmm = 0,
     this.offsetYmm = 0,
     this.scalePercent = 100,
+    this.rotation = 0,
+    this.darkness = 0,
+    this.thicken = false,
     this.enabled = true,
     this.receiptMediaId,
   });
@@ -49,6 +52,15 @@ class PaperProfile {
   final double heightMm;
   final double leftMm, rightMm, topMm, bottomMm, gapMm;
   final double offsetXmm, offsetYmm, scalePercent;
+
+  /// Giro horario del contenido: 0, 90, 180 o 270.
+  final int rotation;
+
+  /// Oscuridad 1–15 (DENSITY en TSPL). 0 = la que tenga la impresora.
+  final int darkness;
+
+  /// Engrosa trazos 1 punto: oscurece aunque la impresora ignore DENSITY.
+  final bool thicken;
   final bool enabled;
   final String? receiptMediaId;
 
@@ -85,6 +97,12 @@ class PaperProfile {
         scalePercent > 200) {
       return 'Revisa los desplazamientos y la escala (25 a 200 %).';
     }
+    if (!const [0, 90, 180, 270].contains(rotation)) {
+      return 'Elige una orientación válida.';
+    }
+    if (darkness < 0 || darkness > 15) {
+      return 'La oscuridad debe estar entre 0 y 15.';
+    }
     return null;
   }
 
@@ -102,6 +120,9 @@ class PaperProfile {
         'offsetXmm': offsetXmm,
         'offsetYmm': offsetYmm,
         'scalePercent': scalePercent,
+        'rotation': rotation,
+        'darkness': darkness,
+        'thicken': thicken,
         'enabled': enabled,
         if (receiptMediaId != null) 'receiptMediaId': receiptMediaId,
       };
@@ -120,6 +141,9 @@ class PaperProfile {
         offsetXmm: (j['offsetXmm'] as num?)?.toDouble() ?? 0,
         offsetYmm: (j['offsetYmm'] as num?)?.toDouble() ?? 0,
         scalePercent: (j['scalePercent'] as num?)?.toDouble() ?? 100,
+        rotation: (j['rotation'] as num?)?.toInt() ?? 0,
+        darkness: (j['darkness'] as num?)?.toInt() ?? 0,
+        thicken: j['thicken'] as bool? ?? false,
         enabled: j['enabled'] as bool? ?? true,
         receiptMediaId: j['receiptMediaId'] as String?,
       );
