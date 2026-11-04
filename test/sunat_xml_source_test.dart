@@ -74,6 +74,55 @@ void main() {
     expect(parsed.showTotals, isFalse);
   });
 
+  test('XML declarado ISO-8859-1 respeta tildes/enie sin mojibake', () async {
+    final xml = _isoXml(_isoCustomerName);
+    final file = File(
+      '${Directory.systemTemp.path}/sunat_iso_${DateTime.now().microsecondsSinceEpoch}.xml',
+    );
+    await file.writeAsBytes(xml, flush: true);
+    addTearDown(() => file.deleteSync());
+
+    final text = await SunatXmlSource.load(file.path);
+    expect(text, contains('CERÁMICA'));
+    expect(text, contains('SAN JUAN DE LURIGANCHO'));
+    final parsed = SunatUblParser.parse(text);
+    expect(parsed.supplierName, contains('CERÁMICA'));
+  });
+
+  test(
+    'declarado ISO-8859-1 no se decodifica como UTF-8 aunque los bytes '
+    'altos formen una secuencia UTF-8 valida por coincidencia',
+    () async {
+      // 0xC3 0xA9 en latin1 son dos caracteres sueltos ('Ã' '©'), pero esa
+      // misma pareja de bytes es tambien la secuencia UTF-8 valida de 'é'.
+      // Si decode() no respetara la declaracion del prolog y probara UTF-8
+      // primero, este archivo pasaria sin lanzar excepcion y el nombre
+      // quedaria corrupto en silencio.
+      final prolog = latin1.encode(
+        '<?xml version="1.0" encoding="ISO-8859-1"?>'
+        '<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2">'
+        '<cbc:ID xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">B01-1</cbc:ID>'
+        '<cac:AccountingSupplierParty xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2">'
+        '<cac:Party><cac:PartyLegalEntity><cbc:RegistrationName xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">',
+      );
+      final nameBytes = [0xC3, 0xA9]; // 'Ã©' en latin1
+      final tail = latin1.encode(
+        '</cbc:RegistrationName></cac:PartyLegalEntity></cac:Party>'
+        '</cac:AccountingSupplierParty></Invoice>',
+      );
+      final bytes = [...prolog, ...nameBytes, ...tail];
+      final file = File(
+        '${Directory.systemTemp.path}/sunat_iso_coincidencia_${DateTime.now().microsecondsSinceEpoch}.xml',
+      );
+      await file.writeAsBytes(bytes, flush: true);
+      addTearDown(() => file.deleteSync());
+
+      final text = await SunatXmlSource.load(file.path);
+      expect(text, contains('Ã©'));
+      expect(text, isNot(contains('é')));
+    },
+  );
+
   test('arma ESC/POS de nota de credito con comillas unicode', () async {
     TestWidgetsFlutterBinding.ensureInitialized();
     final ticket = SunatUblParser.parse(_creditXml);
@@ -84,6 +133,8 @@ void main() {
 }
 
 List<int> utf8Xml(String xml) => utf8.encode(xml);
+
+List<int> _isoXml(String xml) => latin1.encode(xml);
 
 final _printer = SavedPrinter(
   id: 't',
@@ -225,4 +276,49 @@ const _guiaZipXml = '''
     </cac:Item>
   </cac:DespatchLine>
 </DespatchAdvice>
+''';
+
+const _isoCustomerName = '''
+<?xml version="1.0" encoding="ISO-8859-1" standalone="no"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:ID>EB01-129</cbc:ID>
+  <cbc:IssueDate>2026-11-04</cbc:IssueDate>
+  <cbc:InvoiceTypeCode>03</cbc:InvoiceTypeCode>
+  <cbc:DocumentCurrencyCode>PEN</cbc:DocumentCurrencyCode>
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="6">10407096547</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>CER\u00c1MICA C' CENTER</cbc:RegistrationName>
+        <cac:RegistrationAddress>
+          <cbc:District>SAN JUAN DE LURIGANCHO</cbc:District>
+        </cac:RegistrationAddress>
+      </cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>COMERCIAL</cbc:RegistrationName>
+      </cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:AccountingCustomerParty>
+  <cac:LegalMonetaryTotal>
+    <cbc:PayableAmount>2.36</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>
+  <cac:InvoiceLine>
+    <cbc:InvoicedQuantity>1</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount>2.0</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Description>ABASTO</cbc:Description>
+    </cac:Item>
+    <cac:Price>
+      <cbc:PriceAmount>2.00</cbc:PriceAmount>
+    </cac:Price>
+  </cac:InvoiceLine>
+</Invoice>
 ''';

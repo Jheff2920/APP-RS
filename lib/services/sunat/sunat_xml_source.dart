@@ -43,6 +43,14 @@ class SunatXmlSource {
     return decode(bytes);
   }
 
+  // Solo dentro del prolog `<?xml ... ?>` inicial (no en comentarios ni en
+  // atributos de negocio con nombre parecido, p.ej. `otherEncoding="..."`).
+  static final _xmlProlog = RegExp(r'^\s*<\?xml\b[^>]*\?>');
+  static final _encodingAttr = RegExp(
+    r'\bencoding\s*=\s*["\x27]([^"\x27]+)["\x27]',
+    caseSensitive: false,
+  );
+
   static String decode(List<int> bytes) {
     if (bytes.length >= 3 &&
         bytes[0] == 0xEF &&
@@ -50,6 +58,37 @@ class SunatXmlSource {
         bytes[2] == 0xBF) {
       return utf8.decode(bytes.sublist(3), allowMalformed: true);
     }
+
+    // El prolog `<?xml ... encoding="...">` siempre es ASCII, así que se
+    // puede leer con latin1 (1 byte = 1 char) sin arriesgar el resto del
+    // archivo. Confiar en esa declaración evita que un XML ISO-8859-1 con
+    // tildes/ñ se "cuele" como UTF-8 válido por coincidencia de bytes y
+    // termine con caracteres cambiados sin lanzar ninguna excepción.
+    final head = latin1.decode(bytes.take(200).toList());
+    final prolog = _xmlProlog.stringMatch(head);
+    final declared =
+        prolog == null ? null : _encodingAttr.firstMatch(prolog)?.group(1)?.trim();
+    switch (declared?.toUpperCase()) {
+      case 'ISO-8859-1':
+      case 'LATIN1':
+      case 'LATIN-1':
+        return latin1.decode(bytes);
+      case 'UTF-8':
+      case 'UTF8':
+        // Declarado UTF-8: igual se valida de forma estricta. Un emisor que
+        // declara UTF-8 pero entrega bytes latin1 (frecuente en SUNAT) debe
+        // seguir cayendo a latin1 en vez de rellenar con '�'.
+        try {
+          return utf8.decode(bytes);
+        } on FormatException {
+          return latin1.decode(bytes);
+        }
+    }
+
+    // Sin declaración reconocida (o encoding no soportado, p.ej.
+    // windows-1252 con bytes 0x80-0x9F que latin1 no cubre bien): intentar
+    // UTF-8 estricto y, si no es válido, asumir latin1 (comportamiento
+    // previo, como respaldo).
     try {
       return utf8.decode(bytes);
     } on FormatException {
