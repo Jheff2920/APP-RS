@@ -5,6 +5,7 @@ import 'package:image/image.dart' as img;
 
 import 'package:hello_world_app/models/paper_width.dart';
 import 'package:hello_world_app/models/saved_printer.dart';
+import 'package:hello_world_app/services/escpos_test_page.dart';
 import 'package:hello_world_app/services/sunat/sunat_escpos_print.dart';
 import 'package:hello_world_app/services/sunat/sunat_print_settings.dart';
 import 'package:hello_world_app/services/sunat/sunat_ticket.dart';
@@ -31,6 +32,19 @@ void main() {
     expect(text, contains('Gracias por su compra'));
     expect(text, contains('Mesa 4'));
     expect(_indexOf(bytes, [0x1D, 0x76, 0x30]), greaterThan(_indexOfText(bytes, 'LIMAFAC')));
+  });
+
+  test('text lines carry no ESC \$ 0 0 (480BL prints it off the paper)',
+      () async {
+    final sunat = await SunatEscPosPrint.build(
+      _printer(PaperWidth.mm80),
+      SunatUblParser.parse(_boleta),
+    );
+    final testPage = await EscPosTestPage.build(_printer(PaperWidth.mm58));
+    for (final bytes in [sunat, testPage]) {
+      expect(_indexOf(bytes, [0x1b, 0x24, 0x00, 0x00]), -1);
+      expect(_indexOfText(bytes, 'B'), greaterThan(0));
+    }
   });
 
   test('58 mm and detallado include the unit and customer address', () async {

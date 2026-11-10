@@ -62,17 +62,17 @@ void main() {
     expect(out.sublist(3, 3 + footer.length), footer);
   });
 
-  test('footer includes site url and is ASCII', () {
-    final bytes = RedPosAdEscPos.footerBytes(
-      paper: PaperWidth.mm58,
-      siteUrl: 'www.redsoluciones.com.pe',
-    );
+  test('footer is ASCII, small font B, no site url', () {
+    final bytes = RedPosAdEscPos.footerBytes(paper: PaperWidth.mm58);
     final text = String.fromCharCodes(bytes.where((b) => b >= 32 && b < 127));
     expect(
       text.contains('App de uso gratuito') || text.contains('Free to use.'),
       isTrue,
     );
-    expect(text.contains('www.redsoluciones.com.pe'), isTrue);
+    expect(text.contains('de por vida') || text.contains('lifetime key'), isTrue);
+    expect(text.contains('redsoluciones'), isFalse);
+    expect(bytes.sublist(4, 7), [0x1b, 0x21, 0x01]);
+    expect(bytes.sublist(bytes.length - 3), [0x1b, 0x21, 0x00]);
     expect(bytes.contains(0x1d), isFalse);
   });
 }

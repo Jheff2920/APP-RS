@@ -2,33 +2,28 @@ import '../../models/cut_mode.dart';
 import '../../models/paper_width.dart';
 import '../../models/saved_printer.dart';
 import '../../l10n/app_lang.dart';
-import 'redpos_config.dart';
 
 /// Pie de publicidad ESC/POS: pegado al ticket, luego el margen y el corte.
 class RedPosAdEscPos {
   static List<String> get lines => isAppEnglish
       ? const [
           'Free to use.',
-          'Ad-free: RedPOS hardware',
-          'or a subscription.',
+          'Ad-free: RedPOS hardware,',
+          'subscription or lifetime key.',
         ]
       : const [
           'App de uso gratuito.',
-          'Sin publicidad: equipo RedPOS',
-          'o suscripcion.',
+          'Sin publicidad: equipo RedPOS,',
+          'suscripcion o key de por vida.',
         ];
 
-  static List<int> footerBytes({
-    required PaperWidth paper,
-    String? siteUrl,
-  }) {
+  static List<int> footerBytes({required PaperWidth paper}) {
     final width = paper.charsPerLine;
     final stars = '*' * width;
-    final url = (siteUrl ?? RedPosConfig.siteUrl).trim();
     final out = <int>[
       0x0a, // un salto: pegado al PDF, no encima
       0x1b, 0x61, 0x01, // center
-      0x1b, 0x21, 0x00, // font A
+      0x1b, 0x21, 0x01, // font B: letra más pequeña que el ticket
     ];
     void line(String text) {
       out.addAll(text.codeUnits);
@@ -39,10 +34,9 @@ class RedPosAdEscPos {
     for (final row in lines) {
       line(_fit(row, width));
     }
-    if (url.isNotEmpty) line(_fit(url, width));
     line(stars);
     out.add(0x0a);
-    out.addAll(const [0x1b, 0x61, 0x00]); // left
+    out.addAll(const [0x1b, 0x61, 0x00, 0x1b, 0x21, 0x00]); // left, font A
     return out;
   }
 

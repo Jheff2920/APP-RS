@@ -3,7 +3,7 @@
 > **Lee este archivo primero** en cada sesión nueva (Cursor / Cloud / Claude / Codex).
 > Es la fuente de verdad del estado actual del proyecto. Si README y este archivo discrepan, prioriza **CONTEXTO.md**.
 
-**Última actualización:** 2026-11-03
+**Última actualización:** 2026-11-10
 **Empresa:** **Red Soluciones** (una sola **d** — nunca «Redd Soluciones»)  
 **Producto:** RedPOS Service  
 **Carpeta Windows (preferida):** `C:\Users\RS-Soporte\Documents\app`  
@@ -108,6 +108,7 @@ flutter build appbundle --release --dart-define=REDPOS_API=https://redpos-codigo
 | Lenovo TB-X306F | ADB `HPV4MC8C` |
 | Impresora 58 | HL200B_0000 · `86:67:7A:04:C0:55` |
 | Impresora 80 | HQ300_348C · `86:67:7A:02:34:8C` |
+| Impresora 4" (480BL) | Nombre BT «Thermal Printer» · `86:67:7A:00:55:7F` · cabezal 4", sensor al centro → rollo de 80 mm centrado. Configurar papel 80 mm y márgenes izq./der. en **0** (ya no hace falta compensar) |
 | IMIN Falcon 1 | USB integrado; gaveta por GPIO `cashbox_en` |
 
 ### Preferencias del usuario (Jeferson / RS-Soporte)
@@ -224,6 +225,8 @@ Orden típico en papel: **contenido → margen inferior → (ads pie si sin pase
 | Falcon gaveta | GPIO `cashbox_en`, no ESC/POS USB |
 | Prefs headless | `SharedPreferences.reload()` en `loadAll()` |
 | Secretos | Keystore solo en PC; nunca commit |
+| Texto ESC/POS | Toda línea de `generator.text` pasa por `withoutAbsolutePosition()` (`services/escpos_text.dart`): quita el `ESC $ 0 0` que pone esc_pos_utils. La 480BL lo cuenta desde el borde del cabezal 4" y saca el texto ~15 mm del papel. **No volver a llamar `generator.text` sin envolverlo.** No usar `GS L`/`GS W` para mover el ticket: en la 480BL achican el área (probado 2026-11-10) |
+| Pie de publicidad | Font B (`ESC ! 1`), centrado, sin URL; texto «Sin publicidad: equipo RedPOS, / suscripcion o key de por vida.» Igual en Dart (`redpos_ad_escpos.dart`) y Kotlin (`printservice/RedPosAdEscPos.kt`): si cambias uno, cambia el otro |
 
 ---
 
@@ -345,6 +348,14 @@ compilar desde la terminal del usuario.
 ---
 
 ## Cómo retomar (changelog corto)
+
+- **1.8.9+55 (2026-11-10) — impresora 4" 480BL y pie de publicidad:**
+  - *Problema:* en la 480BL (cabezal 4", rollo de 80 mm al centro) el texto salía cortado con «~», corrido a la izquierda y desalineado del título/pie; el usuario compensaba con margen izquierdo 20 mm (el máximo), que quitaba 13 columnas.
+  - *Causa:* esc_pos_utils pone `ESC $ 0 0` al inicio de cada línea. En impresoras normales no hace nada; la 480BL lo mide desde el borde físico del cabezal (≈15 mm fuera del papel). El firmware ya centra su área de 576 puntos, así que sin ese comando imprime como cualquier 80 mm. PDF/imagen no lo usan y ya salían bien.
+  - *Arreglo:* `withoutAbsolutePosition()` en página de prueba, ticket SUNAT y tickets propios. Se probó primero un «desplazamiento» con `GS L`/`GS W`: la 480BL achica el área (pie partido en 41+7) → descartado y revertido.
+  - *Regla de la página de prueba:* ahora salen las marcas 10 y 40 (antes se perdían por redondeo a 1,5 mm/columna).
+  - *Pie de publicidad:* letra más pequeña (Font B), sin www.redsoluciones.com.pe, texto «equipo RedPOS, suscripcion o key de por vida». Dart y Kotlin (Imprimir del sistema).
+  - *Validado:* 154 pruebas Flutter; impresión física confirmada por el usuario en 480BL, HL200B y HQ300 (Lenovo TB-X306F `HPV4MC8C`).
 
 - **1.8.9+54 (distribución):** Ficha de Play para 7 países (AR, CL, CO, ES, US, PE, MX). Se añadió la sección 9 «Usuarios de la Unión Europea (RGPD)» a la política (app, `privacidad.html`, `privacy.html`, `docs/PRIVACIDAD.md`); si cambia lo que guarda `admin-web/lib/store.js`, actualizarla. El ticket SUNAT es **solo Perú** y la ficha lo dice. Textos de la ficha e imágenes (no versionadas) en `inst-apk/play-store/`.
 - **1.8.9+54:** App responsiva en cualquier pantalla (matriz de pruebas), dos paneles solo en tablets, hojas y diálogos desplazables, avisos que ya no tapan «Probar/Guardar», textos legales y de errores sin nombres de código ni variables, tildes corregidas, `friendlyError`, tests de flujos de punta a punta. Corregido un error sin manejar al fallar la conexión mientras se preparaba el ticket.

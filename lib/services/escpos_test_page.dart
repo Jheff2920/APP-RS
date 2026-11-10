@@ -5,6 +5,7 @@ import '../models/paper_width.dart';
 import '../models/saved_printer.dart';
 import 'escpos_capability_profile.dart';
 import 'escpos_feed.dart';
+import 'escpos_text.dart';
 
 class EscPosTestPage {
   /// Genera bytes ESC/POS de una pagina de prueba con regla de calibracion.
@@ -28,12 +29,12 @@ class EscPosTestPage {
     void leftLine(String text, {PosStyles styles = const PosStyles()}) {
       final content = _fit(text, usable);
       final line = (' ' * safeLeft) + content;
-      bytes += generator.text(line, styles: styles);
+      bytes += withoutAbsolutePosition(generator.text(line, styles: styles));
     }
 
     void centerLine(String text, {PosStyles styles = const PosStyles()}) {
       final content = _fit(text, usable);
-      bytes += generator.text(
+      bytes += withoutAbsolutePosition(generator.text(
         content,
         styles: PosStyles(
           align: PosAlign.center,
@@ -46,7 +47,7 @@ class EscPosTestPage {
           fontType: styles.fontType,
           codeTable: styles.codeTable,
         ),
-      );
+      ));
     }
 
     centerLine(
@@ -139,14 +140,14 @@ class EscPosTestPage {
       }
     }
 
+    // Cada múltiplo de 10 mm en la columna más cercana (1,5 mm/col: 10 y 40
+    // caen entre columnas y antes se perdían).
     final labels = List.filled(chars, ' ');
-    for (var i = 0; i < chars; i++) {
-      final mm = (i * mmPerChar).round();
-      if (i == 0 || mm % 10 == 0) {
-        final label = mm.toString();
-        for (var j = 0; j < label.length && i + j < chars; j++) {
-          labels[i + j] = label[j];
-        }
+    for (var mm = 0; (mm / mmPerChar).round() < chars; mm += 10) {
+      final i = (mm / mmPerChar).round();
+      final label = mm.toString();
+      for (var j = 0; j < label.length && i + j < chars; j++) {
+        labels[i + j] = label[j];
       }
     }
 
