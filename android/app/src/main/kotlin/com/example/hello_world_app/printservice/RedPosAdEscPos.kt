@@ -8,17 +8,16 @@ object RedPosAdEscPos {
 
     private val lines = arrayOf(
         "App de uso gratuito.",
-        "Sin publicidad: equipo RedPOS",
-        "o suscripcion.",
+        "Sin publicidad: equipo RedPOS,",
+        "suscripcion o key de por vida.",
     )
 
     fun appendBeforeCut(
         ticket: ByteArray,
         paper: String,
         cut: String,
-        siteUrl: String = "www.redsoluciones.com.pe",
     ): ByteArray {
-        val footer = footerBytes(paper, siteUrl)
+        val footer = footerBytes(paper)
         val cutBytes = cutBytes(cut)
         var end = ticket.size
         if (cutBytes.isNotEmpty() && endsWith(ticket, cutBytes)) {
@@ -35,7 +34,7 @@ object RedPosAdEscPos {
         return ticket.copyOfRange(0, insertAt) + ad + ticket.copyOfRange(insertAt, ticket.size)
     }
 
-    fun footerBytes(paper: String, siteUrl: String): ByteArray {
+    fun footerBytes(paper: String): ByteArray {
         val width = if (paper == "mm80") 48 else 32
         val stars = "*".repeat(width)
         val out = ArrayList<Byte>(160)
@@ -47,13 +46,13 @@ object RedPosAdEscPos {
             for (ch in fit) out.add(ch.code.toByte())
             out.add(0x0a)
         }
-        add(0x0a, 0x1b, 0x61, 0x01, 0x1b, 0x21, 0x00)
+        // Font B (ESC ! 1): letra más pequeña que el ticket.
+        add(0x0a, 0x1b, 0x61, 0x01, 0x1b, 0x21, 0x01)
         line(stars)
         for (row in lines) line(row)
-        if (siteUrl.isNotBlank()) line(siteUrl.trim())
         line(stars)
         out.add(0x0a)
-        add(0x1b, 0x61, 0x00)
+        add(0x1b, 0x61, 0x00, 0x1b, 0x21, 0x00)
         return out.toByteArray()
     }
 
