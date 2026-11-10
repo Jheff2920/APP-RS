@@ -6,6 +6,7 @@ import '../../models/paper_width.dart';
 import '../../models/saved_printer.dart';
 import '../escpos_capability_profile.dart';
 import '../escpos_feed.dart';
+import '../escpos_text.dart';
 import '../sunat/sunat_escpos_print.dart';
 import '../sunat/sunat_logo.dart';
 import 'custom_ticket.dart';
@@ -54,16 +55,16 @@ class CustomTicketEscPos {
 
     void left(String text, {PosStyles styles = const PosStyles()}) {
       for (final part in _wrap(SunatEscPosPrint.latin1Safe(text), usable)) {
-        bytes += generator.text(
+        bytes += withoutAbsolutePosition(generator.text(
           '${' ' * safeLeft}$part',
           styles: styles,
-        );
+        ));
       }
     }
 
     void center(String text, {PosStyles styles = const PosStyles()}) {
       for (final part in _wrap(SunatEscPosPrint.latin1Safe(text), usable)) {
-        bytes += generator.text(
+        bytes += withoutAbsolutePosition(generator.text(
           part,
           styles: PosStyles(
             align: PosAlign.center,
@@ -71,7 +72,7 @@ class CustomTicketEscPos {
             height: styles.height,
             width: styles.width,
           ),
-        );
+        ));
       }
     }
 

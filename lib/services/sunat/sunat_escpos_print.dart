@@ -6,6 +6,7 @@ import '../../models/paper_width.dart';
 import '../../models/saved_printer.dart';
 import '../escpos_capability_profile.dart';
 import '../escpos_feed.dart';
+import '../escpos_text.dart';
 import 'sunat_logo.dart';
 import 'sunat_print_settings.dart';
 import 'sunat_ticket.dart';
@@ -53,16 +54,16 @@ class SunatEscPosPrint {
 
     void left(String text, {PosStyles styles = const PosStyles()}) {
       for (final part in _wrap(latin1Safe(text), usable)) {
-        bytes += generator.text(
+        bytes += withoutAbsolutePosition(generator.text(
           '${' ' * safeLeft}$part',
           styles: styles,
-        );
+        ));
       }
     }
 
     void center(String text, {PosStyles styles = const PosStyles()}) {
       for (final part in _wrap(latin1Safe(text), usable)) {
-        bytes += generator.text(
+        bytes += withoutAbsolutePosition(generator.text(
           part,
           styles: PosStyles(
             align: PosAlign.center,
@@ -70,7 +71,7 @@ class SunatEscPosPrint {
             height: styles.height,
             width: styles.width,
           ),
-        );
+        ));
       }
     }
 
