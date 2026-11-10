@@ -355,7 +355,7 @@ compilar desde la terminal del usuario.
   - *Arreglo:* `withoutAbsolutePosition()` en página de prueba, ticket SUNAT y tickets propios. Se probó primero un «desplazamiento» con `GS L`/`GS W`: la 480BL achica el área (pie partido en 41+7) → descartado y revertido.
   - *Regla de la página de prueba:* ahora salen las marcas 10 y 40 (antes se perdían por redondeo a 1,5 mm/columna).
   - *Pie de publicidad:* letra más pequeña (Font B), sin www.redsoluciones.com.pe, texto «equipo RedPOS, suscripcion o key de por vida». Dart y Kotlin (Imprimir del sistema).
-  - *Validado:* 154 pruebas Flutter; impresión física OK en 480BL con Lenovo TB-X306F (`HPV4MC8C`). **Pendiente:** confirmar que HL200B y HQ300 siguen igual y probar una boleta PDF real en la 480BL.
+  - *Validado:* 154 pruebas Flutter; impresión física confirmada por el usuario en 480BL, HL200B y HQ300 (Lenovo TB-X306F `HPV4MC8C`).
 
 - **1.8.9+54 (distribución):** Ficha de Play para 7 países (AR, CL, CO, ES, US, PE, MX). Se añadió la sección 9 «Usuarios de la Unión Europea (RGPD)» a la política (app, `privacidad.html`, `privacy.html`, `docs/PRIVACIDAD.md`); si cambia lo que guarda `admin-web/lib/store.js`, actualizarla. El ticket SUNAT es **solo Perú** y la ficha lo dice. Textos de la ficha e imágenes (no versionadas) en `inst-apk/play-store/`.
 - **1.8.9+54:** App responsiva en cualquier pantalla (matriz de pruebas), dos paneles solo en tablets, hojas y diálogos desplazables, avisos que ya no tapan «Probar/Guardar», textos legales y de errores sin nombres de código ni variables, tildes corregidas, `friendlyError`, tests de flujos de punta a punta. Corregido un error sin manejar al fallar la conexión mientras se preparaba el ticket.
