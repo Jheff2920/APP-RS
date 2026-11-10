@@ -8,7 +8,7 @@
 **Producto:** RedPOS Service  
 **Carpeta Windows (preferida):** `C:\Users\RS-Soporte\Documents\app`  
 **Repo:** https://github.com/Jheff2920/APP-RS · rama estable `main`  
-**Versión app:** `1.8.9+55` (`pubspec.yaml`) — Play tiene 54 en Producción (70 descargas); 55 es la que sube la feature de impresoras lógicas independientes  
+**Versión app:** `1.8.9+55` (`pubspec.yaml`) — Play tiene 54 en Producción (70 descargas); 55 es la que sube la feature de impresoras lógicas independientes + arreglo impresora 4" 480BL + pie de publicidad nuevo (aún sin compilar AAB)  
 **Package / applicationId:** `com.redpos.service`  
 **iOS bundle:** `com.redpos.service`
 
@@ -330,10 +330,11 @@ compilar desde la terminal del usuario.
 
 ### Próximos pasos (en orden)
 
-1. Compilar AAB `1.8.9+54` con `--dart-define=REDPOS_API=...` y copiarlo a `inst-apk\`
-2. Subirlo a Play Console (Producción ya tiene 53)
-3. Publicar en Vercel `admin-web/public` (privacidad, términos y sus versiones en inglés cambiaron de texto)
-4. Probar en equipo real (Lenovo y Telpo) con letra grande, rotación y densidad alterada; imprimir de prueba en el Telpo
+1. **(2026-11-11)** El usuario revisa un tema pendiente más **antes** de compilar; atenderlo primero.
+2. Compilar AAB `1.8.9+55` con `--dart-define=REDPOS_API=...` y copiarlo a `inst-apk\` (incluye impresoras lógicas, arreglo 480BL y pie de publicidad; Producción tiene 54)
+3. Subirlo a Play Console
+4. Publicar en Vercel `admin-web/public` (privacidad, términos y sus versiones en inglés cambiaron de texto)
+5. Probar en equipo real (Lenovo y Telpo) con letra grande, rotación y densidad alterada; imprimir de prueba en el Telpo
 
 ---
 
