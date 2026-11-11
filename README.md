@@ -4,7 +4,7 @@ Controlador **Android e iOS** de impresoras térmicas ESC/POS (58 y 80 mm).
 Imprime PDF/imagen del POS **o** convierte el **XML/ZIP UBL de SUNAT** (boleta, factura, NC/ND, guía de remisión, retención/percepción) a ticket 58/80 mm.
 
 **Repo:** https://github.com/Jheff2920/APP-RS  
-**Versión:** 1.8.9+55 · Package ID: `com.redpos.service`  
+**Versión:** 1.8.9+56 · Package ID: `com.redpos.service`  
 **Empresa:** Red Soluciones (una d — nunca «Redd»)  
 **Rama estable:** `main`
 
@@ -13,9 +13,12 @@ Imprime PDF/imagen del POS **o** convierte el **XML/ZIP UBL de SUNAT** (boleta, 
 
 ---
 
-## Dónde quedamos (2026-09-28 / inicios oct 2026 · v1.8.9+54)
+## Dónde quedamos (2026-11-11 · v1.8.9+56)
 
 Estado canónico y reglas para AIs: **[CONTEXTO.md](CONTEXTO.md)**. Resumen:
+
+- **Keys (1.8.9+56):** la app siempre canjea en el servidor (`REDPOS_API` por defecto); la key se escribe sola (`RP-` y guiones) y se puede pegar desde un mensaje; aviso «Código activado / no activado» con el motivo. En Android la key queda ligada al teléfono y se reactiva sola al reinstalar; para otro teléfono se libera desde el panel.
+- **Auditoría 2026-11-02 cerrada** (impresión del sistema, copias de recibos, PDF largos, ZIP SUNAT, borrado de privacidad, sin `R100301S`).
 
 - **Ticket SUNAT:** formatos (compacto/claro/detallado), logo, nota al pie, QR más grande (`size6`/`size7`).
 - **Tickets propios:** plantillas 58/80, preview e impresión; IGV opcional; sin campo título en UI/print.
@@ -168,7 +171,7 @@ El cliente escribe el código en la app. Staff genera y controla en Vercel:
 | Generar (amigo / vendedor) | https://redpos-codigos-prueba.vercel.app/ |
 | Control (listado, usos, precios) | https://redpos-codigos-prueba.vercel.app/control.html |
 
-El panel tiene **precio global** para todos los usados y, si hace falta, un precio distinto en una fila. Claves distintas para generador y control (`REDPOS_STAFF_PASSWORD` / `REDPOS_DASHBOARD_PASSWORD` en Vercel). Detalle: [docs/DISTRIBUCION.md](docs/DISTRIBUCION.md) y [admin-web/README.md](admin-web/README.md).
+El panel tiene **precio global** para todos los usados y, si hace falta, un precio distinto en una fila; marca keys **pendientes**, **libera** una key para otro teléfono y guarda el **cliente** de cada key. Claves distintas para generador y control (`REDPOS_STAFF_PASSWORD`, obligatoria, y `REDPOS_DASHBOARD_PASSWORD` en Vercel). Se publica con `npx vercel --prod` dentro de `admin-web/` (el push a `main` no publica). Detalle: [docs/DISTRIBUCION.md](docs/DISTRIBUCION.md) y [admin-web/README.md](admin-web/README.md).
 
 ---
 

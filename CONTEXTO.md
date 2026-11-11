@@ -3,12 +3,12 @@
 > **Lee este archivo primero** en cada sesión nueva (Cursor / Cloud / Claude / Codex).
 > Es la fuente de verdad del estado actual del proyecto. Si README y este archivo discrepan, prioriza **CONTEXTO.md**.
 
-**Última actualización:** 2026-11-11
+**Última actualización:** 2026-11-11 (tarde)
 **Empresa:** **Red Soluciones** (una sola **d** — nunca «Redd Soluciones»)  
 **Producto:** RedPOS Service  
 **Carpeta Windows (preferida):** `C:\Users\RS-Soporte\Documents\app`  
 **Repo:** https://github.com/Jheff2920/APP-RS · rama estable `main`  
-**Versión app:** `1.8.9+56` (`pubspec.yaml`) — Play tiene **55** (AAB del 2026-11-03, compilada **sin** `REDPOS_API`: activa keys solo en el teléfono). 56 lleva el servidor por defecto, formato automático de la key, arreglo 480BL y pie de publicidad nuevo (falta compilar AAB y subir)  
+**Versión app:** `1.8.9+56` (`pubspec.yaml`) — enviada a Play el 2026-11-11 (AAB en `inst-apk\RedPOS-Service-1.8.9+56-play.aab`). La 55 de Play activaba keys solo en el teléfono (compilada sin `REDPOS_API`); la 56 canjea siempre en el servidor, liga la key al teléfono y cierra la auditoría 2026-11-02  
 **Package / applicationId:** `com.redpos.service`  
 **iOS bundle:** `com.redpos.service`
 
@@ -332,10 +332,12 @@ Gradle desde la sesión del agente fallaba por WinNAT (`Unable to establish loop
 
 ### Próximos pasos (en orden)
 
-1. Confirmar que `REDPOS_STAFF_PASSWORD` existe en Vercel (ya no hay clave de respaldo) y publicar `admin-web` **antes** de subir la 56: `npx vercel --prod` dentro de `admin-web/` (el usuario publica así; el push a `main` no publica).
-2. ~~Compilar AAB y APK `1.8.9+56`~~ hecho 2026-11-11: `inst-apk\RedPOS-Service-1.8.9+56-play.aab` y `-arm64.apk` (versionCode 56, firma de subida verificada). Falta subir la AAB a Play Console.
-3. Play Console → Seguridad de los datos: declarar «ID de dispositivo u otros» (funcionalidad de la app y prevención de fraude, no compartido, cifrado en tránsito).
-4. Probar en teléfono real: activar una key nueva (debe salir «usada» y «Ligada a un teléfono» en el panel), desinstalar, reinstalar y volver a activarla (debe aceptarla); «Imprimir» desde otra app (system print); 2 copias de un recibo; PDF de más de 8 páginas (sale el aviso).
+Hecho el 2026-11-11: `admin-web` publicado en Vercel (16:51 UTC; verificado `/api/key`, panel con «Liberar» y privacidad nueva), AAB y APK 1.8.9+56 compilados, y según el usuario «Seguridad de los datos» actualizada y la 56 subida a Play (no verificable desde la sesión del agente).
+
+1. Probar en teléfono real con la 56: activar una key nueva (en el panel debe salir «Usada» y «Ligada a un teléfono»), desinstalar, reinstalar y volver a escribirla (debe activarse sola); «Imprimir» desde otra app; 2 copias de un recibo; PDF de más de 8 páginas (sale el aviso).
+2. Cambiar `REDPOS_DASHBOARD_PASSWORD` en Vercel (la anterior se compartió en el chat) y volver a publicar; confirmar que el generador entra con `REDPOS_STAFF_PASSWORD`.
+3. Clientes con el APK +52 (versionCode 2052): Play no los actualiza; deben desinstalar e instalar la 56, y su key (de antes de la 56, sin teléfono) se libera desde el panel.
+4. Cuando Play apruebe la 56: anotar en el panel el «Cliente» de cada key vendida.
 5. Probar en equipo real (Lenovo y Telpo) con letra grande, rotación y densidad alterada; imprimir de prueba en el Telpo
 
 ---

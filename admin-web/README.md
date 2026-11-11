@@ -1,58 +1,66 @@
-# Códigos RedPOS (prueba en Vercel)
+# Códigos RedPOS (Vercel)
 
-Rama: `test/redpos-vercel-codigos`. **No es producción.**  
-Esta página es **solo para staff**. El cliente no genera códigos aquí: los escribe en la app.
+Proyecto Vercel `redpos-codigos-prueba`. Esta página es **solo para staff**: el cliente no genera códigos aquí, los escribe en la app.
 
 Páginas:
 
-- `/` — **generador** (para tu amigo).
-- `/control.html` — **dashboard** (para ti). Precio global para usados y precio propio por código.
+- `/` — **generador** de keys.
+- `/control.html` — **panel de control** (para el dueño): resumen en ticket, pestañas Todas/Pendientes/Disponibles/Usadas, buscador por key o cliente, precio por defecto y por key, marcar **pendiente**, **liberar** una key usada y campo **Cliente**.
 
-Pon una clave distinta en `REDPOS_DASHBOARD_PASSWORD` para que el amigo con el generador no abra el control.
+Pon una clave distinta en `REDPOS_DASHBOARD_PASSWORD` para que quien use el generador no abra el panel.
 
-## Subir a Vercel (HTTPS)
+## Publicar
 
-1. En [vercel.com](https://vercel.com) → Add New → Project → el repo `APP-RS`.
-2. **Root Directory:** `admin-web`
-3. **Production Branch** (o Preview): `test/redpos-vercel-codigos`
-4. Variables de entorno:
+El push a `main` **no** publica. Desde esta carpeta:
 
-   | Variable | Valor de prueba |
-   |----------|-----------------|
-   | `REDPOS_STAFF_PASSWORD` | clave del **generador** (la que le das a tu amigo) |
-   | `REDPOS_DASHBOARD_PASSWORD` | clave del **control** (`/control.html`); distinta a la del generador |
-   | `REDPOS_HMAC` | `REDPOS-PRUEBA-NO-USAR-EN-PRODUCCION` (el mismo de la app de prueba) |
+```powershell
+npx vercel login      # solo la primera vez
+npx vercel --prod
+```
 
-5. Storage → Create Database → **KV (Upstash)** y conéctalo al proyecto. Eso crea `KV_REST_API_URL` y `KV_REST_API_TOKEN`. Sin KV, generar códigos sí; canjear desde la app en la nube no (hace falta marcar “ya usado”).
-6. Deploy. Queda `https://….vercel.app`.
+La carpeta ya está vinculada al proyecto (`.vercel/project.json`).
+
+Variables de entorno (Vercel → Settings → Environment Variables):
+
+| Variable | Uso |
+|----------|-----|
+| `REDPOS_STAFF_PASSWORD` | clave del **generador**. **Obligatoria**: sin ella nadie entra (ya no hay clave de respaldo en el código) |
+| `REDPOS_DASHBOARD_PASSWORD` | clave del **panel**; si falta, usa la del generador |
+| `REDPOS_HMAC` | `REDPOS-PRUEBA-NO-USAR-EN-PRODUCCION` (el mismo de la app) |
+| `KV_REST_API_URL`, `KV_REST_API_TOKEN` | base de datos KV (Upstash), conectada desde Storage |
+
+## Cómo funciona una key
+
+- Solo se aceptan keys creadas por el generador (`code:<nonce>` con `createdAt`); la firma HMAC sola no basta.
+- Al activarla, la app Android manda un valor anónimo del teléfono (`device`, SHA-256 de `ANDROID_ID` con el código). La key queda **ligada a ese teléfono**: si reinstala la app ahí, se vuelve a activar sola.
+- Otro teléfono (o un iPhone) necesita que el panel la **libere**: vale una sola vez y deja de valer el teléfono anterior.
+- La primera activación (`HSETNX usedAt`) y el uso de una liberación (`HDEL rebind`) son atómicos.
 
 ## Conectar la app
 
-Compila el release con la URL de Vercel (sin barra final):
+`REDPOS_API` ya tiene por defecto `https://redpos-codigos-prueba.vercel.app`; se mantiene explícito al compilar:
 
 ```powershell
-flutter build apk --release --target-platform android-arm64 `
-  --dart-define=REDPOS_API=https://TU-PROYECTO.vercel.app
+flutter build appbundle --release --dart-define=REDPOS_API=https://redpos-codigos-prueba.vercel.app
+flutter build apk --release --target-platform android-arm64 --dart-define=REDPOS_API=https://redpos-codigos-prueba.vercel.app
 ```
 
-La app llama a `POST /api/activate` con `{ "code": "RP-…" }`.
-
-## Local
+## Pruebas
 
 ```powershell
-npx vercel dev --cwd admin-web
+npm test
 ```
 
-Sin Vercel CLI, la página staff no corre sola: son funciones serverless.
+`test/kv.test.js` prueba el camino KV contra un Redis en memoria, con activaciones simultáneas.
 
 ## Endpoints
 
 - `GET /` — generador de códigos (`noindex`)
-- `GET /control.html` — dashboard de control (`noindex`)
-- `GET /terminos.html` — términos (URL de Play)
-- `GET /privacidad.html` — política de privacidad (URL de Play)
-- `POST /api/generate` — `{ "password": "…" }` → `{ "code": "RP-…" }`
-- `POST /api/codes` — `{ "password": "…" }` → listado y totales (clave de control)
-- `POST /api/settings` — `{ "password": "…", "price": 19.99 }` → precio global de usados
-- `POST /api/price` — `{ "password": "…", "nonce": "…", "price": 19.99 }` → precio propio de un código **ya usado** (vacío = vuelve al global)
-- `POST /api/activate` — `{ "code": "RP-…" }` → `{ "ok": true }` o 409 si ya se usó
+- `GET /control.html` — panel de control (`noindex`)
+- `GET /terminos.html`, `/privacidad.html` (y en inglés) — URLs de Play
+- `POST /api/generate` — `{ "password" }` → `{ "code": "RP-…" }`
+- `POST /api/codes` — `{ "password" }` → listado y totales (clave del panel)
+- `POST /api/settings` — `{ "password", "price": 19.99 }` → precio por defecto de las usadas
+- `POST /api/price` — `{ "password", "nonce", "price" }` → precio propio de una key **ya usada** (vacío = vuelve al defecto)
+- `POST /api/key` — `{ "password", "nonce", "pending" | "release" | "note" }` → pendiente, liberar o cliente
+- `POST /api/activate` — `{ "code": "RP-…", "device": "<sha256 hex>" }` → `{ "ok": true, "again": bool }`; errores `invalid` (400), `unknown`/`used` (409)
