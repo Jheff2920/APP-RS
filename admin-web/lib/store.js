@@ -68,6 +68,7 @@ function hashToRow(nonce, raw) {
     code: o.code || '',
     nonce,
     used,
+    pending: !used && o.pending === '1',
     price: readPrice(o.price),
     createdAt: o.createdAt || null,
     usedAt: o.usedAt || null,
@@ -190,6 +191,7 @@ async function rowByNonce(nonce) {
     code: found.code || '',
     nonce,
     used: found.used === true,
+    pending: found.used !== true && found.pending === true,
     price: readPrice(found.price),
     createdAt: found.createdAt || null,
     usedAt: found.usedAt || null,
@@ -221,11 +223,38 @@ async function setPrice(nonce, price) {
   return { ok: true };
 }
 
+// Entregada al cliente pero sin saber si la activó (la app 1.8.9+55 no avisaba).
+async function setPending(nonce, pending) {
+  const row = await rowByNonce(nonce);
+  if (!row.createdAt && !row.code) return { ok: false, error: 'missing' };
+  if (row.used) return { ok: false, error: 'used' };
+  if (hasKv()) {
+    await kv([
+      pending
+        ? ['HSET', `code:${nonce}`, 'pending', '1']
+        : ['HDEL', `code:${nonce}`, 'pending'],
+    ]);
+    return { ok: true };
+  }
+  if (process.env.VERCEL) return { ok: false, error: 'no_kv' };
+  const data = loadFile();
+  const found = data.codes.find((e) => e.nonce === nonce);
+  if (pending) found.pending = true;
+  else delete found.pending;
+  saveFile(data);
+  return { ok: true };
+}
+
 async function consume(nonce) {
   if (nonce === 'TESTALIAS') {
     return { ok: false, error: 'test_alias' };
   }
   if (hasKv()) {
+    // Solo keys del generador: el secreto HMAC viaja dentro de la app y no basta.
+    const [known] = await kv([['HEXISTS', `code:${nonce}`, 'createdAt']]);
+    if (!known || known.result !== 1) {
+      return { ok: false, error: 'unknown' };
+    }
     const usedAt = new Date().toISOString();
     const [setNx] = await kv([['SET', `used:${nonce}`, usedAt, 'NX']]);
     if (setNx.result == null) {
@@ -233,6 +262,7 @@ async function consume(nonce) {
     }
     await kv([
       ['HSET', `code:${nonce}`, 'used', '1', 'usedAt', usedAt],
+      ['HDEL', `code:${nonce}`, 'pending'],
       ['SADD', INDEX_KEY, nonce],
     ]);
     return { ok: true };
@@ -243,18 +273,11 @@ async function consume(nonce) {
   const data = loadFile();
   const list = data.codes || [];
   const i = list.findIndex((e) => e.nonce === nonce);
-  if (i >= 0) {
-    if (list[i].used === true) return { ok: false, error: 'used' };
-    list[i].used = true;
-    list[i].usedAt = new Date().toISOString();
-  } else {
-    list.push({
-      nonce,
-      used: true,
-      usedAt: new Date().toISOString(),
-      note: 'hmac-offline',
-    });
-  }
+  if (i < 0) return { ok: false, error: 'unknown' };
+  if (list[i].used === true) return { ok: false, error: 'used' };
+  list[i].used = true;
+  list[i].usedAt = new Date().toISOString();
+  delete list[i].pending;
   data.codes = list;
   saveFile(data);
   return { ok: true };
@@ -303,6 +326,7 @@ async function listCodes() {
     code: row.code || '',
     nonce: row.nonce || '',
     used: row.used === true,
+    pending: row.used !== true && row.pending === true,
     price: readPrice(row.price),
     createdAt: row.createdAt || null,
     usedAt: row.usedAt || null,
@@ -317,6 +341,7 @@ async function listCodes() {
 module.exports = {
   recordGenerated,
   consume,
+  setPending,
   hasKv,
   listCodes,
   setPrice,

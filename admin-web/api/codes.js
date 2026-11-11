@@ -40,7 +40,8 @@ module.exports = async function handler(req, res) {
     globalPrice: listed.globalPrice,
     generated: codes.length,
     used: usedRows.length,
-    unused: unusedRows.length,
+    unused: unusedRows.filter((row) => !row.pending).length,
+    pending: unusedRows.filter((row) => row.pending).length,
     money: {
       used: roundMoney(sumUsedPrices(usedRows, listed.globalPrice)),
       overrides,
