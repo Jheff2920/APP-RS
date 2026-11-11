@@ -90,6 +90,7 @@
 - Keystore upload: `android/upload-keystore.jks` + `android/key.properties` **solo en PC Windows RS-Soporte**, gitignored. Plantilla: `android/key.properties.example`.
 - AAB Play / APK: salen a `inst-apk\` como `RedPOS-Service-*-play.aab` / APKs (carpeta **no** va a git).
 - Gradle desde la sesión del agente funciona otra vez (2026-11-11): `flutter build apk --debug --target-platform android-arm64` y `android\\gradlew :app:testDebugUnitTest`.
+- APK para instalar directo: `flutter build apk --release --target-platform android-arm64 --dart-define=REDPOS_API=...` → `inst-apk\RedPOS-Service-<versión>-arm64.apk`. **No** usar `--split-per-abi` para entregar: sube el versionCode (arm64 = 2000 + build, p. ej. 2056) y luego Play no puede actualizar esa instalación (le pasó al APK +52 = 2052).
 - `REDPOS_API` ya tiene por defecto `https://redpos-codigos-prueba.vercel.app` (desde 1.8.9+56). Pasarlo vacío (`--dart-define=REDPOS_API=`) vuelve a activar solo en el teléfono: **nunca** en release.
 - Compilar (el define es opcional pero se mantiene explícito):
 
@@ -332,7 +333,7 @@ Gradle desde la sesión del agente fallaba por WinNAT (`Unable to establish loop
 ### Próximos pasos (en orden)
 
 1. Confirmar que `REDPOS_STAFF_PASSWORD` existe en Vercel (ya no hay clave de respaldo) y publicar `admin-web` **antes** de subir la 56: `npx vercel --prod` dentro de `admin-web/` (el usuario publica así; el push a `main` no publica).
-2. Compilar AAB y APK `1.8.9+56` (comandos en «Firma y builds»), copiar a `inst-apk\` y subir la AAB a Play Console.
+2. ~~Compilar AAB y APK `1.8.9+56`~~ hecho 2026-11-11: `inst-apk\RedPOS-Service-1.8.9+56-play.aab` y `-arm64.apk` (versionCode 56, firma de subida verificada). Falta subir la AAB a Play Console.
 3. Play Console → Seguridad de los datos: declarar «ID de dispositivo u otros» (funcionalidad de la app y prevención de fraude, no compartido, cifrado en tránsito).
 4. Probar en teléfono real: activar una key nueva (debe salir «usada» y «Ligada a un teléfono» en el panel), desinstalar, reinstalar y volver a activarla (debe aceptarla); «Imprimir» desde otra app (system print); 2 copias de un recibo; PDF de más de 8 páginas (sale el aviso).
 5. Probar en equipo real (Lenovo y Telpo) con letra grande, rotación y densidad alterada; imprimir de prueba en el Telpo
