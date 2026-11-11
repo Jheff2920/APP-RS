@@ -354,6 +354,8 @@ Hecho el 2026-11-11: `admin-web` publicado en Vercel (16:51 UTC; verificado `/ap
 
 ## Cómo retomar (changelog corto)
 
+- **Panel de keys (2026-11-11, noche) — ficha del cliente:** cada key tiene ficha (nombre o negocio, teléfono/WhatsApp, correo, tipo `lifetime` «De por vida» o `trial` «Regalo», notas) en una ventana del panel; la escribe el dueño, la app no envía nada (no cambia Play ni la app). Anotar contacto en una key sin activar la deja **Entregada** (antes «Pendiente»; mismo campo `pending`). Las keys `trial` usadas no suman al total (`effectivePrice`). Búsqueda por key, nombre, correo, notas o dígitos del teléfono; filtro por tipo; el ticket muestra regalos y «Vendidas de por vida». `POST /api/key` con `client` reemplaza `note`. Probado en local con copia de los datos. Falta publicar con `npx vercel --prod`.
+
 - **1.8.9+56 (2026-11-11) — keys que no se registraban en el panel:**
   - *Problema:* un cliente activó una key en video llamada y `/control.html` siguió marcándola «disponible». Ninguna activación llegó al servidor desde el 2026-11-03 10:32 (Perú).
   - *Causa:* la AAB 1.8.9+55 que está en Play (2026-11-03 11:42) se compiló sin `--dart-define=REDPOS_API`. Con `apiBase` vacío, `redeem()` solo revisa el HMAC y guarda la key en el teléfono. Se probó el servidor: `/api/activate` respondió OK con `RP-PKRD-5K5D-Y5H4`, o sea nunca la había recibido (ahora figura usada con fecha 2026-11-11).

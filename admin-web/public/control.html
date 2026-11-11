@@ -38,7 +38,7 @@
       color: var(--tinta);
       background: var(--lila);
     }
-    button, input { font: inherit; color: inherit; }
+    button, input, select, textarea { font: inherit; color: inherit; }
     button { cursor: pointer; }
     button:disabled { cursor: progress; opacity: .6; }
     :focus-visible { outline: 2px solid var(--morado-medio); outline-offset: 2px; }
@@ -183,7 +183,7 @@
     .c-code { white-space: nowrap; min-width: 15rem; }
     tbody tr:last-child td { border-bottom: 0; }
     tbody tr:hover td { background: #fcfbfe; }
-    /* Pendiente = entregada sin confirmar: la franja pide seguimiento. */
+    /* Entregada = vendida sin activar todavía: la franja pide seguimiento. */
     tr.is-pending td:first-child { box-shadow: inset 3px 0 0 var(--ambar); }
     .code { font-family: var(--mono); font-size: .78rem; font-weight: 600; white-space: nowrap; }
     .ghost {
@@ -200,13 +200,47 @@
     .pill.pending { background: var(--ambar-suave); color: var(--ambar); }
     .pill.free { box-shadow: inset 0 0 0 1px var(--contorno); color: var(--tinta-suave); }
     .pill.released { background: var(--lila); color: var(--morado-medio); box-shadow: inset 0 0 0 1px var(--contorno); }
-    .who {
-      display: block; width: 100%; max-width: 17rem; margin-top: .35rem;
-      font-size: .8rem; background: transparent; color: var(--tinta);
-      border: 1px solid transparent; border-radius: 6px; padding: .2rem .4rem;
+    .client {
+      display: block; max-width: 17rem; margin-top: .4rem; padding: 0;
+      background: none; border: 0; text-align: left; white-space: normal;
     }
-    .who::placeholder { color: var(--contorno); }
-    .who:hover, .who:focus { border-color: var(--contorno); background: #fff; }
+    .client b { display: block; font-size: .85rem; font-weight: 600; }
+    .client:hover b { text-decoration: underline; text-underline-offset: 2px; }
+    .contact { display: flex; flex-wrap: wrap; gap: 0 .75rem; font-size: .75rem; color: var(--tinta-suave); }
+    .kind {
+      display: inline-block; margin-left: .4rem; padding: 0 .45rem; border-radius: 999px;
+      font-size: .7rem; font-weight: 500; vertical-align: 1px;
+    }
+    .kind.lifetime { background: var(--morado); color: #fff; }
+    .kind.trial { box-shadow: inset 0 0 0 1px var(--contorno); color: var(--tinta-suave); }
+    .c-code .link { margin-top: .35rem; }
+    .tools { display: flex; gap: .5rem; flex: 0 1 28rem; }
+    .tools .search { flex: 1; }
+    .tools select {
+      background: #fff; border: 1px solid var(--contorno); border-radius: 8px; padding: .5rem .6rem;
+    }
+
+    /* Ficha del cliente */
+    dialog {
+      width: min(30rem, calc(100vw - 2rem)); padding: 0; border: 0; border-radius: 14px;
+      color: var(--tinta); box-shadow: 0 24px 60px rgb(43 10 83 / 28%);
+    }
+    dialog::backdrop { background: rgb(28 21 48 / 45%); }
+    .dlg { display: grid; gap: .8rem; padding: 1.25rem 1.25rem 1rem; }
+    .dlg h2 { margin: 0; font-size: 1.15rem; color: var(--morado); }
+    .dlg h2 .code { display: block; margin-top: .2rem; color: var(--tinta-suave); }
+    .dlg label { display: grid; gap: .3rem; font-size: .9rem; font-weight: 500; }
+    .dlg input, .dlg select, .dlg textarea {
+      width: 100%; font-weight: 400; background: #fff;
+      border: 1px solid var(--contorno); border-radius: 8px; padding: .5rem .65rem;
+    }
+    .dlg textarea { min-height: 4.5rem; resize: vertical; }
+    .dlg .pair { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+    .dlg .err { margin: 0; min-height: 1.2rem; font-size: .85rem; color: var(--rojo); }
+    .dlg-actions { display: flex; justify-content: flex-end; gap: .5rem; }
+    .btn.plain { background: #fff; color: var(--morado); box-shadow: inset 0 0 0 1px var(--contorno); }
+    .btn.plain:hover { background: var(--lila); }
+    @media (max-width: 480px) { .dlg .pair { grid-template-columns: 1fr; } .tools { flex-wrap: wrap; } }
     .link {
       display: block; background: none; border: 0; padding: .15rem 0 0;
       color: var(--morado-medio); font-size: .8rem; white-space: nowrap;
@@ -290,12 +324,14 @@
               <p class="t-row"><span>Usadas</span><span id="t-used"></span></p>
               <p class="t-row t-sub"><span id="t-g-label"></span><span id="t-g"></span></p>
               <p class="t-row t-sub"><span id="t-o-label"></span><span id="t-o"></span></p>
+              <p class="t-row t-sub" id="t-gift-row" hidden><span id="t-gift-label"></span><span>S/ 0.00</span></p>
               <hr/>
               <p class="t-row t-total"><span>Total</span><span id="t-total"></span></p>
               <hr/>
-              <p class="t-row"><span>Pendientes</span><span id="t-pending"></span></p>
+              <p class="t-row"><span>Entregadas</span><span id="t-pending"></span></p>
               <p class="t-row"><span>Disponibles</span><span id="t-free"></span></p>
               <p class="t-row"><span>Generadas</span><span id="t-gen"></span></p>
+              <p class="t-row"><span>Vendidas de por vida</span><span id="t-life"></span></p>
             </div>
           </div>
         </div>
@@ -315,14 +351,24 @@
       <section aria-labelledby="list-title">
         <div class="list-head">
           <h1 id="list-title">Keys</h1>
-          <label class="search">
-            <span class="sr">Buscar key</span>
-            <input id="q" type="search" placeholder="Buscar key o cliente" autocomplete="off"/>
-          </label>
+          <div class="tools">
+            <label class="search">
+              <span class="sr">Buscar key o cliente</span>
+              <input id="q" type="search" placeholder="Buscar key o cliente" autocomplete="off"/>
+            </label>
+            <label>
+              <span class="sr">Tipo de key</span>
+              <select id="kf">
+                <option value="">Todos los tipos</option>
+                <option value="lifetime">De por vida</option>
+                <option value="trial">Regalo</option>
+              </select>
+            </label>
+          </div>
         </div>
         <div class="tabs" id="tabs">
           <button type="button" data-filter="all" aria-pressed="true">Todas<span class="n" id="c-all">0</span></button>
-          <button type="button" data-filter="pending" aria-pressed="false">Pendientes<span class="n" id="c-pending">0</span></button>
+          <button type="button" data-filter="pending" aria-pressed="false">Entregadas<span class="n" id="c-pending">0</span></button>
           <button type="button" data-filter="unused" aria-pressed="false">Disponibles<span class="n" id="c-free">0</span></button>
           <button type="button" data-filter="used" aria-pressed="false">Usadas<span class="n" id="c-used">0</span></button>
         </div>
@@ -339,10 +385,45 @@
     </div>
   </main>
 
+  <dialog id="client-dialog" aria-labelledby="d-title">
+    <form class="dlg" id="client-form">
+      <h2 id="d-title">Cliente<span class="code" id="d-code"></span></h2>
+      <label>Nombre o negocio
+        <input id="d-name" maxlength="80" autocomplete="off"/>
+      </label>
+      <div class="pair">
+        <label>Teléfono o WhatsApp
+          <input id="d-phone" type="tel" maxlength="40" autocomplete="off"/>
+        </label>
+        <label>Correo
+          <input id="d-email" type="email" maxlength="120" autocomplete="off"/>
+        </label>
+      </div>
+      <label>Tipo
+        <select id="d-kind">
+          <option value="lifetime">De por vida (vendida)</option>
+          <option value="trial">Regalo o prueba (no suma al total)</option>
+          <option value="">Sin definir</option>
+        </select>
+      </label>
+      <label>Notas
+        <textarea id="d-note" maxlength="200"></textarea>
+      </label>
+      <p class="err" id="d-err" role="alert"></p>
+      <div class="dlg-actions">
+        <button class="btn plain" type="button" id="d-cancel">Cancelar</button>
+        <button class="btn" type="submit" id="d-save">Guardar cliente</button>
+      </div>
+    </form>
+  </dialog>
+
   <script>
     const $ = (id) => document.getElementById(id);
     let pw = '';
     let filter = 'all';
+    let kindFilter = '';
+    let editing = '';
+    const KIND = { lifetime: 'De por vida', trial: 'Regalo' };
     let query = '';
     let rows = [];
     let globalPrice = null;
@@ -353,6 +434,7 @@
       used: 'Esa key ya está usada.',
       missing: 'Esa key no está en el listado.',
       not_used: 'Eso solo se puede hacer con una key usada.',
+      correo: 'Revisa el correo: debe ser como nombre@dominio.com.',
       precio: 'Escribe un precio válido, por ejemplo 19.99.',
       no_kv: 'El servidor no tiene la base de datos conectada en Vercel.',
     };
@@ -434,8 +516,10 @@
 
     function renderSummary(data) {
       const used = rows.filter((r) => r.used);
-      const own = used.filter((r) => r.price != null);
-      const withGlobal = used.length - own.length;
+      const gifts = used.filter((r) => r.kind === 'trial');
+      const paid = used.filter((r) => r.kind !== 'trial');
+      const own = paid.filter((r) => r.price != null);
+      const withGlobal = paid.length - own.length;
       const counts = {
         all: rows.length,
         pending: rows.filter(isPending).length,
@@ -448,7 +532,10 @@
       $('t-g').textContent = globalPrice == null ? '—' : money(withGlobal * globalPrice);
       $('t-o-label').textContent = `${own.length} con precio propio`;
       $('t-o').textContent = money(own.reduce((sum, r) => sum + Number(r.price), 0));
+      $('t-gift-row').hidden = gifts.length === 0;
+      $('t-gift-label').textContent = `${gifts.length} de regalo`;
       $('t-total').textContent = money(data.money ? data.money.used : 0);
+      $('t-life').textContent = rows.filter((r) => r.kind === 'lifetime').length;
       $('t-pending').textContent = counts.pending;
       $('t-free').textContent = counts.free;
       $('t-gen').textContent = counts.all;
@@ -461,9 +548,10 @@
 
     function emptyText() {
       if (query) return `Ninguna key coincide con «${query}».`;
+      if (kindFilter) return `No hay keys de tipo «${KIND[kindFilter]}» en este filtro.`;
       return {
         all: 'Todavía no hay keys. Genéralas en «Generar keys».',
-        pending: 'No hay keys pendientes de confirmar.',
+        pending: 'No hay keys entregadas sin activar.',
         unused: 'No quedan keys disponibles. Genera nuevas en «Generar keys».',
         used: 'Todavía no hay keys usadas.',
       }[filter];
@@ -482,14 +570,16 @@
           <span class="note">${r.bound ? 'Ligada a un teléfono' : 'Sin teléfono registrado'}</span>
           <button class="link" type="button" data-release="1" data-nonce="${nonce}">Liberar</button>`;
       } else if (r.pending) {
-        state = `<span class="pill pending">Pendiente</span>
-          <button class="link" type="button" data-pending="0" data-nonce="${nonce}">Quitar pendiente</button>`;
+        state = `<span class="pill pending">Entregada</span>
+          <button class="link" type="button" data-pending="0" data-nonce="${nonce}">Quitar entregada</button>`;
       } else {
         state = `<span class="pill free">Disponible</span>
-          <button class="link" type="button" data-pending="1" data-nonce="${nonce}">Marcar pendiente</button>`;
+          <button class="link" type="button" data-pending="1" data-nonce="${nonce}">Marcar entregada</button>`;
       }
       const own = r.price != null;
-      const price = r.used
+      const price = r.used && r.kind === 'trial'
+        ? '<span class="note">Regalo: no suma al total</span>'
+        : r.used
         ? `<div class="price">
             <span aria-hidden="true">S/</span>
             <input type="text" inputmode="decimal" aria-label="Precio de ${code}"
@@ -501,8 +591,7 @@
         : '<span class="none" aria-label="Sin precio">—</span>';
       return `<tr class="${isPending(r) ? 'is-pending' : ''}">
         <td class="c-code"><span class="code">${code}</span><button class="ghost copy" type="button" data-copy="${code}" aria-label="Copiar ${code}">Copiar</button>
-          <input class="who" type="text" maxlength="120" data-nonce="${nonce}" value="${esc(r.note)}"
-            placeholder="Cliente: nombre o WhatsApp" aria-label="Cliente de ${code}"/></td>
+          ${clientHtml(r, nonce, code)}</td>
         <td class="c-state">${state}</td>
         <td class="c-price${r.used ? '' : ' is-empty'}">${price}</td>
         <td class="c-date" data-label="Creada">${fmt(r.createdAt)}</td>
@@ -510,14 +599,37 @@
       </tr>`;
     }
 
-    function render() {
+    function clientHtml(r, nonce, code) {
+      const title = r.name || r.email || r.phone;
+      if (!title && !r.kind && !r.note) {
+        return `<button class="link" type="button" data-client="${nonce}">Agregar cliente</button>`;
+      }
+      const kind = r.kind ? `<span class="kind ${r.kind}">${KIND[r.kind]}</span>` : '';
+      const extra = [r.phone, r.email].filter((v) => v && v !== title);
+      return `<button class="client" type="button" data-client="${nonce}" aria-label="Editar cliente de ${code}">
+          <b>${esc(title || 'Sin nombre')}${kind}</b>
+          ${extra.length ? `<span class="contact">${extra.map((v) => `<span>${esc(v)}</span>`).join('')}</span>` : ''}
+        </button>`;
+    }
+
+    function matches(r) {
+      if (!query) return true;
       let q = norm(query);
       if (q.length > 2 && q.startsWith('RP')) q = q.slice(2);
+      if (q && norm(r.code || r.nonce).includes(q)) return true;
+      const text = query.toLowerCase();
+      if ([r.name, r.email, r.note].some((v) => (v || '').toLowerCase().includes(text))) return true;
+      const digits = query.replace(/\D/g, '');
+      return digits.length >= 3 && (r.phone || '').replace(/\D/g, '').includes(digits);
+    }
+
+    function render() {
       const visible = rows.filter((r) => {
         if (filter === 'used' && !r.used) return false;
         if (filter === 'pending' && !isPending(r)) return false;
         if (filter === 'unused' && !isFree(r)) return false;
-        return !q || norm(r.code || r.nonce).includes(q) || norm(r.note).includes(norm(query));
+        if (kindFilter && r.kind !== kindFilter) return false;
+        return matches(r);
       });
       $('rows').innerHTML = visible.length
         ? visible.map(rowHtml).join('')
@@ -603,34 +715,66 @@
       render();
     });
 
-    // Cliente: se guarda al salir del campo o con Enter.
-    $('rows').addEventListener('change', async (ev) => {
-      const input = ev.target.closest('.who');
-      if (!input) return;
-      const nonce = input.dataset.nonce;
-      const note = input.value.trim().slice(0, 120);
+    $('kf').addEventListener('change', (ev) => {
+      kindFilter = ev.target.value;
+      render();
+    });
+
+    function openClient(nonce) {
+      const r = rows.find((x) => x.nonce === nonce);
+      if (!r) return;
+      editing = nonce;
+      $('d-code').textContent = r.code || r.nonce;
+      $('d-name').value = r.name || '';
+      $('d-phone').value = r.phone || '';
+      $('d-email').value = r.email || '';
+      // Una key nueva casi siempre es una venta de por vida.
+      $('d-kind').value = r.kind || (r.name || r.email || r.phone ? '' : 'lifetime');
+      $('d-note').value = r.note || '';
+      $('d-err').textContent = '';
+      $('client-dialog').showModal();
+      $('d-name').focus();
+    }
+
+    $('d-cancel').addEventListener('click', () => $('client-dialog').close());
+
+    $('client-form').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const nonce = editing;
+      const client = {
+        name: $('d-name').value,
+        phone: $('d-phone').value,
+        email: $('d-email').value,
+        kind: $('d-kind').value,
+        note: $('d-note').value,
+      };
+      $('d-save').disabled = true;
+      $('d-err').textContent = '';
       try {
-        await api('/api/key', { nonce, note });
-        const r = rows.find((x) => x.nonce === nonce);
-        if (r) r.note = note;
-        setMsg(note ? `Cliente guardado en ${codeOf(nonce)}.` : `Cliente borrado de ${codeOf(nonce)}.`);
+        await api('/api/key', { nonce, client });
+        $('client-dialog').close();
+        await loadList();
+        setMsg(`Cliente guardado en ${codeOf(nonce)}.`);
       } catch (e) {
-        setMsg(errText(e), true);
+        $('d-err').textContent = errText(e);
+      } finally {
+        $('d-save').disabled = false;
       }
     });
 
     $('rows').addEventListener('keydown', (ev) => {
-      if (ev.key === 'Enter' && ev.target.matches('.who')) {
-        ev.preventDefault();
-        ev.target.blur();
-        return;
-      }
       if (ev.key !== 'Enter' || !ev.target.matches('.price input')) return;
       ev.preventDefault();
       ev.target.closest('.price').querySelector('[data-save]').click();
     });
 
     $('rows').addEventListener('click', async (ev) => {
+      const clientBtn = ev.target.closest('[data-client]');
+      if (clientBtn) {
+        openClient(clientBtn.dataset.client);
+        return;
+      }
+
       const copyBtn = ev.target.closest('[data-copy]');
       if (copyBtn) {
         try {
@@ -652,7 +796,7 @@
           await api('/api/key', { nonce, pending });
           await loadList();
           setMsg(pending
-            ? `${codeOf(nonce)} quedó como pendiente.`
+            ? `${codeOf(nonce)} quedó como entregada.`
             : `${codeOf(nonce)} volvió a disponible.`);
         } catch (e) {
           markBtn.disabled = false;

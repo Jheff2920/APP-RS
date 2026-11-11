@@ -85,6 +85,10 @@ function hashToRow(nonce, raw) {
     pending: !used && flag(o.pending),
     released: used && flag(o.rebind),
     bound: Boolean(o.device),
+    name: o.name || '',
+    email: o.email || '',
+    phone: o.phone || '',
+    kind: o.kind || '',
     note: o.note || '',
     price: readPrice(o.price),
     createdAt: o.createdAt || null,
@@ -240,9 +244,40 @@ const setPending = (nonce, pending) =>
 const setRelease = (nonce, release) =>
   setField(nonce, 'rebind', release ? '1' : null, (row) => !row.used && 'not_used');
 
-// Quién compró la key, para reconocerlo si pide liberarla.
-const setNote = (nonce, note) =>
-  setField(nonce, 'note', String(note || '').trim().slice(0, 120) || null);
+const CLIENT_FIELDS = { name: 80, email: 120, phone: 40, note: 200 };
+const KINDS = ['lifetime', 'trial'];
+
+// Ficha del comprador (la escribe el dueño en el panel) para reconocerlo si
+// pide liberar la key. Con datos de contacto, una key sin activar queda entregada.
+async function setClient(nonce, client = {}) {
+  const row = await rowByNonce(nonce);
+  if (!row.createdAt && !row.code) return { ok: false, error: 'missing' };
+  const values = {};
+  for (const [field, max] of Object.entries(CLIENT_FIELDS)) {
+    values[field] = String(client[field] || '').trim().slice(0, max);
+  }
+  if (values.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) {
+    return { ok: false, error: 'correo' };
+  }
+  values.kind = KINDS.includes(client.kind) ? client.kind : '';
+  if (!row.used && (values.name || values.email || values.phone)) values.pending = '1';
+  const fill = Object.entries(values).filter(([, v]) => v);
+  const empty = Object.keys(values).filter((k) => !values[k]);
+  if (hasKv()) {
+    await kv([
+      ...(fill.length ? [['HSET', `code:${nonce}`, ...fill.flat()]] : []),
+      ...(empty.length ? [['HDEL', `code:${nonce}`, ...empty]] : []),
+    ]);
+    return { ok: true };
+  }
+  if (process.env.VERCEL) return { ok: false, error: 'no_kv' };
+  const data = loadFile();
+  const found = data.codes.find((e) => e.nonce === nonce);
+  fill.forEach(([k, v]) => { found[k] = v; });
+  empty.forEach((k) => { delete found[k]; });
+  saveFile(data);
+  return { ok: true };
+}
 
 // Activa una key del generador. Una key usada vuelve a valer si llega desde
 // el mismo teléfono ([device]) o una sola vez si el panel la liberó.
@@ -357,7 +392,7 @@ module.exports = {
   consume,
   setPending,
   setRelease,
-  setNote,
+  setClient,
   hasKv,
   listCodes,
   setPrice,

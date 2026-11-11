@@ -12,7 +12,7 @@ delete process.env.UPSTASH_REDIS_REST_URL;
 delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
 const {
-  recordGenerated, consume, listCodes, setPrice, setGlobalPrice, setPending, setRelease, setNote,
+  recordGenerated, consume, listCodes, setPrice, setGlobalPrice, setPending, setRelease, setClient,
 } = require('../lib/store');
 const { sumUsedPrices } = require('../lib/price');
 
@@ -62,14 +62,28 @@ const row = async (nonce) => (await listCodes()).codes.find((r) => r.nonce === n
   assert.strictEqual((await setRelease('DDDD', true)).ok, true);
   assert.deepStrictEqual(await consume('DDDD', PHONE_A), { ok: true, again: true });
 
-  // Cliente: se guarda recortado y vacío lo borra.
-  assert.strictEqual((await setNote('KKKK', '  Bodega Rosita 987654321  ')).ok, true);
-  assert.strictEqual((await row('KKKK')).note, 'Bodega Rosita 987654321');
-  assert.strictEqual((await setNote('KKKK', 'x'.repeat(300))).ok, true);
-  assert.strictEqual((await row('KKKK')).note.length, 120);
-  assert.strictEqual((await setNote('KKKK', '')).ok, true);
-  assert.strictEqual((await row('KKKK')).note, '');
-  assert.strictEqual((await setNote('ZZZZ', 'x')).error, 'missing');
+  // Ficha del cliente: recorta, valida el correo, vacío borra.
+  const ficha = {
+    name: '  Bodega Rosita  ', email: 'rosita@correo.pe', phone: '987 654 321',
+    kind: 'lifetime', note: 'x'.repeat(300),
+  };
+  assert.strictEqual((await setClient('KKKK', ficha)).ok, true);
+  let k = await row('KKKK');
+  assert.strictEqual(k.name, 'Bodega Rosita');
+  assert.strictEqual(k.email, 'rosita@correo.pe');
+  assert.strictEqual(k.phone, '987 654 321');
+  assert.strictEqual(k.kind, 'lifetime');
+  assert.strictEqual(k.note.length, 200);
+  assert.strictEqual(k.pending, false, 'una key usada no pasa a entregada');
+  assert.strictEqual((await setClient('KKKK', { name: 'Rosita', kind: 'otro' })).ok, true);
+  k = await row('KKKK');
+  assert.deepStrictEqual([k.name, k.email, k.phone, k.kind, k.note], ['Rosita', '', '', '', '']);
+  assert.strictEqual((await setClient('KKKK', { email: 'sin-arroba' })).error, 'correo');
+  assert.strictEqual((await setClient('ZZZZ', { name: 'x' })).error, 'missing');
+  // Anotar al cliente en una key sin activar la deja entregada.
+  await recordGenerated('RP-NNNN-PPPP-QQQQ', 'NNNN');
+  assert.strictEqual((await setClient('NNNN', { phone: '999111222' })).ok, true);
+  assert.strictEqual((await row('NNNN')).pending, true);
   assert.strictEqual(JSON.stringify(await listCodes()).includes(PHONE_A), false, 'el hash no sale');
 
   assert.strictEqual((await setGlobalPrice(20)).ok, true);
@@ -82,6 +96,10 @@ const row = async (nonce) => (await listCodes()).codes.find((r) => r.nonce === n
   assert.strictEqual(d.price, null);
   assert.strictEqual(a.pending, false, 'activar quita pendiente');
   assert.strictEqual(sumUsedPrices(listed.codes, listed.globalPrice), 10 + 20 + 20);
+  // Una key de regalo usada no suma al total.
+  assert.strictEqual((await setClient('DDDD', { name: 'Amigo', kind: 'trial' })).ok, true);
+  const gift = await listCodes();
+  assert.strictEqual(sumUsedPrices(gift.codes, gift.globalPrice), 10 + 20);
   fs.unlinkSync(data);
   console.log('store.test.js ok');
 })().catch((err) => {

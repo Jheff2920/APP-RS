@@ -59,7 +59,7 @@ global.fetch = async (url, opts) => {
   return { ok: true, status: 200, json: async () => out };
 };
 
-const { recordGenerated, consume, listCodes, setRelease } = require('../lib/store');
+const { recordGenerated, consume, listCodes, setRelease, setClient } = require('../lib/store');
 
 const A = 'a'.repeat(64);
 const B = 'b'.repeat(64);
@@ -102,6 +102,15 @@ const row = async (nonce) => (await listCodes()).codes.find((r) => r.nonce === n
   assert.strictEqual((await consume('DDDD', A)).error, 'used');
   assert.strictEqual((await setRelease('DDDD', true)).ok, true);
   assert.deepStrictEqual(await consume('DDDD', A), { ok: true, again: true });
+
+  // Ficha del cliente por KV: HSET de lo lleno y HDEL de lo vacío en un pedido.
+  await recordGenerated('RP-GGGG-HHHH-JJJJ', 'GGGG');
+  assert.strictEqual((await setClient('GGGG', { name: 'Rosita', phone: '987', kind: 'lifetime' })).ok, true);
+  let g = await row('GGGG');
+  assert.deepStrictEqual([g.name, g.phone, g.kind, g.pending], ['Rosita', '987', 'lifetime', true]);
+  assert.strictEqual((await setClient('GGGG', { name: 'Rosita' })).ok, true);
+  g = await row('GGGG');
+  assert.deepStrictEqual([g.phone, g.kind, g.pending], ['', '', true]);
 
   console.log('kv.test.js ok');
 })().catch((err) => {

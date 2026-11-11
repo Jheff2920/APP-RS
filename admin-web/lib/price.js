@@ -24,6 +24,8 @@ function sumPrices(rows) {
 
 function effectivePrice(row, globalPrice) {
   if (!row || !row.used) return null;
+  // Regalo o prueba: no suma al total cobrado.
+  if (row.kind === 'trial') return 0;
   if (typeof row.price === 'number') return row.price;
   if (typeof globalPrice === 'number') return globalPrice;
   return null;

@@ -1,7 +1,7 @@
 const { readBody, dashboardOk } = require('../lib/staff');
-const { setPending, setRelease, setNote } = require('../lib/store');
+const { setPending, setRelease, setClient } = require('../lib/store');
 
-// Cambios del panel a una key: { nonce, pending | release | note }.
+// Cambios del panel a una key: { nonce, pending | release | client }.
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.status(204).end();
@@ -24,7 +24,7 @@ module.exports = async function handler(req, res) {
   let result;
   if ('pending' in body) result = await setPending(nonce, body.pending === true);
   else if ('release' in body) result = await setRelease(nonce, body.release === true);
-  else if ('note' in body) result = await setNote(nonce, body.note);
+  else if ('client' in body) result = await setClient(nonce, body.client || {});
   else result = { ok: false, error: 'campo' };
   if (!result.ok) {
     const status = { used: 409, not_used: 409, missing: 404, no_kv: 503 }[result.error] || 400;

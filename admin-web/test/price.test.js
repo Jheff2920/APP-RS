@@ -6,4 +6,6 @@ assert.strictEqual(parsePrice(19.99).value, 19.99);
 assert.strictEqual(parsePrice('10,5').value, 10.5);
 assert.strictEqual(parsePrice(-1).error, 'precio');
 assert.strictEqual(sumUsedPrices([{ used: true, price: 10 }, { used: true }], 20), 30);
+// Regalo: no suma al total.
+assert.strictEqual(sumUsedPrices([{ used: true, price: 10, kind: 'trial' }, { used: true, kind: 'lifetime' }], 20), 20);
 console.log('price.test.js ok');
