@@ -331,7 +331,7 @@ compilar desde la terminal del usuario.
 
 ### Próximos pasos (en orden)
 
-1. Publicar `admin-web` en Vercel (el servidor ahora rechaza keys que no creó el generador; ver changelog 1.8.9+56)
+1. ~~Publicar `admin-web` en Vercel~~ hecho 2026-11-11 (panel nuevo, estado pendiente y rechazo de keys no generadas verificados en línea)
 2. Compilar AAB `1.8.9+56` desde la terminal del usuario, copiarlo a `inst-apk\` y subirlo a Play Console (Play tiene 55 sin servidor)
 3. Probar con una key nueva en un equipo con la 56: debe aparecer «usada» en `/control.html`
 4. Publicar en Vercel `admin-web/public` (privacidad, términos y sus versiones en inglés cambiaron de texto)
@@ -362,7 +362,8 @@ compilar desde la terminal del usuario.
   - *Riesgo que queda:* las instalaciones que activaron con la 55 siguen activas y no hay registro de qué key usaron; en esa ventana una key pudo usarse en varios teléfonos.
   - *Validado:* 161 pruebas Flutter y pruebas de admin-web.
   - *Panel `control.html` rediseñado:* resumen como ticket térmico que «sale» de una ranura (única animación, respeta reduced-motion), entrada con clave, pestañas con contadores (Todas/Pendientes/Disponibles/Usadas), buscador de key, precio por defecto y por key, link a «Generar keys». Nuevo estado **Pendiente** (key entregada sin saber si la activaron): `POST /api/pending` `{nonce, pending}`, campo `pending` en `code:<nonce>`; al activarse se borra. Fuentes: Schibsted Grotesk (UI) y Martian Mono (ticket y keys), colores de `lib/theme.dart`. Probado en local con copia de los datos (escritorio 1366 px y celular).
-  - *Publicar:* Vercel toma `main` (lo publicado era igual a `main`; la rama `test/redpos-vercel-codigos` ya no se usa). Tras publicar, marcar `RP-XVTA-VWKG-3JFN` como pendiente.
+  - *Publicar:* en línea desde 2026-11-11 15:06 UTC. Los commits de `main` no muestran estados de Vercel; si un push no publica, usar `npx vercel login` y `npx vercel --prod` dentro de `admin-web/` (la carpeta ya está vinculada al proyecto). La rama `test/redpos-vercel-codigos` ya no se usa. `RP-XVTA-VWKG-3JFN` quedó marcada como pendiente.
+  - *Abierto de la auditoría 2026-11-02:* bloqueante #1 (`MainActivity` acepta `system_print_path` sin validar y Flutter borra esa ruta) y #2 (fallback `R100301S` en `admin-web/lib/staff.js`; confirmar `REDPOS_STAFF_PASSWORD` en Vercel antes de quitarlo).
 
 - **1.8.9+55 (2026-11-10) — impresora 4" 480BL y pie de publicidad:**
   - *Problema:* en la 480BL (cabezal 4", rollo de 80 mm al centro) el texto salía cortado con «~», corrido a la izquierda y desalineado del título/pie; el usuario compensaba con margen izquierdo 20 mm (el máximo), que quitaba 13 columnas.
