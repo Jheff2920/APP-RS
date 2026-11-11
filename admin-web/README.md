@@ -5,7 +5,7 @@ Proyecto Vercel `redpos-codigos-prueba`. Esta página es **solo para staff**: el
 Páginas:
 
 - `/` — **generador** de keys.
-- `/control.html` — **panel de control** (para el dueño): resumen en ticket, pestañas Todas/Pendientes/Disponibles/Usadas, buscador por key, nombre, correo o teléfono, filtro por tipo, precio por defecto y por key, marcar **entregada**, **liberar** una key usada y **ficha del cliente** (nombre, teléfono, correo, tipo «De por vida» o «Regalo», notas). Las keys de regalo no suman al total.
+- `/control.html` — **panel de control** (para el dueño): resumen en ticket, pestañas Todas/Entregadas/Disponibles/Usadas, buscador por key, nombre, correo o teléfono, filtro por tipo, precio por defecto y por key, marcar **entregada**, **liberar** una key usada y **ficha del cliente** (nombre, teléfono, correo, tipo «De por vida» o «Regalo», notas). Las keys de regalo no suman al total.
 
 Pon una clave distinta en `REDPOS_DASHBOARD_PASSWORD` para que quien use el generador no abra el panel.
 
