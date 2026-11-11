@@ -51,10 +51,14 @@ async function kv(command) {
   if (!res.ok) {
     throw new Error(`KV ${res.status}`);
   }
-  return res.json();
+  const out = await res.json();
+  // El pipeline responde 200 aunque un comando falle: revisar cada uno.
+  const failed = Array.isArray(out) && out.find((r) => r && r.error);
+  if (failed) throw new Error(`KV ${failed.error}`);
+  return out;
 }
 
-function hashToRow(nonce, raw) {
+function toObject(raw) {
   const o = {};
   if (raw && !Array.isArray(raw) && typeof raw === 'object') {
     Object.assign(o, raw);
@@ -63,15 +67,29 @@ function hashToRow(nonce, raw) {
       o[String(raw[i])] = raw[i + 1];
     }
   }
-  const used = o.used === '1' || o.used === 1 || o.used === true;
+  return o;
+}
+
+const flag = (v) => v === '1' || v === 1 || v === true;
+// usedAt se escribe primero (HSETNX): basta para contar la key como usada.
+const isUsed = (o) => flag(o.used) || Boolean(o.usedAt);
+
+// El hash del teléfono no sale del servidor: el panel solo ve si hay uno.
+function hashToRow(nonce, raw) {
+  const o = toObject(raw);
+  const used = isUsed(o);
   return {
     code: o.code || '',
     nonce,
     used,
-    pending: !used && o.pending === '1',
+    pending: !used && flag(o.pending),
+    released: used && flag(o.rebind),
+    bound: Boolean(o.device),
+    note: o.note || '',
     price: readPrice(o.price),
     createdAt: o.createdAt || null,
     usedAt: o.usedAt || null,
+    reactivatedAt: o.reactivatedAt || null,
   };
 }
 
@@ -185,102 +203,106 @@ async function rowByNonce(nonce) {
     return hashToRow(nonce, reply && reply.result);
   }
   const data = loadFile();
-  const found = (data.codes || []).find((row) => row.nonce === nonce);
-  if (!found) return { code: '', nonce, used: false, price: null, createdAt: null, usedAt: null };
-  return {
-    code: found.code || '',
-    nonce,
-    used: found.used === true,
-    pending: found.used !== true && found.pending === true,
-    price: readPrice(found.price),
-    createdAt: found.createdAt || null,
-    usedAt: found.usedAt || null,
-  };
+  return hashToRow(nonce, (data.codes || []).find((row) => row.nonce === nonce));
 }
 
-async function setPrice(nonce, price) {
-  const row = await rowByNonce(nonce);
-  const exists = Boolean(row.code || row.used || row.createdAt || row.usedAt);
-  if (!exists) return { ok: false, error: 'missing' };
-  if (!row.used) return { ok: false, error: 'not_used' };
-  if (hasKv()) {
-    if (price == null) {
-      await kv([['HDEL', `code:${nonce}`, 'price']]);
-    } else {
-      await kv([['HSET', `code:${nonce}`, 'price', String(price)]]);
-    }
-    return { ok: true };
-  }
-  if (process.env.VERCEL) {
-    return { ok: false, error: 'no_kv' };
-  }
-  const data = loadFile();
-  const i = (data.codes || []).findIndex((e) => e.nonce === nonce);
-  if (i < 0) return { ok: false, error: 'missing' };
-  if (data.codes[i].used !== true) return { ok: false, error: 'not_used' };
-  data.codes[i].price = price;
-  saveFile(data);
-  return { ok: true };
-}
-
-// Entregada al cliente pero sin saber si la activó (la app 1.8.9+55 no avisaba).
-async function setPending(nonce, pending) {
+// Cambia un campo de la key (null lo borra). [guard] devuelve un error o nada.
+async function setField(nonce, field, value, guard) {
   const row = await rowByNonce(nonce);
   if (!row.createdAt && !row.code) return { ok: false, error: 'missing' };
-  if (row.used) return { ok: false, error: 'used' };
+  const bad = guard && guard(row);
+  if (bad) return { ok: false, error: bad };
   if (hasKv()) {
     await kv([
-      pending
-        ? ['HSET', `code:${nonce}`, 'pending', '1']
-        : ['HDEL', `code:${nonce}`, 'pending'],
+      value == null
+        ? ['HDEL', `code:${nonce}`, field]
+        : ['HSET', `code:${nonce}`, field, String(value)],
     ]);
     return { ok: true };
   }
   if (process.env.VERCEL) return { ok: false, error: 'no_kv' };
   const data = loadFile();
   const found = data.codes.find((e) => e.nonce === nonce);
-  if (pending) found.pending = true;
-  else delete found.pending;
+  if (value == null) delete found[field];
+  else found[field] = value;
   saveFile(data);
   return { ok: true };
 }
 
-async function consume(nonce) {
-  if (nonce === 'TESTALIAS') {
-    return { ok: false, error: 'test_alias' };
-  }
+const setPrice = (nonce, price) =>
+  setField(nonce, 'price', price, (row) => !row.used && 'not_used');
+
+// Entregada al cliente pero sin saber si la activó (la app 1.8.9+55 no avisaba).
+const setPending = (nonce, pending) =>
+  setField(nonce, 'pending', pending ? '1' : null, (row) => row.used && 'used');
+
+// Liberar: la próxima activación (desde cualquier teléfono) vuelve a valer.
+const setRelease = (nonce, release) =>
+  setField(nonce, 'rebind', release ? '1' : null, (row) => !row.used && 'not_used');
+
+// Quién compró la key, para reconocerlo si pide liberarla.
+const setNote = (nonce, note) =>
+  setField(nonce, 'note', String(note || '').trim().slice(0, 120) || null);
+
+// Activa una key del generador. Una key usada vuelve a valer si llega desde
+// el mismo teléfono ([device]) o una sola vez si el panel la liberó.
+async function consume(nonce, device = '') {
+  const now = new Date().toISOString();
   if (hasKv()) {
+    const key = `code:${nonce}`;
+    const [reply] = await kv([['HGETALL', key]]);
+    const raw = toObject(reply && reply.result);
     // Solo keys del generador: el secreto HMAC viaja dentro de la app y no basta.
-    const [known] = await kv([['HEXISTS', `code:${nonce}`, 'createdAt']]);
-    if (!known || known.result !== 1) {
-      return { ok: false, error: 'unknown' };
+    if (!raw.createdAt) return { ok: false, error: 'unknown' };
+    if (isUsed(raw)) {
+      if (device && raw.device === device) {
+        // Mismo teléfono: no se reescribe device para no pisar una transferencia.
+        await kv([['HSET', key, 'reactivatedAt', now]]);
+        return { ok: true, again: true };
+      }
+      if (!flag(raw.rebind)) return { ok: false, error: 'used' };
+      // HDEL es atómico: si dos teléfonos llegan a la vez, solo uno se la lleva.
+      const [claim] = await kv([['HDEL', key, 'rebind']]);
+      if (claim.result !== 1) return { ok: false, error: 'used' };
+      // Sin hash (iPhone, app vieja) el teléfono anterior deja de valer igual.
+      await kv([
+        ['HSET', key, 'reactivatedAt', now, ...(device ? ['device', device] : [])],
+        ...(device ? [] : [['HDEL', key, 'device']]),
+      ]);
+      return { ok: true, again: true };
     }
-    const usedAt = new Date().toISOString();
-    const [setNx] = await kv([['SET', `used:${nonce}`, usedAt, 'NX']]);
-    if (setNx.result == null) {
-      return { ok: false, error: 'used' };
-    }
+    // HSETNX es atómico: dos activaciones simultáneas no pueden ganar ambas.
+    const [claim] = await kv([['HSETNX', key, 'usedAt', now]]);
+    if (claim.result !== 1) return { ok: false, error: 'used' };
     await kv([
-      ['HSET', `code:${nonce}`, 'used', '1', 'usedAt', usedAt],
-      ['HDEL', `code:${nonce}`, 'pending'],
+      ['HSET', key, 'used', '1', ...(device ? ['device', device] : [])],
+      ['HDEL', key, 'pending'],
       ['SADD', INDEX_KEY, nonce],
     ]);
     return { ok: true };
   }
-  if (process.env.VERCEL) {
-    return { ok: false, error: 'no_kv' };
-  }
+  if (process.env.VERCEL) return { ok: false, error: 'no_kv' };
   const data = loadFile();
-  const list = data.codes || [];
-  const i = list.findIndex((e) => e.nonce === nonce);
-  if (i < 0) return { ok: false, error: 'unknown' };
-  if (list[i].used === true) return { ok: false, error: 'used' };
-  list[i].used = true;
-  list[i].usedAt = new Date().toISOString();
-  delete list[i].pending;
-  data.codes = list;
+  const found = (data.codes || []).find((e) => e.nonce === nonce);
+  if (!found) return { ok: false, error: 'unknown' };
+  if (!isUsed(found)) {
+    found.used = true;
+    found.usedAt = now;
+    if (device) found.device = device;
+    delete found.pending;
+    saveFile(data);
+    return { ok: true };
+  }
+  const sameDevice = Boolean(device && found.device === device);
+  if (!sameDevice && !flag(found.rebind)) return { ok: false, error: 'used' };
+  if (!sameDevice) {
+    delete found.rebind;
+    if (device) found.device = device;
+    else delete found.device;
+  }
+  found.reactivatedAt = now;
   saveFile(data);
-  return { ok: true };
+  return { ok: true, again: true };
 }
 
 async function getGlobalPrice() {
@@ -322,15 +344,7 @@ async function listCodes() {
     return { kv: false, globalPrice: null, codes: [] };
   }
   const data = loadFile();
-  const codes = (data.codes || []).map((row) => ({
-    code: row.code || '',
-    nonce: row.nonce || '',
-    used: row.used === true,
-    pending: row.used !== true && row.pending === true,
-    price: readPrice(row.price),
-    createdAt: row.createdAt || null,
-    usedAt: row.usedAt || null,
-  }));
+  const codes = (data.codes || []).map((row) => hashToRow(row.nonce || '', row));
   return {
     kv: false,
     globalPrice: readPrice(data.globalPrice),
@@ -342,6 +356,8 @@ module.exports = {
   recordGenerated,
   consume,
   setPending,
+  setRelease,
+  setNote,
   hasKv,
   listCodes,
   setPrice,

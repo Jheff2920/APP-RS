@@ -180,7 +180,7 @@
       padding: .6rem .85rem; background: #faf9fc; border-bottom: 1px solid var(--linea);
     }
     td { padding: .7rem .85rem; border-bottom: 1px solid var(--linea); font-size: .92rem; vertical-align: middle; }
-    .c-code { white-space: nowrap; }
+    .c-code { white-space: nowrap; min-width: 15rem; }
     tbody tr:last-child td { border-bottom: 0; }
     tbody tr:hover td { background: #fcfbfe; }
     /* Pendiente = entregada sin confirmar: la franja pide seguimiento. */
@@ -199,6 +199,14 @@
     .pill.used { background: var(--verde-suave); color: var(--verde); }
     .pill.pending { background: var(--ambar-suave); color: var(--ambar); }
     .pill.free { box-shadow: inset 0 0 0 1px var(--contorno); color: var(--tinta-suave); }
+    .pill.released { background: var(--lila); color: var(--morado-medio); box-shadow: inset 0 0 0 1px var(--contorno); }
+    .who {
+      display: block; width: 100%; max-width: 17rem; margin-top: .35rem;
+      font-size: .8rem; background: transparent; color: var(--tinta);
+      border: 1px solid transparent; border-radius: 6px; padding: .2rem .4rem;
+    }
+    .who::placeholder { color: var(--contorno); }
+    .who:hover, .who:focus { border-color: var(--contorno); background: #fff; }
     .link {
       display: block; background: none; border: 0; padding: .15rem 0 0;
       color: var(--morado-medio); font-size: .8rem; white-space: nowrap;
@@ -309,7 +317,7 @@
           <h1 id="list-title">Keys</h1>
           <label class="search">
             <span class="sr">Buscar key</span>
-            <input id="q" type="search" placeholder="Buscar key, ej. XVTA" autocomplete="off"/>
+            <input id="q" type="search" placeholder="Buscar key o cliente" autocomplete="off"/>
           </label>
         </div>
         <div class="tabs" id="tabs">
@@ -343,8 +351,8 @@
     const ERRORS = {
       clave: 'La clave de control no es correcta.',
       used: 'Esa key ya está usada.',
-      not_used: 'Solo las keys usadas llevan precio.',
       missing: 'Esa key no está en el listado.',
+      not_used: 'Eso solo se puede hacer con una key usada.',
       precio: 'Escribe un precio válido, por ejemplo 19.99.',
       no_kv: 'El servidor no tiene la base de datos conectada en Vercel.',
     };
@@ -465,8 +473,14 @@
       const code = esc(r.code || r.nonce);
       const nonce = esc(r.nonce);
       let state;
-      if (r.used) {
-        state = '<span class="pill used">Usada</span>';
+      if (r.used && r.released) {
+        state = `<span class="pill released">Liberada</span>
+          <span class="note">Vale una vez en otro teléfono</span>
+          <button class="link" type="button" data-release="0" data-nonce="${nonce}">Cancelar</button>`;
+      } else if (r.used) {
+        state = `<span class="pill used">Usada</span>
+          <span class="note">${r.bound ? 'Ligada a un teléfono' : 'Sin teléfono registrado'}</span>
+          <button class="link" type="button" data-release="1" data-nonce="${nonce}">Liberar</button>`;
       } else if (r.pending) {
         state = `<span class="pill pending">Pendiente</span>
           <button class="link" type="button" data-pending="0" data-nonce="${nonce}">Quitar pendiente</button>`;
@@ -486,11 +500,13 @@
           <span class="note">${own ? 'Precio propio' : 'Usa el precio por defecto'}</span>`
         : '<span class="none" aria-label="Sin precio">—</span>';
       return `<tr class="${isPending(r) ? 'is-pending' : ''}">
-        <td class="c-code"><span class="code">${code}</span><button class="ghost copy" type="button" data-copy="${code}" aria-label="Copiar ${code}">Copiar</button></td>
+        <td class="c-code"><span class="code">${code}</span><button class="ghost copy" type="button" data-copy="${code}" aria-label="Copiar ${code}">Copiar</button>
+          <input class="who" type="text" maxlength="120" data-nonce="${nonce}" value="${esc(r.note)}"
+            placeholder="Cliente: nombre o WhatsApp" aria-label="Cliente de ${code}"/></td>
         <td class="c-state">${state}</td>
         <td class="c-price${r.used ? '' : ' is-empty'}">${price}</td>
         <td class="c-date" data-label="Creada">${fmt(r.createdAt)}</td>
-        <td class="c-date" data-label="Usada">${fmt(r.usedAt)}</td>
+        <td class="c-date" data-label="Usada">${fmt(r.usedAt)}${r.reactivatedAt ? `<span class="note">Reactivada ${fmt(r.reactivatedAt)}</span>` : ''}</td>
       </tr>`;
     }
 
@@ -501,7 +517,7 @@
         if (filter === 'used' && !r.used) return false;
         if (filter === 'pending' && !isPending(r)) return false;
         if (filter === 'unused' && !isFree(r)) return false;
-        return !q || norm(r.code || r.nonce).includes(q);
+        return !q || norm(r.code || r.nonce).includes(q) || norm(r.note).includes(norm(query));
       });
       $('rows').innerHTML = visible.length
         ? visible.map(rowHtml).join('')
@@ -587,7 +603,28 @@
       render();
     });
 
+    // Cliente: se guarda al salir del campo o con Enter.
+    $('rows').addEventListener('change', async (ev) => {
+      const input = ev.target.closest('.who');
+      if (!input) return;
+      const nonce = input.dataset.nonce;
+      const note = input.value.trim().slice(0, 120);
+      try {
+        await api('/api/key', { nonce, note });
+        const r = rows.find((x) => x.nonce === nonce);
+        if (r) r.note = note;
+        setMsg(note ? `Cliente guardado en ${codeOf(nonce)}.` : `Cliente borrado de ${codeOf(nonce)}.`);
+      } catch (e) {
+        setMsg(errText(e), true);
+      }
+    });
+
     $('rows').addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' && ev.target.matches('.who')) {
+        ev.preventDefault();
+        ev.target.blur();
+        return;
+      }
       if (ev.key !== 'Enter' || !ev.target.matches('.price input')) return;
       ev.preventDefault();
       ev.target.closest('.price').querySelector('[data-save]').click();
@@ -612,13 +649,32 @@
         const pending = markBtn.dataset.pending === '1';
         markBtn.disabled = true;
         try {
-          await api('/api/pending', { nonce, pending });
+          await api('/api/key', { nonce, pending });
           await loadList();
           setMsg(pending
             ? `${codeOf(nonce)} quedó como pendiente.`
             : `${codeOf(nonce)} volvió a disponible.`);
         } catch (e) {
           markBtn.disabled = false;
+          setMsg(errText(e), true);
+        }
+        return;
+      }
+
+      const releaseBtn = ev.target.closest('[data-release]');
+      if (releaseBtn) {
+        const nonce = releaseBtn.dataset.nonce;
+        const release = releaseBtn.dataset.release === '1';
+        if (release && !confirm(`¿Liberar ${codeOf(nonce)}?\n\nLa próxima activación desde cualquier teléfono valdrá una vez. Hazlo solo si confirmaste que es el mismo cliente.`)) return;
+        releaseBtn.disabled = true;
+        try {
+          await api('/api/key', { nonce, release });
+          await loadList();
+          setMsg(release
+            ? `${codeOf(nonce)} liberada: el cliente ya puede activarla en su teléfono nuevo.`
+            : `${codeOf(nonce)} ya no está liberada.`);
+        } catch (e) {
+          releaseBtn.disabled = false;
           setMsg(errText(e), true);
         }
         return;

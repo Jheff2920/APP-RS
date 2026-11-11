@@ -25,11 +25,9 @@ module.exports = async function handler(req, res) {
     res.status(400).json({ ok: false, error: 'invalid' });
     return;
   }
-  if (checked.testAlias) {
-    res.status(400).json({ ok: false, error: 'invalid' });
-    return;
-  }
-  const result = await consume(checked.nonce);
+  // Hash anónimo del teléfono (sha256 hex) para reactivar en el mismo equipo.
+  const device = /^[a-f0-9]{64}$/.test(String(body.device || '')) ? body.device : '';
+  const result = await consume(checked.nonce, device);
   if (!result.ok) {
     const status = result.error === 'no_kv' ? 503 : 409;
     res.status(status).json({
@@ -39,5 +37,5 @@ module.exports = async function handler(req, res) {
     });
     return;
   }
-  res.status(200).json({ ok: true, kv: hasKv() });
+  res.status(200).json({ ok: true, kv: hasKv(), again: result.again === true });
 };

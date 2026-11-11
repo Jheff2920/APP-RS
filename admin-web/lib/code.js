@@ -58,9 +58,6 @@ function verify(input, secret = defaultSecret()) {
   if (!trimmed) {
     return { ok: false, error: 'empty' };
   }
-  if (normalize(trimmed) === normalize('R100301S')) {
-    return { ok: true, nonce: 'TESTALIAS', testAlias: true };
-  }
   let body = normalize(trimmed);
   if (body.startsWith('RP') && body.length === 14) {
     body = body.slice(2);
@@ -78,7 +75,7 @@ function verify(input, secret = defaultSecret()) {
     diff |= mac.charCodeAt(i) ^ expected.charCodeAt(i);
   }
   if (diff !== 0) return { ok: false, error: 'invalid' };
-  return { ok: true, nonce, testAlias: false };
+  return { ok: true, nonce };
 }
 
 function fromNonce(nonce, secret = defaultSecret()) {

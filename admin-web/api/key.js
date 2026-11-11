@@ -1,7 +1,7 @@
 const { readBody, dashboardOk } = require('../lib/staff');
-const { setPending } = require('../lib/store');
+const { setPending, setRelease, setNote } = require('../lib/store');
 
-// Marca o quita «pendiente» (entregada, sin saber si la activaron).
+// Cambios del panel a una key: { nonce, pending | release | note }.
 module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.status(204).end();
@@ -21,11 +21,15 @@ module.exports = async function handler(req, res) {
     res.status(400).json({ ok: false, error: 'codigo' });
     return;
   }
-  const result = await setPending(nonce, body.pending === true);
+  let result;
+  if ('pending' in body) result = await setPending(nonce, body.pending === true);
+  else if ('release' in body) result = await setRelease(nonce, body.release === true);
+  else if ('note' in body) result = await setNote(nonce, body.note);
+  else result = { ok: false, error: 'campo' };
   if (!result.ok) {
-    const status = { used: 409, missing: 404, no_kv: 503 }[result.error] || 400;
+    const status = { used: 409, not_used: 409, missing: 404, no_kv: 503 }[result.error] || 400;
     res.status(status).json({ ok: false, error: result.error });
     return;
   }
-  res.status(200).json({ ok: true, nonce, pending: body.pending === true });
+  res.status(200).json({ ok: true, nonce });
 };
