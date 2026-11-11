@@ -3,12 +3,12 @@
 > **Lee este archivo primero** en cada sesión nueva (Cursor / Cloud / Claude / Codex).
 > Es la fuente de verdad del estado actual del proyecto. Si README y este archivo discrepan, prioriza **CONTEXTO.md**.
 
-**Última actualización:** 2026-11-10
+**Última actualización:** 2026-11-11
 **Empresa:** **Red Soluciones** (una sola **d** — nunca «Redd Soluciones»)  
 **Producto:** RedPOS Service  
 **Carpeta Windows (preferida):** `C:\Users\RS-Soporte\Documents\app`  
 **Repo:** https://github.com/Jheff2920/APP-RS · rama estable `main`  
-**Versión app:** `1.8.9+55` (`pubspec.yaml`) — Play tiene 54 en Producción (70 descargas); 55 es la que sube la feature de impresoras lógicas independientes + arreglo impresora 4" 480BL + pie de publicidad nuevo (aún sin compilar AAB)  
+**Versión app:** `1.8.9+56` (`pubspec.yaml`) — Play tiene **55** (AAB del 2026-11-03, compilada **sin** `REDPOS_API`: activa keys solo en el teléfono). 56 lleva el servidor por defecto, formato automático de la key, arreglo 480BL y pie de publicidad nuevo (falta compilar AAB y subir)  
 **Package / applicationId:** `com.redpos.service`  
 **iOS bundle:** `com.redpos.service`
 
@@ -89,7 +89,8 @@
 
 - Keystore upload: `android/upload-keystore.jks` + `android/key.properties` **solo en PC Windows RS-Soporte**, gitignored. Plantilla: `android/key.properties.example`.
 - AAB Play / APK: salen a `inst-apk\` como `RedPOS-Service-*-play.aab` / APKs (carpeta **no** va a git).
-- Compilar con define de API:
+- `REDPOS_API` ya tiene por defecto `https://redpos-codigos-prueba.vercel.app` (desde 1.8.9+56). Pasarlo vacío (`--dart-define=REDPOS_API=`) vuelve a activar solo en el teléfono: **nunca** en release.
+- Compilar (el define es opcional pero se mantiene explícito):
 
 ```powershell
 flutter build apk --release --dart-define=REDPOS_API=https://redpos-codigos-prueba.vercel.app
@@ -330,9 +331,9 @@ compilar desde la terminal del usuario.
 
 ### Próximos pasos (en orden)
 
-1. **(2026-11-11)** El usuario revisa un tema pendiente más **antes** de compilar; atenderlo primero.
-2. Compilar AAB `1.8.9+55` con `--dart-define=REDPOS_API=...` y copiarlo a `inst-apk\` (incluye impresoras lógicas, arreglo 480BL y pie de publicidad; Producción tiene 54)
-3. Subirlo a Play Console
+1. Publicar `admin-web` en Vercel (el servidor ahora rechaza keys que no creó el generador; ver changelog 1.8.9+56)
+2. Compilar AAB `1.8.9+56` desde la terminal del usuario, copiarlo a `inst-apk\` y subirlo a Play Console (Play tiene 55 sin servidor)
+3. Probar con una key nueva en un equipo con la 56: debe aparecer «usada» en `/control.html`
 4. Publicar en Vercel `admin-web/public` (privacidad, términos y sus versiones en inglés cambiaron de texto)
 5. Probar en equipo real (Lenovo y Telpo) con letra grande, rotación y densidad alterada; imprimir de prueba en el Telpo
 
@@ -349,6 +350,19 @@ compilar desde la terminal del usuario.
 ---
 
 ## Cómo retomar (changelog corto)
+
+- **1.8.9+56 (2026-11-11) — keys que no se registraban en el panel:**
+  - *Problema:* un cliente activó una key en video llamada y `/control.html` siguió marcándola «disponible». Ninguna activación llegó al servidor desde el 2026-11-03 10:32 (Perú).
+  - *Causa:* la AAB 1.8.9+55 que está en Play (2026-11-03 11:42) se compiló sin `--dart-define=REDPOS_API`. Con `apiBase` vacío, `redeem()` solo revisa el HMAC y guarda la key en el teléfono. Se probó el servidor: `/api/activate` respondió OK con `RP-PKRD-5K5D-Y5H4`, o sea nunca la había recibido (ahora figura usada con fecha 2026-11-11).
+  - *Arreglo app:* `RedPosConfig.apiBase` con la URL de Vercel por defecto. Campo de key (diálogo y formulario de impresora) con `RedPosCodeInputFormatter`: mayúsculas, `RP-` y guiones solos, pegado de la key sola o dentro de un mensaje. `RedPosLicenseStore.activateForTest` solo para pruebas.
+  - *Avisos:* `showRedPosRedeemResultDialog` (`redpos_ad_banner.dart`) muestra «Código activado» o «Código no activado» con la key y el motivo, en el diálogo y en el formulario de impresora. Motivos según el `error` del servidor: `used` → ya fue usado; `unknown`/`invalid` → no existe; otro → reintentar en unos minutos; sin red → mensaje de red.
+  - *Saber si una key se usó:* `/control.html` (o `POST /api/codes`) es solo lectura. **Nunca** probar con `/api/activate`: la consume. Las activaciones hechas con la 55 no llegaron al servidor y no se pueden consultar.
+  - *Marcadas a mano (2026-11-11), confirmadas por el usuario:* `PKRD`, `EUYM`, `E3B3`, `VKZG`, `6BX4`, `X8KB`, `MKFE`, `TWV4`, `CHTK`, `DHZP`, `U5BA`. Su `usedAt` es 2026-11-11, no la fecha real. Libres: `XJFP` y `AZE9` (no usadas), `XVTA` (pendiente de confirmar).
+  - *Seguridad:* las keys reales usan el secreto HMAC de prueba por defecto (está en el código y en el APK), así que cualquiera podía fabricar keys válidas. `consume()` (admin-web) ahora exige que `code:<nonce>` tenga `createdAt` (creada por el generador); si no, `unknown`. Pendiente del usuario: cambiar `REDPOS_DASHBOARD_PASSWORD` y confirmar que `REDPOS_STAFF_PASSWORD` esté puesta en Vercel (si falta, el generador usa `R100301S`).
+  - *Riesgo que queda:* las instalaciones que activaron con la 55 siguen activas y no hay registro de qué key usaron; en esa ventana una key pudo usarse en varios teléfonos.
+  - *Validado:* 161 pruebas Flutter y pruebas de admin-web.
+  - *Panel `control.html` rediseñado:* resumen como ticket térmico que «sale» de una ranura (única animación, respeta reduced-motion), entrada con clave, pestañas con contadores (Todas/Pendientes/Disponibles/Usadas), buscador de key, precio por defecto y por key, link a «Generar keys». Nuevo estado **Pendiente** (key entregada sin saber si la activaron): `POST /api/pending` `{nonce, pending}`, campo `pending` en `code:<nonce>`; al activarse se borra. Fuentes: Schibsted Grotesk (UI) y Martian Mono (ticket y keys), colores de `lib/theme.dart`. Probado en local con copia de los datos (escritorio 1366 px y celular).
+  - *Publicar:* Vercel toma `main` (lo publicado era igual a `main`; la rama `test/redpos-vercel-codigos` ya no se usa). Tras publicar, marcar `RP-XVTA-VWKG-3JFN` como pendiente.
 
 - **1.8.9+55 (2026-11-10) — impresora 4" 480BL y pie de publicidad:**
   - *Problema:* en la 480BL (cabezal 4", rollo de 80 mm al centro) el texto salía cortado con «~», corrido a la izquierda y desalineado del título/pie; el usuario compensaba con margen izquierdo 20 mm (el máximo), que quitaba 13 columnas.
