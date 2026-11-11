@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hello_world_app/models/paper_width.dart';
 import 'package:hello_world_app/models/saved_printer.dart';
 import 'package:hello_world_app/screens/share_print_screen.dart';
+import 'package:hello_world_app/services/escpos_pdf_print.dart';
 import 'package:hello_world_app/services/label_print.dart';
 import 'package:hello_world_app/services/print_service.dart';
 import 'package:hello_world_app/services/printer_store.dart';
@@ -462,6 +463,29 @@ void main() {
 
     expect(payloads.last, hasLength(single.length * 3));
     expect(payloads.last, [...single, ...single, ...single]);
+  });
+
+  test('printSharedFile repeats a receipt ticket per copy', () async {
+    final dir = await Directory.systemTemp.createTemp('receipt-copies');
+    final file = File('${dir.path}/voucher.png');
+    final source = img.Image(width: 40, height: 20);
+    img.fill(source, color: img.ColorRgb8(255, 255, 255));
+    await file.writeAsBytes(img.encodePng(source));
+    addTearDown(() => dir.delete(recursive: true));
+
+    final payloads = <List<int>>[];
+    PrinterTransportFactory.testOverride = (_) => _Transport(<String>[], payloads);
+    final single =
+        await EscPosPdfPrint.buildImageFile(receipt(), filePath: file.path);
+
+    await PrintService().printSharedFile(
+        printer: receipt(), filePath: file.path, copies: 2);
+
+    final sent = payloads.last;
+    // La publicidad va antes del último corte: la primera copia sale intacta.
+    expect(sent.sublist(0, single.length), single);
+    expect(sent.sublist(single.length, single.length + 64), single.sublist(0, 64));
+    expect(sent.length, greaterThanOrEqualTo(single.length * 2));
   });
 
   // NOTA: no se agrega aquí una prueba de firstPage/lastPage con un PDF real

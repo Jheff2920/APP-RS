@@ -58,6 +58,7 @@ class PrivacyDataWipe {
     'redpos_license_v1',
     'redpos_used_nonces_v1',
     RedPosLicenseStore.playEntitlementKey,
+    RedPosLicenseStore.playVerifiedKey,
     RedPosLicenseStore.googleEmailKey,
   ];
 
@@ -86,6 +87,7 @@ class PrivacyDataWipe {
         'redpos_license_v1',
         'redpos_used_nonces_v1',
         RedPosLicenseStore.playEntitlementKey,
+        RedPosLicenseStore.playVerifiedKey,
         RedPosLicenseStore.googleEmailKey,
       ]);
 
@@ -137,7 +139,10 @@ class PrivacyDataWipe {
         final name = entity.uri.pathSegments.isEmpty
             ? ''
             : entity.uri.pathSegments.last.toLowerCase();
-        final looksOurs = name.contains('boleta') ||
+        // shared_incoming (Android) e incoming-* (iOS): archivos compartidos.
+        final looksOurs = name == 'shared_incoming' ||
+            name.startsWith('incoming-') ||
+            name.contains('boleta') ||
             name.contains('redpos') ||
             name.contains('sunat') ||
             name.endsWith('.pdf') ||

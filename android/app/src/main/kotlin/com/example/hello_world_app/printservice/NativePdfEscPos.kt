@@ -66,6 +66,12 @@ object NativePdfEscPos {
                         out.write(byteArrayOf(0x1b, 0x64, 0x01))
                     }
                 }
+                if (renderer.pageCount > pages) {
+                    // ASCII y sin ESC $ (la 480BL lo mide desde el borde del cabezal).
+                    out.write(byteArrayOf(0x0a, 0x1b, 0x61, 0x01))
+                    out.write("PDF recortado: $pages de ${renderer.pageCount} paginas".toByteArray(Charsets.US_ASCII))
+                    out.write(byteArrayOf(0x0a, 0x1b, 0x61, 0x00))
+                }
             }
         }
 

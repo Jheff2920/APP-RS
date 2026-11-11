@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -58,6 +59,10 @@ class EscPosPdfPrint {
       final bytes = <int>[...generator.reset()];
 
       final pages = math.min(doc.pagesCount, maxPages);
+      // Se imprime al final, antes del avance y corte.
+      final cutNotice = doc.pagesCount > maxPages
+          ? truncatedNotice(pages, doc.pagesCount)
+          : const <int>[];
       for (var i = 1; i <= pages; i++) {
         final page = await doc.getPage(i);
         try {
@@ -91,6 +96,7 @@ class EscPosPdfPrint {
         }
       }
 
+      bytes.addAll(cutNotice);
       // Ajustes de la impresora: margen inferior + corte + gaveta.
       bytes.addAll(
         EscPosFeed.finishJob(
@@ -110,6 +116,20 @@ class EscPosPdfPrint {
       await doc.close();
     }
   }
+
+  /// Aviso en el papel cuando el PDF supera el máximo de páginas. ASCII y sin
+  /// ESC $ (la 480BL lo mide desde el borde del cabezal).
+  static List<int> truncatedNotice(int printed, int total) => [
+        0x0a,
+        0x1b,
+        0x61,
+        0x01,
+        ...ascii.encode('PDF recortado: $printed de $total paginas'),
+        0x0a,
+        0x1b,
+        0x61,
+        0x00,
+      ];
 
   static Future<List<int>> buildImageFile(
     SavedPrinter printer, {
@@ -301,9 +321,8 @@ img.Image? _prepareBitmap(
   return _alignToFullWidth(
     work,
     fullWidth,
-    scaleToFill: trimChromeMargins ||
-        fitSharedImage ||
-        work.width > fullWidth + 8,
+    scaleToFill:
+        trimChromeMargins || fitSharedImage || work.width > fullWidth + 8,
   );
 }
 

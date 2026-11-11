@@ -141,60 +141,83 @@ class PrintService {
           return List<int>.generate(bytes.length * copies.clamp(1, 99),
               (i) => bytes[i % bytes.length]);
         }
-        Future<List<int>> pdf() {
-          if (systemMediaSizeId == null &&
-              printer.type == PrinterLinkType.network &&
-              NetworkLanChannel.isSupported) {
-            return timing.measure(
-              'native_raster',
-              () => NetworkLanChannel.rasterizePdf(
-                filePath: filePath,
-                paper: printer.paper.name,
-                bottomMm: printer.margins.bottomMm,
-                cut: printer.cut.name,
-                dpi: printer.dpi.value,
-                rasterScale: printer.rasterScale.factor,
-              ),
-            );
-          }
-          return EscPosPdfPrint.build(
-            printer,
-            filePath: filePath,
-            timing: timing,
+        // Recibos: el ticket completo (con su corte) se repite por copia.
+        final ticket = await _sharedReceipt(printer, filePath, lower, timing,
+            sunatNote: sunatNote,
             systemMediaSizeId: systemMediaSizeId,
-            mediaWidthMils: mediaWidthMils,
-          );
+            mediaWidthMils: mediaWidthMils);
+        final n = copies.clamp(1, 99);
+        if (ticket.length * n > LabelPrint.maxJobBytes) {
+          throw PrinterTransportException(tr(
+              'Reduce la cantidad de copias: el trabajo es demasiado grande.',
+              'Reduce the number of copies: the job is too large.'));
         }
+        return n == 1 ? ticket : [for (var i = 0; i < n; i++) ...ticket];
+      },
+    );
+  }
 
-        Future<List<int>> image() => EscPosPdfPrint.buildImageFile(
-              printer,
-              filePath: filePath,
-              timing: timing,
-            );
-
-        if (lower.endsWith('.pdf')) return pdf();
-        if (_isImage(lower)) return image();
-        // Capturas compartidas desde Yape/BCP pueden llegar sin extensión o
-        // con una equivocada: se decide por los primeros bytes.
-        switch (await sniffFileKind(filePath)) {
-          case SniffedKind.pdf:
-            return pdf();
-          case SniffedKind.image:
-            return image();
-          case SniffedKind.zip:
-          case null:
-            break;
-        }
-        if (await _isSunatXml(filePath) || lower.endsWith('.zip')) {
-          return _buildSunatTicket(printer, filePath, noteOverride: sunatNote);
-        }
-        throw PrinterTransportException(
-          tr(
-            'Formato no soportado. Usa PDF, imagen (PNG/JPG) o XML SUNAT.',
-            'Unsupported format. Use PDF, an image (PNG/JPG), or SUNAT XML.',
+  Future<List<int>> _sharedReceipt(
+    SavedPrinter printer,
+    String filePath,
+    String lower,
+    PrintTiming timing, {
+    String? sunatNote,
+    String? systemMediaSizeId,
+    int? mediaWidthMils,
+  }) async {
+    Future<List<int>> pdf() {
+      if (systemMediaSizeId == null &&
+          printer.type == PrinterLinkType.network &&
+          NetworkLanChannel.isSupported) {
+        return timing.measure(
+          'native_raster',
+          () => NetworkLanChannel.rasterizePdf(
+            filePath: filePath,
+            paper: printer.paper.name,
+            bottomMm: printer.margins.bottomMm,
+            cut: printer.cut.name,
+            dpi: printer.dpi.value,
+            rasterScale: printer.rasterScale.factor,
           ),
         );
-      },
+      }
+      return EscPosPdfPrint.build(
+        printer,
+        filePath: filePath,
+        timing: timing,
+        systemMediaSizeId: systemMediaSizeId,
+        mediaWidthMils: mediaWidthMils,
+      );
+    }
+
+    Future<List<int>> image() => EscPosPdfPrint.buildImageFile(
+          printer,
+          filePath: filePath,
+          timing: timing,
+        );
+
+    if (lower.endsWith('.pdf')) return pdf();
+    if (_isImage(lower)) return image();
+    // Capturas compartidas desde Yape/BCP pueden llegar sin extensión o
+    // con una equivocada: se decide por los primeros bytes.
+    switch (await sniffFileKind(filePath)) {
+      case SniffedKind.pdf:
+        return pdf();
+      case SniffedKind.image:
+        return image();
+      case SniffedKind.zip:
+      case null:
+        break;
+    }
+    if (await _isSunatXml(filePath) || lower.endsWith('.zip')) {
+      return _buildSunatTicket(printer, filePath, noteOverride: sunatNote);
+    }
+    throw PrinterTransportException(
+      tr(
+        'Formato no soportado. Usa PDF, imagen (PNG/JPG) o XML SUNAT.',
+        'Unsupported format. Use PDF, an image (PNG/JPG), or SUNAT XML.',
+      ),
     );
   }
 
@@ -369,7 +392,10 @@ class PrintService {
       rethrow;
     } finally {
       try {
-        await pendingConnect;
+        // Esperar la conexión nativa evita choques con el siguiente trabajo,
+        // pero con tope: un connect colgado no debe frenar la cola para siempre.
+        // Holgado a propósito: BT y TCP ya se rinden antes por su cuenta.
+        await pendingConnect?.timeout(const Duration(minutes: 2));
       } catch (_) {}
       try {
         await timing.measure('disconnect', transport.disconnect);

@@ -3,6 +3,7 @@ package com.example.hello_world_app
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import java.io.File
 import com.example.hello_world_app.printservice.UsbEscPos
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -89,6 +90,16 @@ class MainActivity : FlutterActivity() {
         val copies = intent.getIntExtra("copies", 1)
         val snapshot = intent.getStringExtra("printerSnapshot")
         listOf("mediaSizeId", "mediaWidthMils", "mediaHeightMils", "copies", "printerSnapshot").forEach { intent.removeExtra(it) }
+        // La actividad es exportada y Flutter borra esta ruta al terminar: solo se
+        // aceptan los PDF temporales que copia BoletaPrintService en cacheDir.
+        val file = File(path).canonicalFile
+        if (file.parentFile != cacheDir.canonicalFile ||
+            !file.name.startsWith("system_print_") ||
+            !file.name.endsWith(".pdf")
+        ) {
+            Log.w("MainActivity", "system_print_path rechazado")
+            return
+        }
         val payload = mapOf(
             "filePath" to path,
             "printerId" to printerId,

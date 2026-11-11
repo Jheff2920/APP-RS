@@ -38,6 +38,23 @@ void main() {
     expect(parsed.lines.first.description, contains('ROLLO'));
   });
 
+  test('ZIP con demasiados archivos se rechaza sin descomprimirlo', () async {
+    final zip = Archive();
+    for (var i = 0; i < 60; i++) {
+      final b = utf8Xml('<x/>');
+      zip.addFile(ArchiveFile('f$i.xml', b.length, b));
+    }
+    final file = File(
+      '${Directory.systemTemp.path}/sunat_many_${DateTime.now().microsecondsSinceEpoch}.zip',
+    );
+    await file.writeAsBytes(ZipEncoder().encode(zip), flush: true);
+    addTearDown(() => file.deleteSync());
+    await expectLater(
+      SunatXmlSource.load(file.path),
+      throwsA(isA<SunatXmlException>()),
+    );
+  });
+
   test('ZIP de factura SUNAT elige el Invoice y no el CDR', () async {
     final xml = utf8Xml(_facturaZipXml);
     final cdr = utf8Xml(

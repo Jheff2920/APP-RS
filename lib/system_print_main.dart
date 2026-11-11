@@ -293,7 +293,9 @@ class SystemPrintUiHandler {
     } catch (e) {
       await _notify(token: token, ok: false, message: friendlyError(e));
     } finally {
-      if (rawPath.isNotEmpty) {
+      // Solo se borran copias temporales del PrintService, nunca otra ruta.
+      final name = rawPath.split(RegExp(r'[\\/]')).last;
+      if (name.startsWith('system_print_') && name.endsWith('.pdf')) {
         try {
           await File(rawPath).delete();
         } catch (_) {

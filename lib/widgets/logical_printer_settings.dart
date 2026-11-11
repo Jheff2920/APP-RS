@@ -43,10 +43,11 @@ class LogicalPrinterSettings extends StatelessWidget {
             printerId: printerId,
             newId: PrinterStore().newId()));
     if (result == null) return;
-    onProfilesChanged([
-      ...profiles.where((p) => p.paperProfileId != result.paperProfileId),
-      result
-    ]);
+    // Reemplazar en su lugar: si no hay predeterminado explícito, manda el primero.
+    final i =
+        profiles.indexWhere((p) => p.paperProfileId == result.paperProfileId);
+    onProfilesChanged(
+        i < 0 ? [...profiles, result] : ([...profiles]..[i] = result));
   }
 
   @override

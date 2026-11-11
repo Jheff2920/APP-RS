@@ -103,7 +103,19 @@ class SunatXmlSource {
         (bytes[2] == 0x03 || bytes[2] == 0x05 || bytes[2] == 0x07);
   }
 
+  // Un ZIP de SUNAT trae 1 o 2 XML de pocos KB: más que esto no es un CPE.
+  static const _maxZipBytes = 10 * 1024 * 1024;
+  static const _maxZipFiles = 50;
+  static const _maxXmlBytes = 5 * 1024 * 1024;
+
   static List<int> _xmlFromZip(List<int> bytes) {
+    final tooBig = SunatXmlException(
+      tr(
+        'El ZIP es demasiado grande para ser un comprobante de SUNAT.',
+        'The ZIP is too large to be a SUNAT receipt.',
+      ),
+    );
+    if (bytes.length > _maxZipBytes) throw tooBig;
     final Archive archive;
     try {
       archive = ZipDecoder().decodeBytes(bytes, verify: false);
@@ -116,6 +128,7 @@ class SunatXmlSource {
       );
     }
 
+    if (archive.files.length > _maxZipFiles) throw tooBig;
     final xmlFiles = archive.files.where((f) {
       if (!f.isFile) return false;
       return p.basename(f.name).toLowerCase().endsWith('.xml');
@@ -145,7 +158,9 @@ class SunatXmlSource {
       orElse: () => xmlFiles.first,
     );
 
+    if (cpe.size > _maxXmlBytes) throw tooBig;
     final content = cpe.readBytes();
+    if (content != null && content.length > _maxXmlBytes) throw tooBig;
     if (content == null || content.isEmpty) {
       throw SunatXmlException(
         tr(
