@@ -89,6 +89,7 @@
 
 - Keystore upload: `android/upload-keystore.jks` + `android/key.properties` **solo en PC Windows RS-Soporte**, gitignored. Plantilla: `android/key.properties.example`.
 - AAB Play / APK: salen a `inst-apk\` como `RedPOS-Service-*-play.aab` / APKs (carpeta **no** va a git).
+- Gradle desde la sesión del agente funciona otra vez (2026-11-11): `flutter build apk --debug --target-platform android-arm64` y `android\\gradlew :app:testDebugUnitTest`.
 - `REDPOS_API` ya tiene por defecto `https://redpos-codigos-prueba.vercel.app` (desde 1.8.9+56). Pasarlo vacío (`--dart-define=REDPOS_API=`) vuelve a activar solo en el teléfono: **nunca** en release.
 - Compilar (el define es opcional pero se mantiene explícito):
 
@@ -326,15 +327,14 @@ cuando el nombre no la trae (antes se guardaban como `sunat_*.xml` y fallaban). 
 `sniffFileKind()` (`print_service.dart`) detecta PNG/JPG/WebP/GIF/PDF/ZIP por cabecera antes del
 chequeo SUNAT. Pendiente: probar compartir desde Yape y BCP con la build +51.
 
-Gradle desde la sesión del agente falla por WinNAT (`Unable to establish loopback connection`);
-compilar desde la terminal del usuario.
+Gradle desde la sesión del agente fallaba por WinNAT (`Unable to establish loopback connection`); desde 2026-11-11 compila.
 
 ### Próximos pasos (en orden)
 
-1. ~~Publicar `admin-web` en Vercel~~ hecho 2026-11-11 (panel nuevo, estado pendiente y rechazo de keys no generadas verificados en línea)
-2. Compilar AAB `1.8.9+56` desde la terminal del usuario, copiarlo a `inst-apk\` y subirlo a Play Console (Play tiene 55 sin servidor)
-3. Probar con una key nueva en un equipo con la 56: debe aparecer «usada» en `/control.html`
-4. Publicar en Vercel `admin-web/public` (privacidad, términos y sus versiones en inglés cambiaron de texto)
+1. Confirmar que `REDPOS_STAFF_PASSWORD` existe en Vercel (ya no hay clave de respaldo) y publicar `admin-web` **antes** de subir la 56: `npx vercel --prod` dentro de `admin-web/` (el usuario publica así; el push a `main` no publica).
+2. Compilar AAB y APK `1.8.9+56` (comandos en «Firma y builds»), copiar a `inst-apk\` y subir la AAB a Play Console.
+3. Play Console → Seguridad de los datos: declarar «ID de dispositivo u otros» (funcionalidad de la app y prevención de fraude, no compartido, cifrado en tránsito).
+4. Probar en teléfono real: activar una key nueva (debe salir «usada» y «Ligada a un teléfono» en el panel), desinstalar, reinstalar y volver a activarla (debe aceptarla); «Imprimir» desde otra app (system print); 2 copias de un recibo; PDF de más de 8 páginas (sale el aviso).
 5. Probar en equipo real (Lenovo y Telpo) con letra grande, rotación y densidad alterada; imprimir de prueba en el Telpo
 
 ---
@@ -362,8 +362,17 @@ compilar desde la terminal del usuario.
   - *Riesgo que queda:* las instalaciones que activaron con la 55 siguen activas y no hay registro de qué key usaron; en esa ventana una key pudo usarse en varios teléfonos.
   - *Validado:* 161 pruebas Flutter y pruebas de admin-web.
   - *Panel `control.html` rediseñado:* resumen como ticket térmico que «sale» de una ranura (única animación, respeta reduced-motion), entrada con clave, pestañas con contadores (Todas/Pendientes/Disponibles/Usadas), buscador de key, precio por defecto y por key, link a «Generar keys». Nuevo estado **Pendiente** (key entregada sin saber si la activaron): `POST /api/pending` `{nonce, pending}`, campo `pending` en `code:<nonce>`; al activarse se borra. Fuentes: Schibsted Grotesk (UI) y Martian Mono (ticket y keys), colores de `lib/theme.dart`. Probado en local con copia de los datos (escritorio 1366 px y celular).
-  - *Publicar:* en línea desde 2026-11-11 15:06 UTC. Los commits de `main` no muestran estados de Vercel; si un push no publica, usar `npx vercel login` y `npx vercel --prod` dentro de `admin-web/` (la carpeta ya está vinculada al proyecto). La rama `test/redpos-vercel-codigos` ya no se usa. `RP-XVTA-VWKG-3JFN` quedó marcada como pendiente.
-  - *Abierto de la auditoría 2026-11-02:* bloqueante #1 (`MainActivity` acepta `system_print_path` sin validar y Flutter borra esa ruta) y #2 (fallback `R100301S` en `admin-web/lib/staff.js`; confirmar `REDPOS_STAFF_PASSWORD` en Vercel antes de quitarlo).
+  - *Publicar:* el usuario publica `admin-web` con `npx vercel --prod` desde su propia terminal (`npx vercel login` la primera vez); el push a `main` **no** publica. La rama `test/redpos-vercel-codigos` ya no se usa. `RP-XVTA-VWKG-3JFN` quedó marcada como pendiente.
+
+- **1.8.9+56 (2026-11-11, segunda parte) — reinstalar sin perder la key y auditoría cerrada:**
+  - *Reinstalar:* al canjear, Android manda `device` = SHA-256 de `redpos-device-v1|ANDROID_ID|nonce` (método `deviceId` en `PrintersNativePrefsPlugin`). El servidor liga la key a ese valor: el mismo teléfono la reactiva solo (`again: true`). iOS manda vacío. Actualizar la app no borra la licencia (SharedPreferences sobrevive); desinstalar sí.
+  - *Panel:* «Liberar» (campo `rebind`, vale una vez; si se usa sin `device`, borra el teléfono anterior), «Cliente» (`note`, 120 caracteres, lo escribe el dueño para reconocer al comprador), estado «Ligada a un teléfono / Sin teléfono registrado» y fecha «Reactivada». Endpoint único `POST /api/key` `{nonce, pending|release|note}` (reemplaza `/api/pending`).
+  - *Servidor:* primera activación con `HSETNX usedAt` y liberación con `HDEL rebind` (atómicos: dos teléfonos a la vez no ganan ambos); `usedAt` basta para contar la key como usada; `kv()` lanza error si falla un comando del pipeline. Ya no se escribe `used:<nonce>` (nada lo leía). Prueba `admin-web/test/kv.test.js` con Redis en memoria y pipelines intercalados.
+  - *Suscripción Play:* se recupera sola al reinstalar con la misma cuenta de Google (`refresh()` al iniciar) o con «Ya pagué: restaurar compra». Ahora caduca si Play no la confirma en 35 días (`redpos_play_verified_v1`); sin fecha (versión anterior) el plazo empieza al leerla.
+  - *Auditoría 2026-11-02:* #1 `MainActivity` solo acepta `cacheDir/system_print_*.pdf` y Dart solo borra esos nombres; #2 sin `R100301S` (alias y clave de respaldo; comparación en tiempo constante; sin `REDPOS_STAFF_PASSWORD` no entra nadie al generador); #4 resuelto por `REDPOS_API` por defecto; #5 caducidad de Play; #6 espera de la conexión con tope de 2 minutos; #7 copias de recibos (tope `LabelPrint.maxJobBytes`); #8 aviso «PDF recortado: N de M paginas» en papel (Dart y Kotlin, ASCII sin `ESC $`); #9 el borrado de privacidad incluye `shared_incoming` e `incoming-*`; #10 ZIP SUNAT con límites (10 MB, 50 archivos, XML de 5 MB); #11 editar un tamaño de etiqueta lo reemplaza en su lugar. Sin cambio a propósito: #3 (firmar el pase local necesitaría un secreto dentro de la app) y #12 (riesgo bajo).
+  - *Riesgo aceptado (2.ª revisión de Codex):* el reclamo (`HSETNX`/`HDEL`) y la escritura del teléfono van en dos pedidos; si se pulsa «Liberar» en los ~100 ms entre ambos o el KV falla justo ahí, hay que volver a liberar a mano. Cerrarlo del todo pide un script Lua (`EVAL`) probado contra Upstash real. El tope de 2 min de la conexión no cancela el connect nativo (en BT `closeHeld` ya espera al `openHeld`); validar en hardware.
+  - *Revisión:* Codex (`codex exec --sandbox read-only`, con el diff por stdin porque su sandbox en Windows no lee el repo) encontró 1 bloqueante y 6 importantes; corregidos. Gradle ya compila desde la sesión del agente (debug arm64 y `testDebugUnitTest` pasan).
+  - *Privacidad:* textos de la app, `privacidad.html`, `privacy.html` y `docs/PRIVACIDAD.md` describen el valor anónimo (solo Android), el límite de iPhone y el campo «Cliente». Ya no se envía la dirección de la impresora al canjear (el servidor no la usaba).
 
 - **1.8.9+55 (2026-11-10) — impresora 4" 480BL y pie de publicidad:**
   - *Problema:* en la 480BL (cabezal 4", rollo de 80 mm al centro) el texto salía cortado con «~», corrido a la izquierda y desalineado del título/pie; el usuario compensaba con margen izquierdo 20 mm (el máximo), que quitaba 13 columnas.
