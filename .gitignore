@@ -81,3 +81,7 @@ design-assets/brand-page-*.png
 android/build/
 android/.kotlin/
 releases
+
+# Estado local de herramientas de agentes (worktrees, skills descargadas)
+.claude/
+.cursor/
