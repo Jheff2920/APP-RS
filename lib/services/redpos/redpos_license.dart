@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -37,6 +38,11 @@ class RedPosLicenseStore {
   static const _key = 'redpos_license_v1';
   static const _usedKey = 'redpos_used_nonces_v1';
   static const playEntitlementKey = 'redpos_play_sub_v1';
+  static const playVerifiedKey = 'redpos_play_verified_v1';
+
+  /// Sin revalidar con Google Play en este tiempo, la suscripción ya no quita
+  /// la publicidad (por ejemplo, la cancelaron y el equipo no tiene Play).
+  static const playGrace = Duration(days: 35);
   static const googleEmailKey = 'redpos_google_email_v1';
   static const _nativeChannel = MethodChannel('boleta_print/printers_prefs');
 
@@ -62,12 +68,25 @@ class RedPosLicenseStore {
     if (await _loadToken(reloadDisk: reloadDisk) != null) return true;
     final prefs = await _ensurePrefs();
     if (reloadDisk) await prefs.reload();
-    return prefs.getBool(playEntitlementKey) == true;
+    if (prefs.getBool(playEntitlementKey) != true) return false;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final at = prefs.getInt(playVerifiedKey);
+    if (at == null) {
+      // Guardado por una versión anterior: el plazo empieza ahora.
+      await prefs.setInt(playVerifiedKey, now);
+      return true;
+    }
+    return now - at < playGrace.inMilliseconds;
   }
 
   Future<void> setPlayEntitlement(bool active) async {
     final prefs = await _ensurePrefs();
     await prefs.setBool(playEntitlementKey, active);
+    if (active) {
+      await prefs.setInt(playVerifiedKey, DateTime.now().millisecondsSinceEpoch);
+    } else {
+      await prefs.remove(playVerifiedKey);
+    }
   }
 
   /// Correo de Google usado al pagar. Solo vive en SharedPreferences de este
@@ -96,6 +115,7 @@ class RedPosLicenseStore {
     await prefs.remove(_key);
     await prefs.remove(_usedKey);
     await prefs.remove(playEntitlementKey);
+    await prefs.remove(playVerifiedKey);
     await prefs.remove(googleEmailKey);
     await _syncNative(false);
   }
@@ -141,7 +161,6 @@ class RedPosLicenseStore {
   Future<RedPosRedeemResult> redeem(
     String code, {
     required PrinterStore store,
-    String? address,
   }) async {
     final verified = RedPosCode.verify(code);
     if (!verified.ok || verified.nonce == null) {
@@ -156,17 +175,21 @@ class RedPosLicenseStore {
     if (api.isNotEmpty) {
       try {
         final error = await (activateForTest?.call(code.trim()) ??
-            _activateOnServer(api, code: code.trim(), address: address ?? ''));
+            _activateOnServer(
+              api,
+              code: code.trim(),
+              device: await _deviceHash(verified.nonce!),
+            ));
         if (error != null) {
           return RedPosRedeemResult(
             ok: false,
             adsFree: false,
             message: switch (error) {
               'used' => tr(
-                  'Este código ya fue usado. Cada código sirve para una sola '
-                      'instalación.',
-                  'This code was already used. Each code works for one '
-                      'install only.',
+                  'Este código ya se activó en otro teléfono. Si cambiaste de '
+                      'teléfono, pide a Red Soluciones que lo libere.',
+                  'This code was already activated on another phone. If you '
+                      'changed phones, ask Red Soluciones to release it.',
                 ),
               'unknown' || 'invalid' => tr(
                   'Este código no existe. Pide uno nuevo a Red Soluciones.',
@@ -226,11 +249,23 @@ class RedPosLicenseStore {
     );
   }
 
+  /// Hash del ANDROID_ID con el código: el servidor reconoce este teléfono al
+  /// reinstalar sin poder seguirlo entre keys. iOS no lo tiene: vacío.
+  Future<String> _deviceHash(String nonce) async {
+    try {
+      final id = await _nativeChannel.invokeMethod<String>('deviceId');
+      if (id == null || id.isEmpty) return '';
+      return sha256.convert(utf8.encode('redpos-device-v1|$id|$nonce')).toString();
+    } catch (_) {
+      return '';
+    }
+  }
+
   /// `null` si el servidor la aceptó; si no, su `error` (`used`, `unknown`…).
   Future<String?> _activateOnServer(
     String apiBase, {
     required String code,
-    required String address,
+    required String device,
   }) async {
     final uri = Uri.parse(apiBase).resolve('/api/activate');
     final client = HttpClient();
@@ -241,7 +276,7 @@ class RedPosLicenseStore {
         utf8.encode(
           jsonEncode({
             'code': code,
-            'address': address,
+            'device': device,
           }),
         ),
       );

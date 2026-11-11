@@ -16,6 +16,35 @@ void main() {
     expect(await store.isAdsFree(reloadDisk: false), isTrue);
   });
 
+  test('play entitlement expires if Play does not confirm it again', () async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    Future<bool> adsFreeWith(int? verifiedAt) async {
+      SharedPreferences.setMockInitialValues({
+        RedPosLicenseStore.playEntitlementKey: true,
+        if (verifiedAt != null) RedPosLicenseStore.playVerifiedKey: verifiedAt,
+      });
+      final prefs = await SharedPreferences.getInstance();
+      return RedPosLicenseStore(prefs: prefs).isAdsFree(reloadDisk: false);
+    }
+
+    final day = const Duration(days: 1).inMilliseconds;
+    expect(await adsFreeWith(now - 2 * day), isTrue);
+    expect(await adsFreeWith(now - 36 * day), isFalse);
+    // Guardado por una versión anterior (sin fecha): el plazo empieza ahora.
+    expect(await adsFreeWith(null), isTrue);
+    final legacy = await SharedPreferences.getInstance();
+    expect(legacy.getInt(RedPosLicenseStore.playVerifiedKey), isNotNull);
+
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final store = RedPosLicenseStore(prefs: prefs);
+    await store.setPlayEntitlement(true);
+    expect(prefs.getInt(RedPosLicenseStore.playVerifiedKey), isNotNull);
+    await store.setPlayEntitlement(false);
+    expect(prefs.getInt(RedPosLicenseStore.playVerifiedKey), isNull);
+    expect(await store.isAdsFree(reloadDisk: false), isFalse);
+  });
+
   test('google email persists in local prefs', () async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();

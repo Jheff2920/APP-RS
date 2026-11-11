@@ -29,7 +29,11 @@ Contacto: jcefe.2920@gmail.com
 - Pase de licencia/código, entitlement Play, correo Google si te suscribes
 
 **Hacia RedPOS:** solo canje de código de activación cuando la API está configurada  
-(código + identificador opcional de impresora). **No** se sube PDF/imagen/XML de la boleta.
+(código + hash anónimo del teléfono: SHA-256 de `ANDROID_ID` con el código, solo Android; permite reactivar
+la misma key al reinstalar en el mismo teléfono). **No** se sube PDF/imagen/XML de la boleta.
+Play Console → Seguridad de los datos: declarar «ID de dispositivo u otros» (funcionalidad de la app,
+prevención de fraude), no compartido, cifrado en tránsito. En iOS no se envía (se libera desde el panel).
+El panel `control.html` puede guardar nombre o contacto del cliente por key (campo «Cliente», lo escribe el dueño).
 
 **No incluimos** SDK de Firebase, Crashlytics, Google Analytics ni AdMob, ni tracking publicitario.  
 Los servicios de Google que sí usa la app (Google Play Billing y Google Sign-In) pueden enviar a Google

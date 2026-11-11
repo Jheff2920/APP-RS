@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import com.example.hello_world_app.printservice.PrinterJobCoordinator
 import java.util.concurrent.Executors
 import java.util.concurrent.ConcurrentHashMap
@@ -94,6 +95,13 @@ class PrintersNativePrefsPlugin : FlutterPlugin, MethodChannel.MethodCallHandler
                     .commit()
                 Log.i(TAG, "Synced adsFree=$adsFree")
                 result.success(null)
+            }
+            // Por app y firma: sobrevive a reinstalar, cambia con un reseteo de fábrica.
+            "deviceId" -> {
+                val ctx = appContext
+                result.success(
+                    ctx?.let { Settings.Secure.getString(it.contentResolver, Settings.Secure.ANDROID_ID) } ?: "",
+                )
             }
             else -> result.notImplemented()
         }

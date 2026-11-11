@@ -170,12 +170,11 @@ Future<void> showUnlockOptionsSheet({
 Future<bool> showRedPosActivateDialog({
   required BuildContext context,
   required PrinterStore store,
-  String? address,
   VoidCallback? onActivated,
 }) async {
   final ok = await showDialog<bool>(
     context: context,
-    builder: (ctx) => _ActivateCodeDialog(store: store, address: address),
+    builder: (ctx) => _ActivateCodeDialog(store: store),
   );
   if (ok != true) return false;
   onActivated?.call();
@@ -220,10 +219,9 @@ Future<void> showRedPosRedeemResultDialog(
 }
 
 class _ActivateCodeDialog extends StatefulWidget {
-  const _ActivateCodeDialog({required this.store, this.address});
+  const _ActivateCodeDialog({required this.store});
 
   final PrinterStore store;
-  final String? address;
 
   @override
   State<_ActivateCodeDialog> createState() => _ActivateCodeDialogState();
@@ -248,7 +246,6 @@ class _ActivateCodeDialogState extends State<_ActivateCodeDialog> {
     final result = await RedPosLicenseStore.instance.redeem(
       _ctrl.text,
       store: widget.store,
-      address: widget.address,
     );
     if (!mounted) return;
     if (!result.ok) {

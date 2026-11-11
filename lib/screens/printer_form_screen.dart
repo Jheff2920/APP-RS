@@ -891,7 +891,6 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
         final result = await RedPosLicenseStore.instance.redeem(
           code,
           store: widget.store,
-          address: _addressCtrl.text.trim(),
         );
         if (!mounted) return;
         if (!result.ok) {

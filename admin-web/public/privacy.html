@@ -20,7 +20,7 @@
 
   <h2>2. What is and is not collected</h2>
   <p><strong>On your device (stored only there):</strong> the printers you pair (name, type, Bluetooth address, IP, or USB), margins and cut, print history, your custom ticket templates (with logos), SUNAT ticket settings and logo, the activation code, subscription status and, if you subscribe, the Google email you used to pay.</p>
-  <p><strong>To RedPOS:</strong> only the redemption of an activation code (the code and, if you provide it, a printer identifier). We do <strong>not</strong> upload your PDFs, images, or XML/ZIP files to any RedPOS server in order to print them.</p>
+  <p><strong>To RedPOS:</strong> only the redemption of an activation code (the code and, on Android, an anonymous value computed from the phone identifier and the code itself, so you can reactivate it if you reinstall the app on the same phone; it cannot identify you or track you across codes. It is not sent on iPhone: if you reinstall, write to us to release it). We do <strong>not</strong> upload your PDFs, images, or XML/ZIP files to any RedPOS server in order to print them.</p>
   <p>The app does <strong>not</strong> include Firebase, Crashlytics, Google Analytics, AdMob, or ad-tracking tools. The Google services it does use (Google Play billing and Google sign-in) may send Google technical data of their own, under Google's privacy policy. You do not need a RedPOS account to print.</p>
 
   <h2>3. Artificial intelligence</h2>
@@ -30,7 +30,7 @@
   <ul>
     <li><strong>Google Play:</strong> bills the monthly subscription.</li>
     <li><strong>Google sign-in:</strong> only when you buy the subscription; the email may be stored on your device.</li>
-    <li><strong>RedPOS activation code service:</strong> redeems the activation code. It receives the code and, if you provide it, an identifier of your printer, over a secure connection.</li>
+    <li><strong>RedPOS activation code service:</strong> redeems the activation code. It receives the code and, on Android, the anonymous phone value described above, over a secure connection.</li>
     <li><strong>Email, web, and WhatsApp:</strong> they open in their own apps only when you choose to.</li>
     <li><strong>Printing:</strong> Bluetooth, USB, or the local network; it happens between your device and your printer.</li>
   </ul>
@@ -55,7 +55,7 @@
   <h2>9. Users in the European Union (GDPR)</h2>
   <p>If you use the app from the European Union (for example, Spain), this adds to the above. The controller is the one in section 1.</p>
   <ul>
-    <li><strong>What data we process:</strong> almost everything stays on your device and we never see it. In our service we only keep the record that an activation code was already used (the code and the date) and technical connection data, such as the IP address, which the hosting provider processes to serve the request. If you write to us, we use your email to reply.</li>
+    <li><strong>What data we process:</strong> almost everything stays on your device and we never see it. In our service we only keep the record that an activation code was already used (the code, the date, and the anonymous value of the phone that activated it) and technical connection data, such as the IP address, which the hosting provider processes to serve the request. If you bought a lifetime license, we may also note your name or contact next to the code to recognize you if you ask us to release it. If you write to us, we use your email to reply.</li>
     <li><strong>Why and legal basis:</strong> activating the code you ask for and preventing it from being used twice (performance of the service and legitimate interest in preventing fraud), and answering your questions.</li>
     <li><strong>How long:</strong> the code record is kept while the code remains valid, so it cannot be reused; you can ask for it to be deleted. Your support emails, as long as needed to resolve your question. Deletion requests (email and date), up to 90 days.</li>
     <li><strong>Transfers:</strong> the redemption service servers may be outside the European Union, for example in the United States.</li>

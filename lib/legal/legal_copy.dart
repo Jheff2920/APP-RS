@@ -130,9 +130,17 @@ class LegalCopy {
           )
         : l(
             'El servicio de canje de RedPOS (conexión segura) recibe el código y, '
-            'si lo indicas, un identificador de tu impresora.',
+            'en Android, un código anónimo calculado a partir del identificador '
+            'del teléfono y del propio código, que no sirve para identificarte '
+            'ni para seguirte entre códigos. Así puedes volver a activarlo si '
+            'reinstalas la app en el mismo teléfono. En iPhone no se envía: si '
+            'reinstalas, escríbenos para liberarlo.',
             'The RedPOS redemption service (secure connection) receives the code '
-            'and, if you provide it, an identifier of your printer.',
+            'and, on Android, an anonymous value computed from the phone '
+            'identifier and the code itself, which cannot identify you or track '
+            'you across codes. This lets you activate it again if you reinstall '
+            'the app on the same phone. It is not sent on iPhone: if you '
+            'reinstall, write to us to release it.',
           );
     return [
       LegalSection(
@@ -155,7 +163,9 @@ class LegalCopy {
           'suscripción y, si te suscribes, el correo de Google que usaste al '
           'pagar.\n\n'
           'Hacia RedPOS: solo el canje de un código de activación (el código y, '
-          'si lo indicas, un identificador de la impresora). No subimos tus PDF, '
+          'en Android, un código anónimo del teléfono calculado junto con el '
+          'código). '
+          'No subimos tus PDF, '
           'imágenes ni XML/ZIP a ningún servidor de RedPOS para imprimirlos.\n\n'
           'La app no incluye Firebase, Crashlytics, Google Analytics, AdMob ni '
           'herramientas de seguimiento publicitario. Los servicios de Google que '
@@ -167,8 +177,10 @@ class LegalCopy {
           'custom ticket templates (with logos), SUNAT ticket settings and logo, '
           'the activation code, subscription status and, if you subscribe, the '
           'Google email you used to pay.\n\n'
-          'To RedPOS: only the redemption of an activation code (the code and, if '
-          'you provide it, a printer identifier). We do not upload your PDFs, '
+          'To RedPOS: only the redemption of an activation code (the code and, on '
+          'Android, an anonymous phone value computed together with the code). '
+          'We do not '
+          'upload your PDFs, '
           'images, or XML/ZIP files to any RedPOS server in order to print them.\n\n'
           'The app does not include Firebase, Crashlytics, Google Analytics, AdMob, '
           'or ad-tracking tools. The Google services it does use (Google Play '
@@ -290,9 +302,12 @@ class LegalCopy {
           'suma a lo anterior. El responsable es el de la sección 1.\n\n'
           '• Qué datos tratamos: casi todo se queda en tu equipo y no lo vemos. '
           'En nuestro servicio solo queda el registro de que un código de '
-          'activación ya se usó (el código y la fecha) y los datos técnicos de la '
+          'activación ya se usó (el código, la fecha y el código anónimo del '
+          'teléfono que lo activó) y los datos técnicos de la '
           'conexión, como la dirección IP, que el proveedor de alojamiento '
-          'procesa para atender la solicitud. Si nos escribes, usamos tu correo '
+          'procesa para atender la solicitud. Si compraste una licencia de por '
+          'vida, también podemos anotar tu nombre o contacto junto al código '
+          'para reconocerte si pides liberarlo. Si nos escribes, usamos tu correo '
           'para responderte.\n'
           '• Para qué y con qué base legal: activar el código que tú pides y '
           'evitar que se use dos veces (ejecución del servicio e interés legítimo '
@@ -313,9 +328,12 @@ class LegalCopy {
           'adds to the above. The controller is the one in section 1.\n\n'
           '• What data we process: almost everything stays on your device and we '
           'never see it. In our service we only keep the record that an '
-          'activation code was already used (the code and the date) and '
+          'activation code was already used (the code, the date, and the '
+          'anonymous value of the phone that activated it) and '
           'technical connection data, such as the IP address, which the hosting '
-          'provider processes to serve the request. If you write to us, we use '
+          'provider processes to serve the request. If you bought a lifetime '
+          'license, we may also note your name or contact next to the code to '
+          'recognize you if you ask us to release it. If you write to us, we use '
           'your email to reply.\n'
           '• Why and legal basis: activating the code you ask for and preventing '
           'it from being used twice (performance of the service and legitimate '

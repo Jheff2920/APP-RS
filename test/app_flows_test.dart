@@ -536,7 +536,7 @@ void main() {
       await settle(t, rounds: 10);
       expect(sent, [code]);
       expect(find.text('Código no activado'), findsOneWidget);
-      expect(find.textContaining('ya fue usado'), findsWidgets);
+      expect(find.textContaining('otro teléfono'), findsWidgets);
       await tapText(t, 'Entendido');
       expect(find.text('Versión gratuita'), findsOneWidget);
 

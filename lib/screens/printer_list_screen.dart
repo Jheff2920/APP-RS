@@ -467,7 +467,6 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
                           showRedPosActivateDialog(
                             context: context,
                             store: widget.store,
-                            address: printer.address,
                             onActivated: _reload,
                           );
                         }),
