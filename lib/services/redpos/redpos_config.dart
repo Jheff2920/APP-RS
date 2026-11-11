@@ -7,8 +7,12 @@ class RedPosConfig {
     defaultValue: 'REDPOS-PRUEBA-NO-USAR-EN-PRODUCCION',
   );
 
-  /// Si no está vacío, la app intenta canjear el código en este servidor.
-  static const apiBase = String.fromEnvironment('REDPOS_API', defaultValue: '');
+  /// Servidor que canjea y registra cada código. Por defecto el de Vercel: un
+  /// build sin `--dart-define` activaba solo en el teléfono (Play 1.8.9+55).
+  static const apiBase = String.fromEnvironment(
+    'REDPOS_API',
+    defaultValue: 'https://redpos-codigos-prueba.vercel.app',
+  );
 
   static const siteUrl = String.fromEnvironment(
     'REDPOS_SITE',

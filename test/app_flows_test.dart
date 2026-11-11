@@ -513,17 +513,47 @@ void main() {
       await t.enterText(find.byType(TextField), 'RP-AAAA-BBBB-CCCC');
       await tapText(t, 'Activar');
       await settle(t, rounds: 10);
+      expect(find.text('Código no activado'), findsOneWidget);
+      await tapText(t, 'Entendido');
       expect(find.text('Código no válido'), findsOneWidget);
       expect(find.text('Versión gratuita'), findsOneWidget);
 
-      await t.enterText(find.byType(TextField), RedPosCode.generate());
+      // Firma válida pero el servidor la rechaza (ya usada): no se activa.
+      final sent = <String>[];
+      String? serverError = 'used';
+      RedPosLicenseStore.activateForTest = (code) async {
+        sent.add(code);
+        return serverError;
+      };
+      addTearDown(() => RedPosLicenseStore.activateForTest = null);
+      final code = RedPosCode.generate();
+      // Escrito en minúsculas y sin guiones; el campo lo completa.
+      await t.enterText(
+        find.byType(TextField),
+        code.substring(3).replaceAll('-', '').toLowerCase(),
+      );
+      await tapText(t, 'Activar');
+      await settle(t, rounds: 10);
+      expect(sent, [code]);
+      expect(find.text('Código no activado'), findsOneWidget);
+      expect(find.textContaining('ya fue usado'), findsWidgets);
+      await tapText(t, 'Entendido');
+      expect(find.text('Versión gratuita'), findsOneWidget);
+
+      serverError = 'unknown';
+      await tapText(t, 'Activar');
+      await settle(t, rounds: 10);
+      expect(find.textContaining('no existe'), findsWidgets);
+      await tapText(t, 'Entendido');
+
+      serverError = null;
       await tapText(t, 'Activar');
       await settle(t, rounds: 15);
+      expect(find.text('Código activado'), findsOneWidget);
+      expect(find.textContaining(code), findsWidgets); // campo y aviso
+      await tapText(t, 'Entendido');
+      await settle(t, rounds: 6);
       expect(find.text('Versión gratuita'), findsNothing);
-      expect(
-        find.text('Publicidad desactivada en esta instalación'),
-        findsOneWidget,
-      );
       expect(
         await t.runAsync(
           () => RedPosLicenseStore.instance.isAdsFree(reloadDisk: false),

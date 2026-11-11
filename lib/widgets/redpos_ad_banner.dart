@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/app_lang.dart';
 import '../services/printer_store.dart';
+import '../services/redpos/redpos_code.dart';
 import '../services/redpos/redpos_license.dart';
 import '../theme.dart';
 import 'redpos_unlock_actions.dart';
@@ -176,23 +177,46 @@ Future<bool> showRedPosActivateDialog({
     context: context,
     builder: (ctx) => _ActivateCodeDialog(store: store, address: address),
   );
-  if (ok == true) {
-    onActivated?.call();
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            L.of(context)(
-              'Publicidad desactivada en esta instalación',
-              'Ads turned off on this install',
-            ),
-          ),
+  if (ok != true) return false;
+  onActivated?.call();
+  return true;
+}
+
+/// Aviso claro de si el código quedó activado o fue rechazado (y por qué).
+Future<void> showRedPosRedeemResultDialog(
+  BuildContext context, {
+  required String code,
+  required RedPosRedeemResult result,
+}) {
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) {
+      final l = L.of(ctx);
+      return AlertDialog(
+        scrollable: true,
+        icon: Icon(
+          result.ok ? Icons.check_circle_outline : Icons.cancel_outlined,
+          color: result.ok ? AppColors.ok : Theme.of(ctx).colorScheme.error,
+          size: 52,
         ),
+        title: Text(
+          result.ok
+              ? l('Código activado', 'Code activated')
+              : l('Código no activado', 'Code not activated'),
+        ),
+        content: Text(
+          '${code.trim()}\n\n${result.message ?? ''}',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l('Entendido', 'OK')),
+          ),
+        ],
       );
-    }
-    return true;
-  }
-  return false;
+    },
+  );
 }
 
 class _ActivateCodeDialog extends StatefulWidget {
@@ -232,9 +256,17 @@ class _ActivateCodeDialogState extends State<_ActivateCodeDialog> {
         _busy = false;
         _error = result.message;
       });
-      return;
     }
-    Navigator.pop(context, true);
+    // Campo vacío: basta el aviso bajo el campo.
+    if (_ctrl.text.trim().isNotEmpty) {
+      await showRedPosRedeemResultDialog(
+        context,
+        code: _ctrl.text,
+        result: result,
+      );
+      if (!mounted) return;
+    }
+    if (result.ok) Navigator.pop(context, true);
   }
 
   @override
@@ -270,6 +302,9 @@ class _ActivateCodeDialogState extends State<_ActivateCodeDialog> {
             controller: _ctrl,
             autofocus: true,
             textCapitalization: TextCapitalization.characters,
+            autocorrect: false,
+            enableSuggestions: false,
+            inputFormatters: [RedPosCodeInputFormatter()],
             enabled: !_busy,
             textAlign: TextAlign.center,
             style: const TextStyle(

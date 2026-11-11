@@ -18,6 +18,7 @@ import '../services/bluetooth_bond_channel.dart';
 import '../services/print_service.dart';
 import '../services/printer_permissions.dart';
 import '../services/printer_store.dart';
+import '../services/redpos/redpos_code.dart';
 import '../services/redpos/redpos_license.dart';
 import '../services/usb_printer_channel.dart';
 import '../services/transports/printer_transport.dart';
@@ -30,6 +31,7 @@ import '../widgets/logical_printer_settings.dart';
 import '../widgets/paper_width_selector.dart';
 import '../widgets/print_status_dialog.dart';
 import '../widgets/raster_scale_fields.dart';
+import '../widgets/redpos_ad_banner.dart';
 import '../widgets/redpos_unlock_actions.dart';
 
 class PrinterFormScreen extends StatefulWidget {
@@ -895,21 +897,24 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
         if (!result.ok) {
           await _rollbackUncommitted(unpair: true);
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                result.message ??
-                    tr(
-                      'No se pudo activar. Revisa el código o bórralo para '
-                          'guardar con publicidad.',
-                      'Could not activate. Check the code, or clear it to '
-                          'save with ads.',
-                    ),
-              ),
+          await showRedPosRedeemResultDialog(
+            context,
+            code: code,
+            result: RedPosRedeemResult(
+              ok: false,
+              adsFree: false,
+              message: '${result.message ?? ''}\n\n${tr(
+                'La impresora no se guardó. Revisa el código o bórralo para '
+                    'guardarla con publicidad.',
+                'The printer was not saved. Check the code, or clear it to '
+                    'save it with ads.',
+              )}',
             ),
           );
           return;
         }
+        await showRedPosRedeemResultDialog(context, code: code, result: result);
+        if (!mounted) return;
         _adsFree = true;
       } else {
         _adsFree = await RedPosLicenseStore.instance.isAdsFree();
@@ -1394,6 +1399,9 @@ class _PrinterFormScreenState extends State<PrinterFormScreen>
           TextFormField(
             controller: _codeCtrl,
             textCapitalization: TextCapitalization.characters,
+            autocorrect: false,
+            enableSuggestions: false,
+            inputFormatters: [RedPosCodeInputFormatter()],
             decoration: InputDecoration(
               labelText: l(
                 'Código de activación (opcional)',

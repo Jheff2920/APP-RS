@@ -44,6 +44,10 @@ class RedPosLicenseStore {
 
   SharedPreferences? _prefs;
 
+  /// Solo tests: responde en lugar del servidor de canje (`null` = aceptada).
+  @visibleForTesting
+  static Future<String?> Function(String code)? activateForTest;
+
   /// Solo tests: suelta el cache de SharedPreferences del singleton.
   @visibleForTesting
   void resetForTest({SharedPreferences? prefs}) {
@@ -151,19 +155,30 @@ class RedPosLicenseStore {
     final api = RedPosConfig.apiBase.trim();
     if (api.isNotEmpty) {
       try {
-        final accepted = await _activateOnServer(
-          api,
-          code: code.trim(),
-          address: address ?? '',
-        );
-        if (!accepted) {
+        final error = await (activateForTest?.call(code.trim()) ??
+            _activateOnServer(api, code: code.trim(), address: address ?? ''));
+        if (error != null) {
           return RedPosRedeemResult(
             ok: false,
             adsFree: false,
-            message: tr(
-              'Este código ya fue usado o el servidor lo rechazó',
-              'This code was already used or the server rejected it',
-            ),
+            message: switch (error) {
+              'used' => tr(
+                  'Este código ya fue usado. Cada código sirve para una sola '
+                      'instalación.',
+                  'This code was already used. Each code works for one '
+                      'install only.',
+                ),
+              'unknown' || 'invalid' => tr(
+                  'Este código no existe. Pide uno nuevo a Red Soluciones.',
+                  'This code does not exist. Ask Red Soluciones for a new one.',
+                ),
+              _ => tr(
+                  'No se pudo validar el código ahora. Inténtalo de nuevo en '
+                      'unos minutos.',
+                  'The code could not be checked right now. Try again in a '
+                      'few minutes.',
+                ),
+            },
           );
         }
       } catch (e) {
@@ -211,7 +226,8 @@ class RedPosLicenseStore {
     );
   }
 
-  Future<bool> _activateOnServer(
+  /// `null` si el servidor la aceptó; si no, su `error` (`used`, `unknown`…).
+  Future<String?> _activateOnServer(
     String apiBase, {
     required String code,
     required String address,
@@ -231,10 +247,18 @@ class RedPosLicenseStore {
       );
       final res = await req.close().timeout(const Duration(seconds: 8));
       final body = await utf8.decodeStream(res);
-      if (res.statusCode < 200 || res.statusCode >= 300) return false;
-      final decoded = jsonDecode(body);
-      if (decoded is Map && decoded['ok'] == true) return true;
-      return false;
+      Object? decoded;
+      try {
+        decoded = jsonDecode(body);
+      } on FormatException {
+        decoded = null;
+      }
+      final ok = res.statusCode >= 200 && res.statusCode < 300;
+      if (ok && decoded is Map && decoded['ok'] == true) return null;
+      if (decoded is Map && decoded['error'] is String) {
+        return decoded['error'] as String;
+      }
+      return 'http_${res.statusCode}';
     } finally {
       client.close(force: true);
     }

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/services.dart';
 
 import 'redpos_config.dart';
 import '../../l10n/app_lang.dart';
@@ -53,6 +54,34 @@ class RedPosCode {
 
   static String normalize(String input) {
     return input.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+  }
+
+  static final _pasted = RegExp(
+    r'RP[\s-]*([A-Z0-9]{4})[\s-]*([A-Z0-9]{4})[\s-]*([A-Z0-9]{4})',
+  );
+
+  /// Texto del campo al escribir o pegar: mayúsculas, `RP-` y guiones solos.
+  /// [deleting]: el usuario borró, así «RP-» vacío se puede quitar.
+  static String formatInput(String input, {bool deleting = false}) {
+    final upper = input.toUpperCase();
+    // Pegado desde un mensaje («Tu key: rp-abcd-efgh-ijkl»).
+    final m = _pasted.firstMatch(upper);
+    if (m != null) return 'RP-${m[1]}-${m[2]}-${m[3]}';
+    var body = normalize(upper);
+    // Una «R» sola puede ser el inicio del prefijo que escribe a mano.
+    if (body == 'R') return 'R';
+    // «RP» es el prefijo; un cuerpo de 12 pegado que empieza con RP se respeta.
+    if (upper.trimLeft().startsWith('RP-') ||
+        (body.startsWith('RP') && body.length != 12)) {
+      body = body.substring(2);
+    }
+    if (body.length > 12) body = body.substring(0, 12);
+    if (body.isEmpty) return deleting || upper.trim().isEmpty ? '' : 'RP-';
+    final groups = [
+      for (var i = 0; i < body.length; i += 4)
+        body.substring(i, min(i + 4, body.length)),
+    ];
+    return 'RP-${groups.join('-')}';
   }
 
   static RedPosCodeResult verify(String input, {String? secret}) {
@@ -114,6 +143,24 @@ class RedPosCode {
       diff |= a.codeUnitAt(i) ^ b.codeUnitAt(i);
     }
     return diff == 0;
+  }
+}
+
+/// Campo de key: aplica [RedPosCode.formatInput] mientras se escribe o pega.
+class RedPosCodeInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = RedPosCode.formatInput(
+      newValue.text,
+      deleting: newValue.text.length < oldValue.text.length,
+    );
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
   }
 }
 
