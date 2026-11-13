@@ -1,8 +1,9 @@
 # Impresoras lógicas independientes (Android)
 
-Rama: `feature/impresoras-logicas-independientes`. Validación física pendiente
-con el usuario: la compilación y las pruebas automáticas no certifican el
-protocolo ni el sensor de una HQ300 concreta.
+En `main` desde los commits `a78278c`/`78a1466`. Validación física por
+Bluetooth con TSPL confirmada por el usuario (2026-11-13): imprime etiquetas
+correctamente en una HQ300. La compilación y las pruebas automáticas no
+sustituyen esa validación en otro hardware.
 
 ## Configuración y prueba
 
