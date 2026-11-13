@@ -13,6 +13,7 @@ import '../widgets/print_status_dialog.dart';
 import 'escpos_pdf_print.dart';
 import 'escpos_test_page.dart';
 import 'drawer_wait.dart';
+import 'engagement_prompts_store.dart';
 import 'print_history_store.dart';
 import 'print_timing.dart';
 import 'label_print.dart';
@@ -36,8 +37,12 @@ class PrintService {
   PrintService({
     PrintHistoryStore? history,
     SunatPrintStore? sunatPrint,
+    EngagementPromptsStore? engagement,
   })  : _history = history ?? PrintHistoryStore(),
-        _sunatPrint = sunatPrint ?? SunatPrintStore();
+        _sunatPrint = sunatPrint ?? SunatPrintStore(),
+        _engagement = engagement ?? EngagementPromptsStore();
+
+  final EngagementPromptsStore _engagement;
 
   final PrintHistoryStore _history;
   final SunatPrintStore _sunatPrint;
@@ -380,6 +385,9 @@ class PrintService {
         status: PrintJobStatus.success,
         source: source,
       );
+      // No debe retrasar ni fallar el trabajo: solo cuenta para el aviso de
+      // valoración, que se decide luego en una pantalla con contexto visible.
+      unawaited(_engagement.recordSuccessfulPrint().catchError((_) {}));
     } catch (e) {
       timing.event('error', fields: {'error_type': e.runtimeType.toString()});
       _recordHistory(

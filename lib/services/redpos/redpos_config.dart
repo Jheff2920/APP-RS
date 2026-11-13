@@ -112,4 +112,21 @@ class RedPosConfig {
     return Uri.parse('https://wa.me/$digits');
   }
 
+  /// Comentario privado de quien califica con pocas estrellas (no va a Play).
+  static Uri feedbackMailtoUri({required int stars, String comment = ''}) {
+    final subject = Uri.encodeComponent(
+      isAppEnglish
+          ? 'RedPOS Service feedback ($stars★)'
+          : 'Comentario de RedPOS Service ($stars★)',
+    );
+    final trimmed = comment.trim();
+    final body = Uri.encodeComponent(
+      isAppEnglish
+          ? 'Rating: $stars of 5 stars.\n\n'
+              '${trimmed.isEmpty ? 'What could we improve?\n' : '$trimmed\n'}'
+          : 'Calificación: $stars de 5 estrellas.\n\n'
+              '${trimmed.isEmpty ? '¿Qué podemos mejorar?\n' : '$trimmed\n'}',
+    );
+    return Uri.parse('mailto:$supportEmail?subject=$subject&body=$body');
+  }
 }

@@ -10,6 +10,7 @@ import '../l10n/app_lang.dart';
 import '../models/saved_printer.dart';
 import '../platform_caps.dart';
 import '../services/bluetooth_bond_channel.dart';
+import '../services/engagement_prompts_store.dart';
 import '../services/print_service.dart';
 import '../services/printer_permissions.dart';
 import '../services/printer_store.dart';
@@ -19,6 +20,7 @@ import '../services/user_error.dart';
 import '../theme.dart';
 import '../widgets/print_status_dialog.dart';
 import '../widgets/printer_card.dart';
+import '../widgets/rating_prompt_dialog.dart';
 import '../widgets/redpos_ad_banner.dart';
 import '../widgets/ui_kit.dart';
 import 'help_screen.dart';
@@ -69,7 +71,38 @@ class _PrinterListScreenState extends State<PrinterListScreen> {
   void initState() {
     super.initState();
     _reload();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAskOverlay());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _runEngagementChecks());
+  }
+
+  /// Como mucho un aviso por apertura: la valoración pesa más que el
+  /// recordatorio de activación, así que se revisa primero.
+  Future<void> _runEngagementChecks() async {
+    await _maybeAskOverlay();
+    if (!mounted) return;
+    final askedRating = await _maybeShowRatingPrompt();
+    if (!mounted || askedRating) return;
+    await _maybeShowActivationReminder();
+  }
+
+  Future<bool> _maybeShowRatingPrompt() async {
+    final engagement = EngagementPromptsStore();
+    if (!await engagement.shouldShowRatingPrompt() || !mounted) return false;
+    await showRatingPromptDialog(context, store: engagement);
+    return true;
+  }
+
+  Future<void> _maybeShowActivationReminder() async {
+    final adsFree = await RedPosLicenseStore.instance.isAdsFree(reloadDisk: false);
+    if (adsFree) return;
+    final engagement = EngagementPromptsStore();
+    if (!await engagement.shouldShowActivationReminder() || !mounted) return;
+    await engagement.markActivationReminderShown();
+    if (!mounted) return;
+    await showUnlockOptionsSheet(
+      context: context,
+      store: widget.store,
+      onActivated: _reload,
+    );
   }
 
   Future<void> _maybeAskOverlay() async {
